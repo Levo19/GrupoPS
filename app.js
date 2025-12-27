@@ -194,10 +194,55 @@ function closeRoomEditor() {
     document.getElementById('modalRoomEditor').style.display = 'none';
 }
 
-function saveRoom(e) {
+function openNewRoom() {
+    document.getElementById('editRoomId').value = '';
+    document.getElementById('editNum').value = '';
+    document.getElementById('editTipo').value = 'Matrimonial';
+    document.getElementById('editPrecio').value = '';
+    document.getElementById('editEstado').value = 'Disponible';
+    document.getElementById('editFoto').value = '';
+    document.getElementById('modalRoomEditor').style.display = 'flex';
+}
+
+async function saveRoom(e) {
     e.preventDefault();
-    alert('Función de guardado pendiente de implementar en backend');
-    closeRoomEditor();
+    const btn = e.target.querySelector('button[type="submit"]');
+    const originalText = btn.innerText;
+
+    btn.disabled = true;
+    btn.innerText = 'Guardando...';
+
+    const roomData = {
+        id: document.getElementById('editRoomId').value,
+        numero: document.getElementById('editNum').value,
+        tipo: document.getElementById('editTipo').value,
+        precio: document.getElementById('editPrecio').value,
+        estado: document.getElementById('editEstado').value,
+        fotos: document.getElementById('editFoto').value
+    };
+
+    try {
+        const res = await fetch(CONFIG.API_URL, {
+            method: 'POST',
+            body: JSON.stringify({
+                action: 'saveHabitacion',
+                habitacion: roomData
+            })
+        });
+        const data = await res.json();
+
+        if (data.success) {
+            closeRoomEditor();
+            loadRoomsView(); // Refresh list
+        } else {
+            alert('Error: ' + data.error);
+        }
+    } catch (err) {
+        alert('Error de conexión: ' + err.message);
+    } finally {
+        btn.disabled = false;
+        btn.innerText = originalText;
+    }
 }
 
 function renderRooms(rooms) {
