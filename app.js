@@ -147,7 +147,55 @@ async function loadRoomsView() {
     }
 }
 
+function loadCalendarView() {
+    document.getElementById('view-calendar').innerHTML = `
+        <div style="text-align:center; padding: 50px; color: #64748B;">
+            <i class="fas fa-calendar-times" style="font-size: 3rem; margin-bottom: 15px; color: var(--primary);"></i>
+            <h3>Módulo en Construcción</h3>
+            <p>Aquí verás el calendario tipo Gantt.</p>
+        </div>
+    `;
+}
+
+// ===== ROOM EDITOR LOGIC =====
+let currentRoomsList = []; // Store fetched rooms to find by ID easily
+
+function editRoom(id) {
+    const room = currentRoomsList.find(r => r.id == id);
+    if (!room) return;
+
+    document.getElementById('editRoomId').value = room.id;
+    document.getElementById('editNum').value = room.numero;
+    document.getElementById('editTipo').value = room.tipo;
+    document.getElementById('editPrecio').value = room.precio;
+    document.getElementById('editEstado').value = room.estado;
+
+    // Photo logic
+    let photoUrl = '';
+    try {
+        if (room.fotos && room.fotos.startsWith('[')) {
+            photoUrl = JSON.parse(room.fotos)[0] || '';
+        } else {
+            photoUrl = room.fotos;
+        }
+    } catch (e) { photoUrl = room.fotos; }
+    document.getElementById('editFoto').value = photoUrl;
+
+    document.getElementById('modalRoomEditor').style.display = 'flex';
+}
+
+function closeRoomEditor() {
+    document.getElementById('modalRoomEditor').style.display = 'none';
+}
+
+function saveRoom(e) {
+    e.preventDefault();
+    alert('Función de guardado pendiente de implementar en backend');
+    closeRoomEditor();
+}
+
 function renderRooms(rooms) {
+    currentRoomsList = rooms; // Cache for editing
     const container = document.getElementById('view-rooms');
 
     if (rooms.length === 0) {
@@ -155,7 +203,7 @@ function renderRooms(rooms) {
             <div style="text-align:center; padding: 40px; background:white; border-radius:10px;">
                 <i class="fas fa-box-open" style="font-size:2rem; color:#cbd5e1;"></i>
                 <p>No hay habitaciones registradas.</p>
-                <button class="btn-login" style="width:auto; margin-top:10px;">+ Crear Primera Habitación</button>
+                <button class="btn-login" style="width:auto; margin-top:10px;" onclick="openNewRoom()">+ Crear Primera Habitación</button>
             </div>
         `;
         return;
@@ -213,14 +261,4 @@ function renderRooms(rooms) {
     html += '</div>';
 
     container.innerHTML = html;
-}
-
-function loadCalendarView() {
-    document.getElementById('view-calendar').innerHTML = `
-        <div style="text-align:center; padding: 50px; color: #64748B;">
-            <i class="fas fa-calendar-times" style="font-size: 3rem; margin-bottom: 15px; color: var(--primary);"></i>
-            <h3>Módulo en Construcción</h3>
-            <p>Aquí verás el calendario tipo Gantt.</p>
-        </div>
-    `;
 }
