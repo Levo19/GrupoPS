@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Grupo PS ERP</title>
+    <link rel="stylesheet" href="styles.css">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;800&display=swap" rel="stylesheet">
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- Config Script for Deploy URL -->
+    <script>
+        const CONFIG = {
+            // REEMPLAZAR CON TU URL DE DEPLOY DE GRUPO PS
+            API_URL: 'https://script.google.com/macros/s/AKfycbxJl95HxUzrgcgeuHTcwRxSK0syzYleEeofzeANmeQcbinIzbmCT2BOy_Dgj9My421Y/exec'
+        };
+    </script>
+</head>
+
+<body>
+
+    <!-- 1. LOGIN SCREEN -->
+    <div id="loginScreen" class="login-container">
+        <div class="shape shape-1"></div>
+        <div class="shape shape-2"></div>
+
+        <div class="login-card fade-in">
+            <div class="brand-logo">Grupo PS</div>
+            <p style="color: #cbd5e1; margin-bottom: 30px;">Plataforma de Gestión Integrada</p>
+
+            <form onsubmit="handleLogin(event)">
+                <div class="form-group">
+                    <label class="form-label">Email Corporativo</label>
+                    <input type="email" id="txtEmail" class="form-input" placeholder="usuario@grupops.com" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Contraseña</label>
+                    <input type="password" id="txtPassword" class="form-input" placeholder="••••••••" required>
+                </div>
+                <button type="submit" id="btnLogin" class="btn-login">
+                    Iniciar Sesión <i class="fas fa-arrow-right" style="margin-left:8px"></i>
+                </button>
+            </form>
+            <div id="loginError" style="color: #f87171; margin-top: 15px; font-size: 0.9rem; display: none;"></div>
+        </div>
+    </div>
+
+    <!-- 2. DASHBOARD LAYOUT (Hidden initially) -->
+    <div id="appContainer" class="app-container" style="display: none;">
+
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div style="margin-bottom: 40px; display: flex; align-items: center; gap: 10px;">
+                <div
+                    style="width: 35px; height: 35px; background: var(--primary); border-radius: 8px; display:flex; align-items:center; justify-content:center; color:white; font-weight:800;">
+                    PS</div>
+                <span style="font-weight: 800; font-size: 1.2rem; color: var(--text-main);">Grupo PS</span>
+            </div>
+
+            <nav>
+                <div
+                    style="font-size: 0.75rem; text-transform: uppercase; color: #94A3B8; font-weight: 700; margin-bottom: 10px; letter-spacing: 1px;">
+                    Principal</div>
+                <a href="#" class="nav-item active" onclick="navigate('dashboard')">
+                    <i class="fas fa-th-large"></i> Dashboard
+                </a>
+                <a href="#" class="nav-item" onclick="navigate('rooms')">
+                    <i class="fas fa-bed"></i> Habitaciones
+                </a>
+                <a href="#" class="nav-item" onclick="navigate('calendar')">
+                    <i class="fas fa-calendar-alt"></i> Calendario
+                </a>
+
+                <div
+                    style="font-size: 0.75rem; text-transform: uppercase; color: #94A3B8; font-weight: 700; margin-bottom: 10px; margin-top: 30px; letter-spacing: 1px;">
+                    Admin</div>
+                <a href="#" class="nav-item" onclick="navigate('users')">
+                    <i class="fas fa-users"></i> Usuarios
+                </a>
+                <a href="#" class="nav-item" style="color: #ef4444;" onclick="logout()">
+                    <i class="fas fa-sign-out-alt"></i> Salir
+                </a>
+            </nav>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Header -->
+            <header style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px;">
+                <h1 id="pageTitle" style="font-size: 1.8rem; font-weight: 700; color: var(--text-main);">Dashboard</h1>
+                <div style="display: flex; align-items: center; gap: 15px;">
+                    <div style="text-align: right;">
+                        <div id="userDisplay" style="font-weight: 600; font-size: 0.9rem;">Admin User</div>
+                        <div id="roleDisplay" style="font-size: 0.8rem; color: #64748B;">Administrador</div>
+                    </div>
+                    <div style="width: 40px; height: 40px; background: #e2e8f0; border-radius: 50%; overflow: hidden;">
+                        <img src="https://ui-avatars.com/api/?name=Admin+User&background=0F766E&color=fff" alt="User">
+                    </div>
+                </div>
+            </header>
+
+            <!-- Dynamic Views -->
+            <div id="viewArea">
+                <!-- VISTA: DASHBOARD -->
+                <div id="view-dashboard" class="fade-in">
+                    <div class="dash-grid">
+                        <!-- Stat 1 -->
+                        <div class="stat-card">
+                            <div>
+                                <div class="stat-value">85%</div>
+                                <div class="stat-label">Ocupación Hoy</div>
+                            </div>
+                            <div class="icon-box" style="background: #ccfbf1; color: var(--primary);">
+                                <i class="fas fa-percentage"></i>
+                            </div>
+                        </div>
+                        <!-- Stat 2 -->
+                        <div class="stat-card">
+                            <div>
+                                <div class="stat-value">12</div>
+                                <div class="stat-label">Check-ins Pendientes</div>
+                            </div>
+                            <div class="icon-box" style="background: #ffedd5; color: var(--accent);">
+                                <i class="fas fa-suitcase-rolling"></i>
+                            </div>
+                        </div>
+                        <!-- Stat 3 -->
+                        <div class="stat-card">
+                            <div>
+                                <div class="stat-value">03</div>
+                                <div class="stat-label">Limpieza Requerida</div>
+                            </div>
+                            <div class="icon-box" style="background: #fee2e2; color: #ef4444;">
+                                <i class="fas fa-broom"></i>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Recent Activity Placeholder -->
+                    <div
+                        style="background: white; border-radius: var(--radius-l); padding: 25px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);">
+                        <h3 style="margin-bottom: 20px; color: var(--text-main);">Llegadas de Hoy</h3>
+                        <table style="width: 100%; border-collapse: collapse;">
+                            <thead>
+                                <tr style="text-align: left; color: #64748B; border-bottom: 2px solid #f1f5f9;">
+                                    <th style="padding: 10px;">Huésped</th>
+                                    <th style="padding: 10px;">Habitación</th>
+                                    <th style="padding: 10px;">Estado</th>
+                                    <th style="padding: 10px;">Acción</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr style="border-bottom: 1px solid #f1f5f9;">
+                                    <td style="padding: 15px 10px;">Juan Perez</td>
+                                    <td style="padding: 15px 10px;"><span
+                                            style="background: #e0f2fe; color: #0284c7; padding: 4px 8px; border-radius: 6px; font-size: 0.85rem; font-weight: 600;">101</span>
+                                    </td>
+                                    <td style="padding: 15px 10px; color: #f59e0b; font-weight: 600;">Pendiente</td>
+                                    <td style="padding: 15px 10px;"><button
+                                            style="border:none; background: var(--primary); color: white; padding: 6px 12px; border-radius: 6px; cursor: pointer;">Check-In</button>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- OTRAS VISTAS (Se inyectarán luego) -->
+                <div id="view-rooms" style="display:none;"></div>
+                <div id="view-calendar" style="display:none;"></div>
+            </div>
+
+        </main>
+    </div>
+
+    <!-- 3. MODAL: ROOM EDITOR -->
+    <div id="modalRoomEditor" class="modal-backdrop" onclick="if(event.target === this) closeRoomEditor()">
+        <div class="login-card fade-in"
+            style="width: 500px; max-width: 95%; background: white; color: var(--text-main); margin: auto; text-align: left;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+                <h2 style="color:var(--primary);">Editar Habitación</h2>
+                <button onclick="closeRoomEditor()"
+                    style="border:none; background:transparent; font-size:1.5rem; cursor:pointer;">&times;</button>
+            </div>
+
+            <form id="formRoom" onsubmit="saveRoom(event)">
+                <input type="hidden" id="editRoomId">
+                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:15px;">
+                    <div class="form-group">
+                        <label class="form-label" style="color:#64748B;">Número</label>
+                        <input type="text" id="editNum" class="form-input"
+                            style="color:black; background:#f1f5f9; border:1px solid #cbd5e1;" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" style="color:#64748B;">Tipo</label>
+                        <select id="editTipo" class="form-input"
+                            style="color:black; background:#f1f5f9; border:1px solid #cbd5e1;">
+                            <option value="Matrimonial">Matrimonial</option>
+                            <option value="Doble">Doble</option>
+                            <option value="Suite">Suite</option>
+                            <option value="Familiar">Familiar</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:15px;">
+                    <div class="form-group">
+                        <label class="form-label" style="color:#64748B;">Precio Base (S/)</label>
+                        <input type="number" id="editPrecio" class="form-input"
+                            style="color:black; background:#f1f5f9; border:1px solid #cbd5e1;" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" style="color:#64748B;">Estado</label>
+                        <select id="editEstado" class="form-input"
+                            style="color:black; background:#f1f5f9; border:1px solid #cbd5e1;">
+                            <option value="Disponible">Disponible</option>
+                            <option value="Ocupado">Ocupado</option>
+                            <option value="Mantenimiento">Mantenimiento</option>
+                            <option value="Sucio">Sucio</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" style="color:#64748B;">URL Foto Principal</label>
+                    <input type="url" id="editFoto" class="form-input"
+                        style="color:black; background:#f1f5f9; border:1px solid #cbd5e1;" placeholder="https://...">
+                </div>
+
+                <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px;">
+                    <button type="button" onclick="closeRoomEditor()"
+                        style="padding:10px 20px; border:1px solid #cbd5e1; background:white; border-radius:8px; cursor:pointer;">Cancelar</button>
+                    <button type="submit" class="btn-login" style="width:auto; margin-top:0;">Guardar Cambios</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- CSS Quick Fix for Modal -->
+    <style>
+        .modal-backdrop {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(5px);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+        }
+    </style>
+
+    <script src="app.js"></script>
+</body>
+
+</html>
