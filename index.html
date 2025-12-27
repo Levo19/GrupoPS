@@ -171,6 +171,7 @@
                 <!-- OTRAS VISTAS (Se inyectarán luego) -->
                 <div id="view-rooms" style="display:none;"></div>
                 <div id="view-calendar" style="display:none;"></div>
+                <div id="view-users" style="display:none;"></div>
             </div>
 
         </main>
@@ -234,6 +235,67 @@
                     <button type="button" onclick="closeRoomEditor()"
                         style="padding:10px 20px; border:1px solid #cbd5e1; background:white; border-radius:8px; cursor:pointer;">Cancelar</button>
                     <button type="submit" class="btn-login" style="width:auto; margin-top:0;">Guardar Cambios</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="modalUserEditor" class="modal-backdrop" onclick="if(event.target === this) closeUserEditor()">
+        <div class="login-card fade-in"
+            style="width: 500px; max-width: 95%; background: white; color: var(--text-main); margin: auto; text-align: left;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+                <h2 style="color:var(--primary);">Gestión Usuario</h2>
+                <button onclick="closeUserEditor()"
+                    style="border:none; background:transparent; font-size:1.5rem; cursor:pointer;">&times;</button>
+            </div>
+
+            <form id="formUser" onsubmit="saveUser(event)">
+                <input type="hidden" id="editUserId">
+
+                <div class="form-group">
+                    <label class="form-label" style="color:#64748B;">Nombre Completo</label>
+                    <input type="text" id="editUserNombre" class="form-input"
+                        style="color:black; background:#f1f5f9; border:1px solid #cbd5e1;" required>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" style="color:#64748B;">Email Corporativo</label>
+                    <input type="email" id="editUserEmail" class="form-input"
+                        style="color:black; background:#f1f5f9; border:1px solid #cbd5e1;" required>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" style="color:#64748B;">Contraseña <small>(Dejar en blanco para no
+                            cambiar)</small></label>
+                    <input type="password" id="editUserPass" class="form-input"
+                        style="color:black; background:#f1f5f9; border:1px solid #cbd5e1;" placeholder="••••••">
+                </div>
+
+                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:15px;">
+                    <div class="form-group">
+                        <label class="form-label" style="color:#64748B;">Rol</label>
+                        <select id="editUserRol" class="form-input"
+                            style="color:black; background:#f1f5f9; border:1px solid #cbd5e1;">
+                            <option value="Admin">Administrador</option>
+                            <option value="Recepcion">Recepción</option>
+                            <option value="Limpieza">Limpieza</option>
+                            <option value="Tours">Gestor Tours</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" style="color:#64748B;">Estado</label>
+                        <select id="editUserEstado" class="form-input"
+                            style="color:black; background:#f1f5f9; border:1px solid #cbd5e1;">
+                            <option value="Activo">Activo</option>
+                            <option value="Inactivo">Inactivo</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px;">
+                    <button type="button" onclick="closeUserEditor()"
+                        style="padding:10px 20px; border:1px solid #cbd5e1; background:white; border-radius:8px; cursor:pointer;">Cancelar</button>
+                    <button type="submit" class="btn-login" style="width:auto; margin-top:0;">Guardar Usuario</button>
                 </div>
             </form>
         </div>
