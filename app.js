@@ -319,41 +319,43 @@ function renderRooms(rooms) {
     });
     html += '</div>';
 
+    container.innerHTML = html;
+}
 
-    // ===== USERS MODULE =====
-    let currentUsersList = [];
+// ===== USERS MODULE =====
+let currentUsersList = [];
 
-    async function loadUsersView() {
-        const container = document.getElementById('view-users');
-        container.innerHTML = `
+async function loadUsersView() {
+    const container = document.getElementById('view-users');
+    container.innerHTML = `
         <div style="text-align:center; padding: 50px;">
             <i class="fas fa-spinner fa-spin" style="font-size: 2rem; color: var(--primary);"></i>
             <p style="margin-top:15px; color:#64748B;">Cargando usuarios...</p>
         </div>
     `;
 
-        try {
-            const res = await fetch(CONFIG.API_URL, {
-                method: 'POST',
-                body: JSON.stringify({ action: 'getUsuarios' })
-            });
-            const data = await res.json();
+    try {
+        const res = await fetch(CONFIG.API_URL, {
+            method: 'POST',
+            body: JSON.stringify({ action: 'getUsuarios' })
+        });
+        const data = await res.json();
 
-            if (data.success) {
-                currentUsersList = data.usuarios;
-                renderUsers(data.usuarios);
-            } else {
-                container.innerHTML = `<div style="color:red; text-align:center;">Error: ${data.error}</div>`;
-            }
-        } catch (e) {
-            container.innerHTML = `<div style="color:red; text-align:center;">Error de conexión: ${e.message}</div>`;
+        if (data.success) {
+            currentUsersList = data.usuarios;
+            renderUsers(data.usuarios);
+        } else {
+            container.innerHTML = `<div style="color:red; text-align:center;">Error: ${data.error}</div>`;
         }
+    } catch (e) {
+        container.innerHTML = `<div style="color:red; text-align:center;">Error de conexión: ${e.message}</div>`;
     }
+}
 
-    function renderUsers(users) {
-        const container = document.getElementById('view-users');
+function renderUsers(users) {
+    const container = document.getElementById('view-users');
 
-        let html = `
+    let html = `
     <div style="display:flex; justify-content:flex-end; margin-bottom:20px;">
         <button class="btn-login" style="width:auto;" onclick="openNewUser()">+ Nuevo Usuario</button>
     </div>
@@ -371,16 +373,16 @@ function renderRooms(rooms) {
             <tbody>
     `;
 
-        users.forEach(u => {
-            let roleColor = '#64748B';
-            if (u.rol === 'Admin') roleColor = 'var(--primary)';
-            if (u.rol === 'Tours') roleColor = 'var(--accent)';
+    users.forEach(u => {
+        let roleColor = '#64748B';
+        if (u.rol === 'Admin') roleColor = 'var(--primary)';
+        if (u.rol === 'Tours') roleColor = 'var(--accent)';
 
-            let statusBadge = u.estado === 'Activo'
-                ? `<span style="background:#dcfce7; color:#166534; padding:4px 8px; border-radius:6px; font-size:0.8rem; font-weight:600;">Activo</span>`
-                : `<span style="background:#f1f5f9; color:#64748B; padding:4px 8px; border-radius:6px; font-size:0.8rem; font-weight:600;">Inactivo</span>`;
+        let statusBadge = u.estado === 'Activo'
+            ? `<span style="background:#dcfce7; color:#166534; padding:4px 8px; border-radius:6px; font-size:0.8rem; font-weight:600;">Activo</span>`
+            : `<span style="background:#f1f5f9; color:#64748B; padding:4px 8px; border-radius:6px; font-size:0.8rem; font-weight:600;">Inactivo</span>`;
 
-            html += `
+        html += `
         <tr style="border-bottom:1px solid #f1f5f9;">
             <td style="padding:15px; font-weight:600;">${u.nombre}</td>
             <td style="padding:15px;">${u.email}</td>
@@ -391,77 +393,77 @@ function renderRooms(rooms) {
             </td>
         </tr>
         `;
+    });
+
+    html += '</tbody></table></div>';
+    container.innerHTML = html;
+}
+
+function openNewUser() {
+    document.getElementById('editUserId').value = '';
+    document.getElementById('editUserNombre').value = '';
+    document.getElementById('editUserEmail').value = '';
+    document.getElementById('editUserPass').value = '';
+    document.getElementById('editUserRol').value = 'Recepcion';
+    document.getElementById('editUserEstado').value = 'Activo';
+    document.getElementById('modalUserEditor').style.display = 'flex';
+}
+
+function editUser(id) {
+    const user = currentUsersList.find(u => u.id == id);
+    if (!user) return;
+
+    document.getElementById('editUserId').value = user.id;
+    document.getElementById('editUserNombre').value = user.nombre;
+    document.getElementById('editUserEmail').value = user.email;
+    document.getElementById('editUserPass').value = ''; // Blank to keep existing
+    document.getElementById('editUserRol').value = user.rol;
+    document.getElementById('editUserEstado').value = user.estado;
+
+    document.getElementById('modalUserEditor').style.display = 'flex';
+}
+
+function closeUserEditor() {
+    document.getElementById('modalUserEditor').style.display = 'none';
+}
+
+async function saveUser(e) {
+    e.preventDefault();
+    const btn = e.target.querySelector('button[type="submit"]');
+    btn.innerText = 'Guardando...';
+    btn.disabled = true;
+
+    const userData = {
+        id: document.getElementById('editUserId').value,
+        nombre: document.getElementById('editUserNombre').value,
+        email: document.getElementById('editUserEmail').value,
+        password: document.getElementById('editUserPass').value,
+        rol: document.getElementById('editUserRol').value,
+        estado: document.getElementById('editUserEstado').value,
+    };
+
+    try {
+        const res = await fetch(CONFIG.API_URL, {
+            method: 'POST',
+            body: JSON.stringify({ action: 'saveUsuario', usuario: userData })
         });
+        const data = await res.json();
 
-        html += '</tbody></table></div>';
-        container.innerHTML = html;
-    }
-
-    function openNewUser() {
-        document.getElementById('editUserId').value = '';
-        document.getElementById('editUserNombre').value = '';
-        document.getElementById('editUserEmail').value = '';
-        document.getElementById('editUserPass').value = '';
-        document.getElementById('editUserRol').value = 'Recepcion';
-        document.getElementById('editUserEstado').value = 'Activo';
-        document.getElementById('modalUserEditor').style.display = 'flex';
-    }
-
-    function editUser(id) {
-        const user = currentUsersList.find(u => u.id == id);
-        if (!user) return;
-
-        document.getElementById('editUserId').value = user.id;
-        document.getElementById('editUserNombre').value = user.nombre;
-        document.getElementById('editUserEmail').value = user.email;
-        document.getElementById('editUserPass').value = ''; // Blank to keep existing
-        document.getElementById('editUserRol').value = user.rol;
-        document.getElementById('editUserEstado').value = user.estado;
-
-        document.getElementById('modalUserEditor').style.display = 'flex';
-    }
-
-    function closeUserEditor() {
-        document.getElementById('modalUserEditor').style.display = 'none';
-    }
-
-    async function saveUser(e) {
-        e.preventDefault();
-        const btn = e.target.querySelector('button[type="submit"]');
-        btn.innerText = 'Guardando...';
-        btn.disabled = true;
-
-        const userData = {
-            id: document.getElementById('editUserId').value,
-            nombre: document.getElementById('editUserNombre').value,
-            email: document.getElementById('editUserEmail').value,
-            password: document.getElementById('editUserPass').value,
-            rol: document.getElementById('editUserRol').value,
-            estado: document.getElementById('editUserEstado').value,
-        };
-
-        try {
-            const res = await fetch(CONFIG.API_URL, {
-                method: 'POST',
-                body: JSON.stringify({ action: 'saveUsuario', usuario: userData })
-            });
-            const data = await res.json();
-
-            if (data.success) {
-                closeUserEditor();
-                loadUsersView();
-                // Re-login if updating self? No, keep simple.
-            } else {
-                alert('Error: ' + data.error);
-            }
-        } catch (err) {
-            alert('Error: ' + err.message);
-        } finally {
-            btn.innerText = 'Guardar Usuario';
-            btn.disabled = false;
+        if (data.success) {
+            closeUserEditor();
+            loadUsersView();
+            // Re-login if updating self? No, keep simple.
+        } else {
+            alert('Error: ' + data.error);
         }
+    } catch (err) {
+        alert('Error: ' + err.message);
+    } finally {
+        btn.innerText = 'Guardar Usuario';
+        btn.disabled = false;
     }
-} // Fixed missing brace
+}
+
 
 // ===== PRODUCTS MODULE =====
 let currentProductsList = [];
