@@ -141,15 +141,11 @@ async function loadRoomsView() {
     `;
 
     try {
-        const res = await fetch(CONFIG.API_URL + '?action=getHabitaciones'); // GET for simplicity in reading
-        // But code.gs is doPost mostly. Let's check code.gs.
-        // It supports doGet (index) and doPost (actions).
-        // Let's use POST for actions standard.
-        const resPost = await fetch(CONFIG.API_URL, {
+        const res = await fetch(CONFIG.API_URL, {
             method: 'POST',
             body: JSON.stringify({ action: 'getHabitaciones' })
         });
-        const data = await resPost.json();
+        const data = await res.json();
 
         if (data.success) {
             renderRooms(data.habitaciones);
