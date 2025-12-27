@@ -16,6 +16,12 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 });
 
+function showLogin() {
+    document.getElementById('loginScreen').style.display = 'flex';
+    document.getElementById('loginScreen').style.opacity = '1';
+    document.getElementById('appContainer').style.display = 'none';
+}
+
 // ===== AUTHENTICATION =====
 async function handleLogin(e) {
     e.preventDefault();
