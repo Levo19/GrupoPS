@@ -304,9 +304,14 @@ function renderRooms(rooms) {
                     <span><i class="fas fa-bed"></i> ${r.camas}</span>
                 </div>
 
-                <div class="room-actions">
-                    <button class="btn-icon" title="Editar" onclick="editRoom('${r.id}')"><i class="fas fa-edit"></i></button>
-                    <button class="btn-icon" title="Calendario"><i class="fas fa-calendar"></i></button>
+                <div class="room-actions" style="justify-content:space-between; width:100%;">
+                    ${r.estado === 'Disponible'
+                ? `<button onclick="openCheckIn('${r.numero}')" style="background:#22c55e; color:white; border:none; padding:6px 12px; border-radius:6px; cursor:pointer; font-size:0.85rem; display:flex; align-items:center; gap:5px;"><i class="fas fa-check"></i> Check-In</button>`
+                : r.estado === 'Ocupado'
+                    ? `<button style="background:#eab308; color:white; border:none; padding:6px 12px; border-radius:6px; cursor:pointer; font-size:0.85rem; display:flex; align-items:center; gap:5px;"><i class="fas fa-concierge-bell"></i> Gestionar</button>`
+                    : ''
+            }
+                    <button class="btn-icon" title="Editar" onclick="editRoom('${r.id}')"><i class="fas fa-pen"></i></button>
                     ${r.estado === 'Sucio' ? `<button class="btn-icon" title="Marcar Limpio" style="color:var(--primary);"><i class="fas fa-broom"></i></button>` : ''}
                 </div>
             </div>
@@ -316,6 +321,68 @@ function renderRooms(rooms) {
     html += '</div>';
 
     container.innerHTML = html;
+}
+
+// ===== CHECK-IN LOGIC (PHASE 5) =====
+function openCheckIn(roomNum) {
+    document.getElementById('checkInRoomId').value = roomNum;
+    document.getElementById('checkInRoomNum').innerText = 'Habitación ' + roomNum;
+    document.getElementById('formCheckIn').reset();
+
+    // Default checkout: Tomorrow 11:00 AM
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    tomorrow.setHours(11, 0, 0, 0);
+    // Format for datetime-local: YYYY-MM-DDTHH:mm
+    const toISO = (date) => {
+        const pad = n => n < 10 ? '0' + n : n;
+        return date.getFullYear() + '-' + pad(date.getMonth() + 1) + '-' + pad(date.getDate()) + 'T' + pad(date.getHours()) + ':' + pad(date.getMinutes());
+    };
+    document.getElementById('checkInSalida').value = toISO(tomorrow);
+
+    document.getElementById('modalCheckIn').style.display = 'flex';
+}
+
+function closeCheckIn() {
+    document.getElementById('modalCheckIn').style.display = 'none';
+}
+
+async function processCheckIn(e) {
+    e.preventDefault();
+
+    const submitBtn = e.target.querySelector('button[type="submit"]');
+    const originalText = submitBtn.innerText;
+    submitBtn.innerText = 'Procesando...';
+    submitBtn.disabled = true;
+
+    const data = {
+        action: 'checkIn',
+        habitacionId: document.getElementById('checkInRoomId').value,
+        cliente: document.getElementById('checkInCliente').value,
+        fechaSalida: document.getElementById('checkInSalida').value,
+        notas: document.getElementById('checkInNotas').value
+    };
+
+    try {
+        const res = await fetch(CONFIG.API_URL, {
+            method: 'POST',
+            body: JSON.stringify(data)
+        });
+        const result = await res.json();
+
+        if (result.success) {
+            alert('✅ Check-in realizado con éxito');
+            closeCheckIn();
+            loadRoomsView(); // Refresh UI to show 'Occupied'
+        } else {
+            alert('❌ Error: ' + result.error);
+        }
+    } catch (error) {
+        alert('❌ Error de conexión: ' + error.message);
+    } finally {
+        submitBtn.innerText = originalText;
+        submitBtn.disabled = false;
+    }
 }
 
 // ===== USERS MODULE =====
@@ -529,7 +596,7 @@ function renderProducts(products) {
         if (p.categoria === 'Bebidas') catColor = '#3b82f6';
         if (p.categoria === 'Snacks') catColor = '#eab308';
 
-        let imgTag = p.imagen ? `<img src="${p.imagen}" style="width:40px; height:40px; border-radius:4px; object-fit:cover;">` : '<div style="width:40px; height:40px; background:#f1f5f9; border-radius:4px;"></div>';
+        let imgTag = p.imagen_url ? `<img src="${p.imagen_url}" style="width:40px; height:40px; border-radius:4px; object-fit:cover;">` : '<div style="width:40px; height:40px; background:#f1f5f9; border-radius:4px;"></div>';
 
         html += `
         <tr style="border-bottom:1px solid #f1f5f9;">
@@ -581,7 +648,7 @@ function editProduct(id) {
     document.getElementById('editProdDesc').value = p.descripcion;
     document.getElementById('editProdPrecio').value = p.precio;
     document.getElementById('editProdStock').value = p.stock;
-    document.getElementById('editProdImg').value = p.imagen;
+    document.getElementById('editProdImg').value = p.imagen_url;
     document.getElementById('editProdActivo').value = p.activo;
     document.getElementById('editProdEmpresa').value = p.empresa;
 
@@ -605,7 +672,7 @@ async function saveProduct(e) {
         descripcion: document.getElementById('editProdDesc').value,
         precio: document.getElementById('editProdPrecio').value,
         stock: document.getElementById('editProdStock').value,
-        imagen: document.getElementById('editProdImg').value,
+        imagen_url: document.getElementById('editProdImg').value,
         activo: document.getElementById('editProdActivo').value,
         empresa: document.getElementById('editProdEmpresa').value
     };
