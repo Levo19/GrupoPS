@@ -123,6 +123,10 @@ function navigate(viewId) {
         document.getElementById('view-users').style.display = 'block';
         title.innerText = 'Gestión de Usuarios';
         loadUsersView();
+    } else if (viewId === 'products') {
+        document.getElementById('view-products').style.display = 'block';
+        title.innerText = 'Inventario Productos & Servicios';
+        loadProductsView();
     }
 }
 
@@ -457,3 +461,173 @@ function renderRooms(rooms) {
             btn.disabled = false;
         }
     }
+} // Fixed missing brace
+
+// ===== PRODUCTS MODULE =====
+let currentProductsList = [];
+
+async function loadProductsView() {
+    const container = document.getElementById('view-products');
+    container.innerHTML = `
+        <div style="text-align:center; padding: 50px;">
+            <i class="fas fa-spinner fa-spin" style="font-size: 2rem; color: var(--primary);"></i>
+            <p style="margin-top:15px; color:#64748B;">Cargando inventario...</p>
+        </div>
+    `;
+
+    try {
+        const res = await fetch(CONFIG.API_URL, {
+            method: 'POST',
+            body: JSON.stringify({ action: 'getProductos' })
+        });
+        const data = await res.json();
+
+        if (data.success) {
+            currentProductsList = data.productos;
+            renderProducts(data.productos);
+        } else {
+            container.innerHTML = `<div style="color:red; text-align:center;">Error: ${data.error}</div>`;
+        }
+    } catch (e) {
+        container.innerHTML = `<div style="color:red; text-align:center;">Error de conexión: ${e.message}</div>`;
+    }
+}
+
+function renderProducts(products) {
+    const container = document.getElementById('view-products');
+
+    // Group by category for cleaner view if needed, but table is fine for now
+    let html = `
+    <div style="display:flex; justify-content:space-between; margin-bottom:20px;">
+        <div style="display:flex; gap:10px;">
+             <button class="btn-login" style="width:auto; background:#64748B;" onclick="renderProducts(currentProductsList)">Todos</button>
+             <button class="btn-login" style="width:auto; background:#eab308;" onclick="filterProducts('Snacks')">Snacks</button>
+             <button class="btn-login" style="width:auto; background:#3b82f6;" onclick="filterProducts('Bebidas')">Bebidas</button>
+             <button class="btn-login" style="width:auto; background:#10b981;" onclick="filterProducts('Tours')">Tours</button>
+        </div>
+        <button class="btn-login" style="width:auto;" onclick="openNewProduct()">+ Nuevo Producto</button>
+    </div>
+    
+    <div style="background:white; border-radius:var(--radius-l); padding:20px; box-shadow:0 4px 10px rgba(0,0,0,0.05);">
+        <table style="width:100%; border-collapse:collapse;">
+            <thead>
+                <tr style="text-align:left; color:#64748B; border-bottom:2px solid #f1f5f9;">
+                    <th style="padding:15px;">Img</th>
+                    <th style="padding:15px;">Producto</th>
+                    <th style="padding:15px;">Categoría</th>
+                    <th style="padding:15px;">Empresa</th>
+                    <th style="padding:15px;">Precio</th>
+                    <th style="padding:15px;">Stock</th>
+                    <th style="padding:15px;">Estado</th>
+                    <th style="padding:15px;">Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+    `;
+
+    products.forEach(p => {
+        let catColor = '#64748B';
+        if (p.categoria === 'Tours') catColor = '#10b981';
+        if (p.categoria === 'Bebidas') catColor = '#3b82f6';
+        if (p.categoria === 'Snacks') catColor = '#eab308';
+
+        let imgTag = p.imagen ? `<img src="${p.imagen}" style="width:40px; height:40px; border-radius:4px; object-fit:cover;">` : '<div style="width:40px; height:40px; background:#f1f5f9; border-radius:4px;"></div>';
+
+        html += `
+        <tr style="border-bottom:1px solid #f1f5f9;">
+            <td style="padding:15px;">${imgTag}</td>
+            <td style="padding:15px;">
+                <div style="font-weight:600;">${p.nombre}</div>
+                <div style="font-size:0.8rem; color:#94a3b8;">${p.descripcion || ''}</div>
+            </td>
+            <td style="padding:15px;"><span style="color:${catColor}; font-weight:bold;">${p.categoria}</span></td>
+            <td style="padding:15px;">${p.empresa}</td>
+            <td style="padding:15px;">S/ ${p.precio}</td>
+            <td style="padding:15px; font-weight:bold;">${p.stock}</td>
+            <td style="padding:15px;">${p.activo}</td>
+            <td style="padding:15px;">
+                <button class="btn-icon" onclick="editProduct('${p.id}')"><i class="fas fa-edit"></i></button>
+            </td>
+        </tr>
+        `;
+    });
+    html += '</tbody></table></div>';
+    container.innerHTML = html;
+}
+
+function filterProducts(cat) {
+    const filtered = currentProductsList.filter(p => p.categoria === cat);
+    renderProducts(filtered);
+}
+
+function openNewProduct() {
+    document.getElementById('editProdId').value = '';
+    document.getElementById('editProdCat').value = 'Bebidas';
+    document.getElementById('editProdNombre').value = '';
+    document.getElementById('editProdDesc').value = '';
+    document.getElementById('editProdPrecio').value = '';
+    document.getElementById('editProdStock').value = '';
+    document.getElementById('editProdImg').value = '';
+    document.getElementById('editProdActivo').value = 'Activo';
+    document.getElementById('editProdEmpresa').value = 'CasaMunay';
+    document.getElementById('modalProductEditor').style.display = 'flex';
+}
+
+function editProduct(id) {
+    const p = currentProductsList.find(x => x.id == id);
+    if (!p) return;
+
+    document.getElementById('editProdId').value = p.id;
+    document.getElementById('editProdCat').value = p.categoria;
+    document.getElementById('editProdNombre').value = p.nombre;
+    document.getElementById('editProdDesc').value = p.descripcion;
+    document.getElementById('editProdPrecio').value = p.precio;
+    document.getElementById('editProdStock').value = p.stock;
+    document.getElementById('editProdImg').value = p.imagen;
+    document.getElementById('editProdActivo').value = p.activo;
+    document.getElementById('editProdEmpresa').value = p.empresa;
+
+    document.getElementById('modalProductEditor').style.display = 'flex';
+}
+
+function closeProductEditor() {
+    document.getElementById('modalProductEditor').style.display = 'none';
+}
+
+async function saveProduct(e) {
+    e.preventDefault();
+    const btn = e.target.querySelector('button[type="submit"]');
+    btn.innerText = 'Guardando...';
+    btn.disabled = true;
+
+    const prodData = {
+        id: document.getElementById('editProdId').value,
+        categoria: document.getElementById('editProdCat').value,
+        nombre: document.getElementById('editProdNombre').value,
+        descripcion: document.getElementById('editProdDesc').value,
+        precio: document.getElementById('editProdPrecio').value,
+        stock: document.getElementById('editProdStock').value,
+        imagen: document.getElementById('editProdImg').value,
+        activo: document.getElementById('editProdActivo').value,
+        empresa: document.getElementById('editProdEmpresa').value
+    };
+
+    try {
+        const res = await fetch(CONFIG.API_URL, {
+            method: 'POST',
+            body: JSON.stringify({ action: 'saveProducto', producto: prodData })
+        });
+        const data = await res.json();
+        if (data.success) {
+            closeProductEditor();
+            loadProductsView();
+        } else {
+            alert('Error: ' + data.error);
+        }
+    } catch (err) {
+        alert('Error: ' + err.message);
+    } finally {
+        btn.innerText = 'Guardar';
+        btn.disabled = false;
+    }
+}
