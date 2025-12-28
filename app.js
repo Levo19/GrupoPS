@@ -1378,8 +1378,11 @@ function renderCalendarTimeline(rooms, reservations) {
                 const end = new Date(res.fechaSalida);
                 const current = new Date(date).setHours(0, 0, 0, 0);
                 const s = new Date(start).setHours(0, 0, 0, 0);
-                const e = new Date(end).setHours(0, 0, 0, 0);
-                return current >= s && current < e;
+                // Ensure at least 1 day block if start == end (checked out same day)
+                let eTime = new Date(end).setHours(0, 0, 0, 0);
+                if (eTime <= s) eTime = s + 86400000;
+
+                return current >= s && current < eTime;
             });
 
             if (res) {
@@ -1389,8 +1392,11 @@ function renderCalendarTimeline(rooms, reservations) {
                 } else if (res.estado === 'Reserva' || res.estado === 'Pendiente') {
                     cellColor = colorFuture;
                     cellTitle = 'Reservado: ' + res.cliente;
+                } else if (res.estado === 'Finalizada') {
+                    cellColor = colorPast; // Grey
+                    cellTitle = 'Finalizado: ' + res.cliente;
                 }
-                cellText = res.cliente.split(' ')[0];
+                cellText = res.cliente ? res.cliente.split(' ')[0] : 'N/A';
             }
 
             if (cellColor) {
