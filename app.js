@@ -160,15 +160,7 @@ async function loadRoomsView() {
     }
 }
 
-function loadCalendarView() {
-    document.getElementById('view-calendar').innerHTML = `
-        <div style="text-align:center; padding: 50px; color: #64748B;">
-            <i class="fas fa-calendar-times" style="font-size: 3rem; margin-bottom: 15px; color: var(--primary);"></i>
-            <h3>Módulo en Construcción</h3>
-            <p>Aquí verás el calendario tipo Gantt.</p>
-        </div>
-    `;
-}
+
 
 // ===== ROOM EDITOR LOGIC =====
 let currentRoomsList = []; // Store fetched rooms to find by ID easily
@@ -716,6 +708,8 @@ async function saveProduct(e) {
 }
 
 // ===== CALENDAR MODULE (PHASE 6) =====
+let calendarStartDate = new Date();
+
 async function loadCalendarView() {
     const container = document.getElementById('view-calendar');
     container.innerHTML = `
@@ -744,17 +738,22 @@ async function loadCalendarView() {
     }
 }
 
+function changeCalendarDate(days) {
+    calendarStartDate.setDate(calendarStartDate.getDate() + days);
+    loadCalendarView();
+}
+
 function renderCalendarTimeline(rooms, reservations) {
     const container = document.getElementById('view-calendar');
 
-    // Config: Show next 14 days
-    const daysToShow = 14;
-    const today = new Date();
+    // Config: Show next 15 days from calendarStartDate
+    const daysToShow = 15;
     const dates = [];
+    const start = new Date(calendarStartDate);
 
     for (let i = 0; i < daysToShow; i++) {
-        const d = new Date();
-        d.setDate(today.getDate() + i);
+        const d = new Date(start);
+        d.setDate(start.getDate() + i);
         dates.push(d);
     }
 
@@ -765,8 +764,13 @@ function renderCalendarTimeline(rooms, reservations) {
 
     let html = `
     <div style="background:white; border-radius:12px; padding:20px; box-shadow:0 4px 6px -1px rgba(0,0,0,0.05); overflow-x:auto;">
-        <div style="display:flex; justify-content:space-between; margin-bottom:15px;">
-            <h2 style="color:var(--primary); font-size:1.5rem;">📅 Ocupación (15 Días)</h2>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+            <div style="display:flex; gap:10px; align-items:center;">
+                <button onclick="changeCalendarDate(-15)" style="border:1px solid #cbd5e1; background:white; padding:5px 10px; border-radius:6px; cursor:pointer;"><i class="fas fa-chevron-left"></i></button>
+                <h2 style="color:var(--primary); font-size:1.5rem; margin:0;">Oc. ${start.toLocaleDateString()}</h2>
+                <button onclick="changeCalendarDate(15)" style="border:1px solid #cbd5e1; background:white; padding:5px 10px; border-radius:6px; cursor:pointer;"><i class="fas fa-chevron-right"></i></button>
+            </div>
+            
             <div style="font-size:0.9rem; color:#64748B;">
                 <span style="display:inline-block; width:12px; height:12px; background:${colorActive}; border-radius:50%; margin-right:5px;"></span>Ocupado
                 <span style="display:inline-block; width:12px; height:12px; background:${colorFuture}; border-radius:50%; margin-right:5px; margin-left:10px;"></span>Reservado
@@ -798,24 +802,18 @@ function renderCalendarTimeline(rooms, reservations) {
                     </td>`;
 
         dates.forEach(date => {
-            // Find overlaps
-            // Simple logic: Is this date >= checkIn AND < checkOut?
             let cellColor = '';
             let cellTitle = '';
-            let cellText = ''; // e.g. Guest Name
+            let cellText = '';
 
             const res = reservations.find(res => {
-                // Check room match (ID or Number)
                 if (String(res.habitacionId) !== String(r.id) && String(res.habitacionId) !== String(r.numero)) return false;
-                // Parse dates
                 const start = new Date(res.fechaEntrada);
                 const end = new Date(res.fechaSalida);
-                // Normalize to midnight for comparison
                 const current = new Date(date).setHours(0, 0, 0, 0);
                 const s = new Date(start).setHours(0, 0, 0, 0);
                 const e = new Date(end).setHours(0, 0, 0, 0);
-
-                return current >= s && current < e; // Exclusive end date usually
+                return current >= s && current < e;
             });
 
             if (res) {
@@ -826,7 +824,7 @@ function renderCalendarTimeline(rooms, reservations) {
                     cellColor = colorFuture;
                     cellTitle = 'Reservado: ' + res.cliente;
                 }
-                cellText = res.cliente.split(' ')[0]; // First name
+                cellText = res.cliente.split(' ')[0];
             }
 
             if (cellColor) {
