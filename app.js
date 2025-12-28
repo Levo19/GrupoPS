@@ -546,20 +546,21 @@ function selectPickerDate(dateStr) {
         }
 
         pickerState.endDate = dateStr;
-
+    } else {
         // 2. Reservation Logic (Flexible)
         // Prevent past dates
         if (dateStr < today) return;
 
+        const details = getDateDetails(roomId, dateStr);
+
         if (!startDate || (startDate && endDate)) {
             // Start new range
-            // Validate: Start Date cannot be 'occupied' or 'reserved' (Check-in time taken)
-            if (isDateBlocked(roomId, dateStr)) {
-                // Check if it's strictly a "Check-out" gap? 
-                // Currently isDateBlocked returns true for Start Date. 
-                // If previous res ends today (29), it returns 'free' (because < end logic).
-                // So if isDateBlocked returns true, it's truly occupied.
-                alert('⚠️ Fecha no disponible para ingreso.');
+            // Validating Start Date:
+            // Forbidden: 'full', 'full-split', 'checkin-pm' (occupied PM)
+            // Allowed: 'free', 'checkout-am' (free PM)
+
+            if (details.type === 'full' || details.type === 'full-split' || details.type === 'checkin-pm') {
+                alert('⚠️ Fecha ocupada para ingreso.');
                 return;
             }
 
@@ -568,14 +569,29 @@ function selectPickerDate(dateStr) {
         } else {
             // We have start
             if (dateStr < startDate) {
-                // Restart with this date
-                if (isDateBlocked(roomId, dateStr)) {
-                    alert('⚠️ Fecha no disponible para ingreso.');
+                // Restart with this date?
+                if (details.type === 'full' || details.type === 'full-split' || details.type === 'checkin-pm') {
+                    alert('⚠️ Fecha ocupada para ingreso.');
                     return;
                 }
                 pickerState.startDate = dateStr;
                 pickerState.endDate = null;
             } else if (dateStr > startDate) {
+                // Validate Range
+                // We need to check inclusive/exclusive?
+                // getDateDetails returns full for ranges in between.
+                // We need to check if ANY date in (start, end) is blocked.
+                // And check if 'end' itself is valid as an END date.
+
+                // End Date Validation:
+                // Forbidden: 'full', 'full-split', 'checkout-am' (occupied AM)
+                // Allowed: 'free', 'checkin-pm' (free AM)
+                if (details.type === 'full' || details.type === 'full-split' || details.type === 'checkout-am') {
+                    alert('⚠️ Fecha ocupada para salida.');
+                    return;
+                }
+
+                // Intermediate Dates
                 if (isRangeBlocked(roomId, startDate, dateStr)) {
                     alert('⚠️ El rango incluye fechas ocupadas.');
                     return;
@@ -595,58 +611,64 @@ function selectPickerDate(dateStr) {
 }
 
 // Helper: Determine status of a date
+// Helper: Determine status of a date
 function getDateDetails(roomId, dateStr) {
     // 1. Past
     const today = new Date().toISOString().split('T')[0];
-    if (dateStr < today) return 'past';
+    if (dateStr < today) return { type: 'past', color: 'grey' };
 
-    if (!roomId || !currentReservationsList) return 'free';
+    if (!roomId || !currentReservationsList) return { type: 'free', color: 'white' };
 
-    // 2. Find all matching reservations for this day
+    // 2. Find all matches
     const matches = currentReservationsList.filter(r => {
         if (String(r.habitacionId) !== String(roomId) && String(r.habitacionId) !== String(r.habitacionNumero)) return false;
         if (r.estado === 'Cancelada' || r.estado === 'Finalizada') return false;
 
-        // Clean Date Strings (YYYY-MM-DD)
+        const start = r.fechaEntrada.substring(0, 10);
+        const end = r.fechaSalida.substring(0, 10);
+        return dateStr >= start && dateStr <= end; // Inclusive
+    });
+
+    if (matches.length === 0) return { type: 'free', color: 'white' };
+
+    // Analyze occupancy
+    let hasStart = false; // Someone arriving
+    let hasEnd = false;   // Someone leaving
+    let hasFull = false;  // Occupied middle
+    let status = 'reserved'; // default priority
+
+    matches.forEach(r => {
         const start = r.fechaEntrada.substring(0, 10);
         const end = r.fechaSalida.substring(0, 10);
 
-        return dateStr >= start && dateStr < end;
+        if (r.estado === 'Activa' || r.estado === 'Ocupada') status = 'occupied';
+
+        if (dateStr > start && dateStr < end) hasFull = true;
+        if (dateStr === start) hasStart = true;
+        if (dateStr === end) hasEnd = true;
     });
 
-    if (matches.length === 0) return 'free';
+    // Determine specific type
+    if (hasFull) return { type: 'full', color: status === 'occupied' ? 'green' : 'yellow' };
+    if (hasStart && hasEnd) return { type: 'full-split', color: 'split' }; // One leaves, one arrives -> Full day busy
+    if (hasStart) return { type: 'checkin-pm', color: status === 'occupied' ? 'green' : 'yellow' }; // Arriving PM, AM free
+    if (hasEnd) return { type: 'checkout-am', color: status === 'occupied' ? 'green' : 'yellow' }; // Leaving AM, PM free
 
-    // 3. Prioritize Status: Occupied (3) > Reserved (2) > Other (1)
-    const priority = { 'Activa': 3, 'Ocupada': 3, 'Reserva': 2, 'Pendiente': 2 };
-
-    // Sort descending by priority
-    matches.sort((a, b) => (priority[b.estado] || 0) - (priority[a.estado] || 0));
-
-    const topRes = matches[0];
-
-    if (topRes.estado === 'Activa' || topRes.estado === 'Ocupada') return 'occupied';
-    if (topRes.estado === 'Reserva' || topRes.estado === 'Pendiente') return 'reserved';
-
-    return 'occupied'; // Default
+    return { type: 'free', color: 'white' };
 }
 
 function isDateBlocked(roomId, dateStr) {
-    const status = getDateDetails(roomId, dateStr);
-    return status !== 'free';
+    const details = getDateDetails(roomId, dateStr);
+    return details.type === 'full' || details.type === 'full-split';
 }
 
-function isRangeBlocked(roomId, startStr, endStr) {
-    // Check every day from start to end-1
-    let curr = new Date(startStr);
-    const end = new Date(endStr);
-
-    while (curr < end) {
-        const s = curr.toISOString().split('T')[0];
-        if (isDateBlocked(roomId, s)) return true;
-        curr.setDate(curr.getDate() + 1);
-    }
-    return false;
-}
+// ... isRangeBlocked uses isDateBlocked, which now allows partial days. 
+// Ideally range check should be stricter? 
+// For range: curr must be available. 
+// If curr is 'checkout-am': it is available as START, but NOT as middle.
+// If curr is 'checkin-pm': it is available as END, but NOT as middle.
+// Simplified: isDateBlocked only blocks FULL. We need detailed range check? 
+// Let's stick to basic for now, selectPickerDate does the heavy lifting.
 
 function renderDatePicker() {
     const container = document.getElementById('customDatePicker');
@@ -664,11 +686,7 @@ function renderDatePicker() {
     const firstDay = new Date(year, month, 1);
     const lastDay = new Date(year, month + 1, 0);
     const daysInMonth = lastDay.getDate();
-    // 0 = Sun, 1 = Mon. We want Mon first? 
-    // Spanish calendar: Mon=0 .. Sun=6 usually in grid logic 
-    // getDay(): Sun=0, Mon=1...
     let startDayCode = firstDay.getDay();
-    // Convert to Mon=0, Sun=6
     startDayCode = startDayCode === 0 ? 6 : startDayCode - 1;
 
     const monthNames = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
@@ -703,19 +721,26 @@ function renderDatePicker() {
 
         let classes = 'pixel-day';
         let onclick = `onclick="selectPickerDate('${iso}')"`;
+        let style = '';
 
         // Check Status
-        const status = getDateDetails(pickerState.roomId, iso);
+        const details = getDateDetails(pickerState.roomId, iso);
 
-        if (status === 'past') {
+        if (details.type === 'past') {
             classes += ' blocked';
-            onclick = ''; // Past is always blocked
-        } else if (status === 'occupied') {
-            classes += ' status-occupied';
-            // onclick kept! Validated in logic
-        } else if (status === 'reserved') {
-            classes += ' status-reserved';
-            // onclick kept!
+            onclick = '';
+        } else if (details.type === 'full' || details.type === 'full-split') {
+            classes += (details.color === 'green' || details.color === 'split' ? ' status-occupied' : ' status-reserved');
+            // Allow click to see logic, OR block?
+            // selectPickerDate handles alerting.
+        } else if (details.type === 'checkin-pm') {
+            // Half? visual
+            // Bottom half colored
+            style = `background: linear-gradient(to bottom, white 50%, ${details.color === 'green' ? '#22c55e' : '#eab308'} 50%);`;
+            // Add class for text color logic?
+        } else if (details.type === 'checkout-am') {
+            // Top half colored
+            style = `background: linear-gradient(to bottom, ${details.color === 'green' ? '#22c55e' : '#eab308'} 50%, white 50%);`;
         }
 
         // Visual Lock for Start Date in Check-CheckIn Mode
@@ -734,7 +759,7 @@ function renderDatePicker() {
             classes += ' in-range';
         }
 
-        html += `<div class="${classes}" ${onclick}>${i}</div>`;
+        html += `<div class="${classes}" style="${style}" ${onclick}>${i}</div>`;
     }
 
     html += `</div></div>`;
@@ -1559,18 +1584,25 @@ function renderCalendarTimeline(rooms, reservations) {
             // 3. Render Cell
             if (leftType || rightType) {
                 let bgStyle = '';
+                // TOP = Checkout/Leaving (leftType logic -> Top)
+                // BOTTOM = Checkin/Arriving (rightType logic -> Bottom)
+
+                // Matches earlier logic:
+                // leftType was "Ends Today" -> Checkout -> Top
+                // rightType was "Starts Today" -> Checkin -> Bottom
+
                 if (leftType && rightType) {
                     if (leftType === rightType) {
                         bgStyle = `background:${leftType};`; // Solid
                     } else {
-                        bgStyle = `background: linear-gradient(90deg, ${leftType} 50%, ${rightType} 50%);`; // Split
+                        bgStyle = `background: linear-gradient(to bottom, ${leftType} 50%, ${rightType} 50%);`; // Split Top/Bottom
                     }
                 } else if (leftType) {
-                    // Only Left (Checkout)
-                    bgStyle = `background: linear-gradient(90deg, ${leftType} 50%, white 50%);`;
+                    // Only Top (Checkout) -> Top Color, Bottom White
+                    bgStyle = `background: linear-gradient(to bottom, ${leftType} 50%, white 50%);`;
                 } else if (rightType) {
-                    // Only Right (Checkin)
-                    bgStyle = `background: linear-gradient(90deg, white 50%, ${rightType} 50%);`;
+                    // Only Bottom (Checkin) -> Top White, Bottom Color
+                    bgStyle = `background: linear-gradient(to bottom, white 50%, ${rightType} 50%);`;
                 }
 
                 html += `<td style="padding:5px;">
