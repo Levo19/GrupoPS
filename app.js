@@ -248,18 +248,25 @@ function renderRooms(rooms) {
     currentRoomsList = rooms; // Cache for editing
     const container = document.getElementById('view-rooms');
 
+    // Add "New Room" Button Logic
+    let html = `
+    <div style="display:flex; justify-content:flex-end; margin-bottom:20px;">
+        <button class="btn-login" style="width:auto;" onclick="openNewRoom()">+ Nueva Habitación</button>
+    </div>
+    `;
+
     if (rooms.length === 0) {
-        container.innerHTML = `
+        html += `
             <div style="text-align:center; padding: 40px; background:white; border-radius:10px;">
                 <i class="fas fa-box-open" style="font-size:2rem; color:#cbd5e1;"></i>
                 <p>No hay habitaciones registradas.</p>
-                <button class="btn-login" style="width:auto; margin-top:10px;" onclick="openNewRoom()">+ Crear Primera Habitación</button>
             </div>
         `;
+        container.innerHTML = html;
         return;
     }
 
-    let html = '<div class="room-grid">';
+    html += '<div class="room-grid">';
     rooms.forEach(r => {
         // Status Badge Logic
         let statusClass = 'status-disponible';
@@ -281,9 +288,12 @@ function renderRooms(rooms) {
         else if (statusText.toLowerCase() === 'disponible') {
             statusClass = 'status-disponible';
             statusLabel = 'DISPONIBLE';
+        } else if (statusText.toLowerCase() === 'reservado') {
+            statusClass = 'status-mantenimiento'; // Use warning color
+            statusLabel = 'RESERVADO';
         }
 
-        // Image Logic (Check if it's a URL or JSON string)
+        // Image Logic
         let mainImg = 'https://images.unsplash.com/photo-1611892440504-42a792e24d32?q=80&w=600';
         try {
             if (r.fotos && r.fotos.startsWith('[')) {
@@ -297,8 +307,8 @@ function renderRooms(rooms) {
         html += `
         <div class="room-card fade-in">
             <div class="room-img-box">
-                <span class="room-status-badge ${statusClass}">${statusLabel}</span>
                 <img src="${mainImg}" class="room-img" alt="Foto">
+                <span class="room-status-badge ${statusClass}">${statusLabel}</span>
             </div>
             <div class="room-body">
                 <div style="display:flex; justify-content:space-between; align-items:flex-start;">
@@ -315,14 +325,19 @@ function renderRooms(rooms) {
                 </div>
 
                 <div class="room-actions" style="justify-content:space-between; width:100%;">
-                    ${r.estado === 'Disponible'
-                ? `<button onclick="openCheckIn('${r.id}', '${r.numero}')" style="background:#22c55e; color:white; border:none; padding:6px 12px; border-radius:6px; cursor:pointer; font-size:0.85rem; display:flex; align-items:center; gap:5px;"><i class="fas fa-check"></i> Check-In</button>`
-                : r.estado === 'Ocupado'
-                    ? `<button style="background:#eab308; color:white; border:none; padding:6px 12px; border-radius:6px; cursor:pointer; font-size:0.85rem; display:flex; align-items:center; gap:5px;"><i class="fas fa-concierge-bell"></i> Gestionar</button>`
+                    ${statusText.toLowerCase() === 'disponible'
+                ? `<div style="display:flex; gap:5px;">
+                                <button onclick="openCheckIn('${r.id}', '${r.numero}')" style="background:#22c55e; color:white; border:none; padding:6px 10px; border-radius:6px; cursor:pointer; font-size:0.85rem; display:flex; align-items:center; gap:5px;"><i class="fas fa-check"></i> Check-In</button>
+                                <button onclick="openReservation('${r.id}', '${r.numero}')" style="background:#eab308; color:white; border:none; padding:6px 10px; border-radius:6px; cursor:pointer; font-size:0.85rem; display:flex; align-items:center; gap:5px;"><i class="fas fa-calendar-plus"></i> Reservar</button>
+                           </div>`
+                : statusText.toLowerCase() === 'ocupado'
+                    ? `<button style="background:#ef4444; color:white; border:none; padding:6px 12px; border-radius:6px; cursor:not-allowed; opacity:0.8; font-size:0.85rem;" disabled><i class="fas fa-ban"></i> Ocupado</button>`
                     : ''
             }
-                    <button class="btn-icon" title="Editar" onclick="editRoom('${r.id}')"><i class="fas fa-pen"></i></button>
-                    ${r.estado === 'Sucio' ? `<button class="btn-icon" title="Marcar Limpio" style="color:var(--primary);"><i class="fas fa-broom"></i></button>` : ''}
+                    <div style="display:flex; gap:5px;">
+                        <button class="btn-icon" title="Editar" onclick="editRoom('${r.id}')"><i class="fas fa-pen"></i></button>
+                        ${statusText.toLowerCase() === 'sucio' ? `<button class="btn-icon" title="Marcar Limpio" style="color:var(--primary);"><i class="fas fa-broom"></i></button>` : ''}
+                    </div>
                 </div>
             </div>
         </div>
@@ -334,22 +349,49 @@ function renderRooms(rooms) {
 }
 
 // ===== CHECK-IN LOGIC (PHASE 5) =====
+// ===== CHECK-IN / RESERVATION LOGIC =====
+let checkInMode = 'checkin'; // 'checkin' or 'reservation'
+
 function openCheckIn(roomId, roomNum) {
+    checkInMode = 'checkin';
+    document.getElementById('modalTitleCheckIn').innerText = '🏨 Check-In';
+    document.getElementById('btnSubmitCheckIn').innerText = 'Confirmar Ingreso';
+    document.getElementById('btnSubmitCheckIn').style.background = 'var(--accent)';
+
+    setupCheckInModal(roomId, roomNum);
+}
+
+function openReservation(roomId, roomNum) {
+    checkInMode = 'reservation';
+    document.getElementById('modalTitleCheckIn').innerText = '📅 Nueva Reserva';
+    document.getElementById('btnSubmitCheckIn').innerText = 'Confirmar Reserva';
+    document.getElementById('btnSubmitCheckIn').style.background = '#22c55e'; // Green for reservation
+
+    setupCheckInModal(roomId, roomNum);
+}
+
+function setupCheckInModal(roomId, roomNum) {
     document.getElementById('checkInRoomId').value = roomId;
     document.getElementById('checkInRoomNum').innerText = 'Habitación ' + roomNum;
     document.getElementById('formCheckIn').reset();
 
-    // Default checkout: Tomorrow 11:00 AM
-    const tomorrow = new Date();
+    // Default dates
+    const now = new Date();
+    const tomorrow = new Date(now);
     tomorrow.setDate(tomorrow.getDate() + 1);
     tomorrow.setHours(11, 0, 0, 0);
-    // Format for datetime-local: YYYY-MM-DDTHH:mm
+
     const toISO = (date) => {
         const pad = n => n < 10 ? '0' + n : n;
         return date.getFullYear() + '-' + pad(date.getMonth() + 1) + '-' + pad(date.getDate()) + 'T' + pad(date.getHours()) + ':' + pad(date.getMinutes());
     };
-    document.getElementById('checkInSalida').value = toISO(tomorrow);
 
+    // For reservation, maybe we want to select Start Date too?
+    // Current modal only has "Fecha Salida".
+    // Ideally we need Start Date. But for now, assuming "Start Now" for checkin.
+    // For reservation, we really need a Start Date.
+    // Let's stick to simplest: Reservation starts now (holds the room).
+    document.getElementById('checkInSalida').value = toISO(tomorrow);
     document.getElementById('modalCheckIn').style.display = 'flex';
 }
 
@@ -370,7 +412,8 @@ async function processCheckIn(e) {
         habitacionId: document.getElementById('checkInRoomId').value,
         cliente: document.getElementById('checkInCliente').value,
         fechaSalida: document.getElementById('checkInSalida').value,
-        notas: document.getElementById('checkInNotas').value
+        notas: document.getElementById('checkInNotas').value,
+        isReservation: (checkInMode === 'reservation')
     };
 
     try {
@@ -381,15 +424,16 @@ async function processCheckIn(e) {
         const result = await res.json();
 
         if (result.success) {
-            alert('✅ Check-in realizado con éxito');
+            alert('✅ Operación exitosa');
             closeCheckIn();
-            loadRoomsView(); // Refresh UI to show 'Occupied'
+            loadRoomsView();
         } else {
             alert('❌ Error: ' + result.error);
         }
     } catch (error) {
         alert('❌ Error de conexión: ' + error.message);
     } finally {
+        // Restore button state
         submitBtn.innerText = originalText;
         submitBtn.disabled = false;
     }
