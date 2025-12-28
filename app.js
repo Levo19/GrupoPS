@@ -515,25 +515,36 @@ function selectPickerDate(dateStr) {
     renderDatePicker();
 }
 
-function isDateBlocked(roomId, dateStr) {
-    // 1. Block Past Dates universally
+// Helper: Determine status of a date
+function getDateDetails(roomId, dateStr) {
+    // 1. Past
     const today = new Date().toISOString().split('T')[0];
-    if (dateStr < today) return true;
+    if (dateStr < today) return 'past';
 
-    if (!roomId || !currentReservationsList) return false;
+    if (!roomId || !currentReservationsList) return 'free';
 
-    return currentReservationsList.some(r => {
-        if (String(r.habitacionId) !== String(roomId) && String(r.habitacionId) !== String(r.habitacionNumero)) return false;
-        // Don't block if Cancelled/Finalized? Depends on "Finalized". 
-        // If Finalized means Checkout done today, then today IS free. 
-        // For simplicity: Finalized = Free.
-        if (r.estado === 'Cancelada' || r.estado === 'Finalizada') return false;
+    // 2. Occupied / Reserved
+    for (const r of currentReservationsList) {
+        if (String(r.habitacionId) !== String(roomId) && String(r.habitacionId) !== String(r.habitacionNumero)) continue;
+        if (r.estado === 'Cancelada' || r.estado === 'Finalizada') continue;
 
         const start = r.fechaEntrada.split('T')[0];
         const end = r.fechaSalida.split('T')[0];
 
-        return dateStr >= start && dateStr < end;
-    });
+        if (dateStr >= start && dateStr < end) {
+            // Found a hit. Check type.
+            if (r.estado === 'Activa' || r.estado === 'Ocupada') return 'occupied';
+            if (r.estado === 'Reserva' || r.estado === 'Pendiente') return 'reserved';
+            return 'occupied'; // Default fallback
+        }
+    }
+
+    return 'free';
+}
+
+function isDateBlocked(roomId, dateStr) {
+    const status = getDateDetails(roomId, dateStr);
+    return status !== 'free';
 }
 
 function isRangeBlocked(roomId, startStr, endStr) {
@@ -605,9 +616,17 @@ function renderDatePicker() {
         let classes = 'pixel-day';
         let onclick = `onclick="selectPickerDate('${iso}')"`;
 
-        // Blocked?
-        if (isDateBlocked(pickerState.roomId, iso)) {
+        // Check Status
+        const status = getDateDetails(pickerState.roomId, iso);
+
+        if (status === 'past') {
             classes += ' blocked';
+            onclick = '';
+        } else if (status === 'occupied') {
+            classes += ' status-occupied'; // Green
+            onclick = '';
+        } else if (status === 'reserved') {
+            classes += ' status-reserved'; // Yellow
             onclick = '';
         }
 
