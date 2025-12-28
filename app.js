@@ -399,16 +399,17 @@ function openReservation(roomId, roomNum, startInfo) {
     setupCheckInModal(roomId, roomNum);
 }
 
-function updateEndDate() {
-    const startVal = document.getElementById('checkInEntrada').value;
-    if (!startVal) return;
-    const parts = startVal.split('-');
-    const start = new Date(parts[0], parts[1] - 1, parts[2]);
-    const end = new Date(start);
-    end.setDate(end.getDate() + 1);
-    const pad = n => n < 10 ? '0' + n : n;
-    const toISO = d => d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
-    document.getElementById('checkInSalida').value = toISO(end);
+// Helper to ensure reservations are loaded for blocking logic
+async function ensureReservationsLoaded() {
+    if (typeof currentReservationsList !== 'undefined' && currentReservationsList.length > 0) return;
+    try {
+        const res = await fetch(CONFIG.API_URL + '?action=getReservas');
+        const result = await res.json();
+        if (result.success) {
+            currentReservationsList = result.data;
+            if (pickerState.roomId) initDatePicker(pickerState.roomId);
+        }
+    } catch (e) { console.error('Error loading reservations for picker', e); }
 }
 
 function setupCheckInModal(roomId, roomNum, preSelectedDate) {
@@ -422,17 +423,19 @@ function setupCheckInModal(roomId, roomNum, preSelectedDate) {
 
     // 1. Setup Room Selection
     if (roomId) {
-        // Mode: Specific Room (from Card or Calendar Row)
         roomIdInput.value = roomId;
         roomLabel.innerText = 'Habitación ' + roomNum;
         roomLabel.style.display = 'inline-block';
         roomSelect.style.display = 'none';
+
+        // Init Picker for Room
+        initDatePicker(roomId, preSelectedDate);
     } else {
-        // Mode: Generic/Global (from Top Button)
         roomIdInput.value = '';
         roomLabel.style.display = 'none';
         roomSelect.style.display = 'block';
 
+        // Populate
         let ops = '<option value="" disabled selected>-- Elija Habitación --</option>';
         if (typeof currentRoomsList !== 'undefined') {
             currentRoomsList.forEach(r => {
@@ -440,44 +443,19 @@ function setupCheckInModal(roomId, roomNum, preSelectedDate) {
             });
         }
         roomSelect.innerHTML = ops;
+
+        // On Change -> Update Picker Blocks
         roomSelect.onchange = function () {
             roomIdInput.value = this.value;
+            initDatePicker(this.value);
         };
+
+        // Init Empty Picker
+        initDatePicker(null);
     }
 
-    // 2. Setup Dates
-    const now = new Date();
-    const pad = n => n < 10 ? '0' + n : n;
-    const toDateStr = d => d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
-
-    const elEntrada = document.getElementById('checkInEntrada');
-    const elSalida = document.getElementById('checkInSalida');
-
-    if (checkInMode === 'checkin') {
-        // Check-In: Start is NOW (Today)
-        elEntrada.value = toDateStr(now);
-        elEntrada.disabled = true; // Locked
-
-        // End Date: Tomorrow default
-        const tomorrow = new Date(now);
-        tomorrow.setDate(tomorrow.getDate() + 1);
-        elSalida.value = toDateStr(tomorrow);
-    }
-    else {
-        // Reservation: Flexible Start
-        let startDate = now;
-        if (preSelectedDate) {
-            startDate = new Date(preSelectedDate);
-        }
-
-        elEntrada.value = toDateStr(startDate);
-        elEntrada.disabled = false; // Editable
-
-        // Auto-calc End Date
-        const end = new Date(startDate);
-        end.setDate(end.getDate() + 1);
-        elSalida.value = toDateStr(end);
-    }
+    // Ensure blocks are loaded
+    ensureReservationsLoaded();
 
     document.getElementById('modalCheckIn').style.display = 'flex';
 }
