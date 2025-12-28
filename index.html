@@ -430,15 +430,29 @@
                     <input type="text" id="checkInCliente" class="form-input" placeholder="Nombre completo" required>
                 </div>
 
+                <!-- Custom Date Picker -->
+                <div id="pickerSummary" class="picker-summary" style="display:none;">
+                    Seleccione fechas
+                </div>
+                <div id="customDatePicker">
+                    <!-- JS will render calendar here -->
+                </div>
+
+                <!-- Hidden Inputs for Form Logic -->
+                <input type="hidden" id="checkInEntrada">
+                <input type="hidden" id="checkInSalida">
+
+                <!-- Legacy Date Inputs (REMOVED) -->
+                <!-- 
                 <div class="form-group">
                     <label class="form-label">Fecha Entrada (Check-In 11:00)</label>
                     <input type="date" id="checkInEntrada" class="form-input" required onchange="updateEndDate()">
                 </div>
-
                 <div class="form-group">
                     <label class="form-label">Fecha Salida (Check-Out 14:00)</label>
                     <input type="date" id="checkInSalida" class="form-input" required>
-                </div>
+                </div> 
+                -->
 
                 <div class="form-group">
                     <label class="form-label">Notas / Observaciones</label>
