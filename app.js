@@ -380,6 +380,13 @@ function renderRooms(rooms) {
 // ===== CHECK-IN LOGIC (PHASE 5) =====
 // ===== CHECK-IN / RESERVATION LOGIC =====
 let checkInMode = 'checkin'; // 'checkin' or 'reservation'
+// [NEW] Picker State
+let pickerState = {
+    roomId: null,
+    currentMonth: new Date(),
+    startDate: null,
+    endDate: null
+};
 
 function openCheckIn(roomId, roomNum) {
     checkInMode = 'checkin';
@@ -410,6 +417,195 @@ async function ensureReservationsLoaded() {
             if (pickerState.roomId) initDatePicker(pickerState.roomId);
         }
     } catch (e) { console.error('Error loading reservations for picker', e); }
+}
+
+// [NEW] Date Picker Implementation
+function initDatePicker(roomId, preDate = null) {
+    pickerState.roomId = roomId;
+    pickerState.currentMonth = preDate ? new Date(preDate) : new Date();
+
+    // Reset or Set values
+    if (preDate) {
+        pickerState.startDate = preDate; // ISO String expected
+        // Default 1 night?
+        let d = new Date(preDate);
+        d.setDate(d.getDate() + 1);
+        pickerState.endDate = d.toISOString().split('T')[0];
+    } else {
+        pickerState.startDate = null;
+        pickerState.endDate = null;
+    }
+
+    // Sync Hidden Inputs
+    document.getElementById('checkInEntrada').value = pickerState.startDate || '';
+    document.getElementById('checkInSalida').value = pickerState.endDate || '';
+
+    renderDatePicker();
+}
+
+function changePickerMonth(d) {
+    pickerState.currentMonth.setMonth(pickerState.currentMonth.getMonth() + d);
+    renderDatePicker();
+}
+
+function selectPickerDate(dateStr) {
+    const { startDate, endDate, roomId } = pickerState;
+
+    // Logic: 
+    // 1. If nothing selected or both selected -> Start fresh
+    // 2. If start selected -> Select end (if valid)
+
+    if (!startDate || (startDate && endDate)) {
+        // Start new range
+        pickerState.startDate = dateStr;
+        pickerState.endDate = null;
+    } else {
+        // We have start, trying to select end
+        if (dateStr < startDate) {
+            // New start
+            pickerState.startDate = dateStr;
+        } else if (dateStr > startDate) {
+            // Validate range (check if any blocked date in between)
+            if (isRangeBlocked(roomId, startDate, dateStr)) {
+                alert('⚠️ El rango seleccionado incluye fechas ocupadas.');
+                return;
+            }
+            pickerState.endDate = dateStr;
+        } else {
+            // Same day? Usually min 1 night. Let's allow same day ONLY if we treat it as day-use? 
+            // Standard hotel: End date is checkout. So same day is invalid for overnight.
+            // Let's assume min 1 night
+            pickerState.endDate = null; // Unselect logic?
+        }
+    }
+
+    // Update Hidden
+    document.getElementById('checkInEntrada').value = pickerState.startDate || '';
+    document.getElementById('checkInSalida').value = pickerState.endDate || '';
+
+    renderDatePicker();
+}
+
+function isDateBlocked(roomId, dateStr) {
+    if (!roomId || !currentReservationsList) return false;
+    // Check conflicts
+    // A date is blocked if it falls inside an existing reservation range (Start <= Date < End)
+    // Usually Checkout day is free for Checkin. So Start (inclusive) to End (exclusive).
+
+    return currentReservationsList.some(r => {
+        if (String(r.habitacionId) !== String(roomId) && String(r.habitacionId) !== String(r.habitacionNumero)) return false;
+        if (r.estado === 'Cancelada' || r.estado === 'Finalizada') return false; // Maybe verify Finalized?
+
+        const start = r.fechaEntrada.split('T')[0]; // ISO YYYY-MM-DD
+        const end = r.fechaSalida.split('T')[0];
+
+        return dateStr >= start && dateStr < end;
+    });
+}
+
+function isRangeBlocked(roomId, startStr, endStr) {
+    // Check every day from start to end-1
+    let curr = new Date(startStr);
+    const end = new Date(endStr);
+
+    while (curr < end) {
+        const s = curr.toISOString().split('T')[0];
+        if (isDateBlocked(roomId, s)) return true;
+        curr.setDate(curr.getDate() + 1);
+    }
+    return false;
+}
+
+function renderDatePicker() {
+    const container = document.getElementById('customDatePicker');
+    const summary = document.getElementById('pickerSummary');
+
+    if (!pickerState.roomId) {
+        container.innerHTML = '<div style="text-align:center; padding:20px; color:#94a3b8;">Seleccione una habitación primero</div>';
+        summary.style.display = 'none';
+        return;
+    }
+
+    const year = pickerState.currentMonth.getFullYear();
+    const month = pickerState.currentMonth.getMonth();
+
+    const firstDay = new Date(year, month, 1);
+    const lastDay = new Date(year, month + 1, 0);
+    const daysInMonth = lastDay.getDate();
+    // 0 = Sun, 1 = Mon. We want Mon first? 
+    // Spanish calendar: Mon=0 .. Sun=6 usually in grid logic 
+    // getDay(): Sun=0, Mon=1...
+    let startDayCode = firstDay.getDay();
+    // Convert to Mon=0, Sun=6
+    startDayCode = startDayCode === 0 ? 6 : startDayCode - 1;
+
+    const monthNames = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+
+    // Header
+    let html = `
+    <div class="pixel-calendar">
+        <div class="pixel-header">
+            <button type="button" onclick="changePickerMonth(-1)" class="btn-icon"><i class="fas fa-chevron-left"></i></button>
+            <span>${monthNames[month]} ${year}</span>
+            <button type="button" onclick="changePickerMonth(1)" class="btn-icon"><i class="fas fa-chevron-right"></i></button>
+        </div>
+        <div class="pixel-grid">
+            <div class="pixel-day-header">L</div>
+            <div class="pixel-day-header">M</div>
+            <div class="pixel-day-header">X</div>
+            <div class="pixel-day-header">J</div>
+            <div class="pixel-day-header">V</div>
+            <div class="pixel-day-header">S</div>
+            <div class="pixel-day-header">D</div>
+    `;
+
+    // Empty Cells
+    for (let i = 0; i < startDayCode; i++) {
+        html += `<div class="pixel-day empty"></div>`;
+    }
+
+    // Days
+    for (let i = 1; i <= daysInMonth; i++) {
+        const d = new Date(year, month, i);
+        const iso = d.toISOString().split('T')[0];
+
+        let classes = 'pixel-day';
+        let onclick = `onclick="selectPickerDate('${iso}')"`;
+
+        // Blocked?
+        if (isDateBlocked(pickerState.roomId, iso)) {
+            classes += ' blocked';
+            onclick = '';
+        }
+
+        // Selected?
+        if (pickerState.startDate === iso || pickerState.endDate === iso) {
+            classes += ' selected';
+        }
+
+        // Range?
+        if (pickerState.startDate && pickerState.endDate && iso > pickerState.startDate && iso < pickerState.endDate) {
+            classes += ' in-range';
+        }
+
+        html += `<div class="${classes}" ${onclick}>${i}</div>`;
+    }
+
+    html += `</div></div>`;
+
+    container.innerHTML = html;
+
+    // Update Summary
+    if (pickerState.startDate) {
+        summary.style.display = 'block';
+        if (pickerState.endDate) {
+            summary.innerHTML = `📅 Del <b>${pickerState.startDate}</b> al <b>${pickerState.endDate}</b>`;
+        } else {
+            summary.innerHTML = `📅 Entrada: <b>${pickerState.startDate}</b> <span style="font-weight:normal; font-size:0.8em; color:#64748B;">(Seleccione salida)</span>`;
+        }
+    } else {
+        summary.style.display = 'none';
+    }
 }
 
 function setupCheckInModal(roomId, roomNum, preSelectedDate) {
