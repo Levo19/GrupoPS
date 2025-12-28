@@ -389,35 +389,39 @@ function renderRooms(rooms) {
         // Normalize status for comparison
         const statusNorm = r.estado.toLowerCase();
 
-        if (statusNorm === 'disponible') {
-            actionsHtml = `<button onclick="openCheckIn('${r.id}', '${r.numero}')" style="width:100%; padding:10px; border:none; border-radius:8px; background:var(--accent); color:white; font-weight:bold; cursor:pointer;" class="btn-hover-effect">
-                                <i class="fas fa-key"></i> Check-In (Ingreso)
-                             </button>
+        if (statusNorm === 'disponible' || statusNorm === 'sucio') {
+            const btnCheckIn = statusNorm === 'sucio'
+                ? `<div style="text-align:center; padding:8px; color:#f97316; font-weight:bold; font-size:0.8rem; border:1px dashed #f97316; border-radius:8px;">⚠️ Limpieza Pendiente</div>`
+                : `<button onclick="openCheckIn('${r.id}', '${r.numero}')" style="width:100%; padding:10px; border:none; border-radius:8px; background:#22c55e; color:white; font-weight:bold; cursor:pointer;" class="btn-hover-effect">
+                        <i class="fas fa-key"></i> Check-In (Ingreso)
+                   </button>`;
+
+            actionsHtml = `${btnCheckIn}
                              <div style="height:10px;"></div>
-                             <button onclick="openReservation('${r.id}', '${r.numero}', null, '')" style="width:100%; padding:10px; border:none; border-radius:8px; background:var(--primary); color:white; font-weight:bold; cursor:pointer;" class="btn-hover-effect">
+                             <button onclick="openReservation('${r.id}', '${r.numero}', null, '')" style="width:100%; padding:10px; border:none; border-radius:8px; background:#eab308; color:white; font-weight:bold; cursor:pointer;" class="btn-hover-effect">
                                 <i class="fas fa-calendar-alt"></i> Reservar
                              </button>`;
         } else if (statusNorm === 'ocupado') {
             // Placeholder for clientName, assuming it would be fetched or passed
             const clientName = r.cliente_actual || '';
 
-            const btnFinish = `<button onclick="openCheckOut('${r.id}', '${r.numero}', '${clientName}')" style="width:100%; padding:10px; border:none; border-radius:8px; background:var(--accent); color:white; font-weight:bold; cursor:pointer; margin-bottom:8px;">
+            const btnFinish = `<button onclick="openCheckOut('${r.id}', '${r.numero}', '${clientName}')" style="width:100%; padding:10px; border:none; border-radius:8px; background:#ef4444; color:white; font-weight:bold; cursor:pointer; margin-bottom:8px;">
                                 <i class="fas fa-sign-out-alt"></i> Finalizar (Check-Out)
                            </button>`;
 
             // Pass isExtension = true
-            const btnExtend = `<button onclick="openReservation('${r.id}', '${r.numero}', null, '${clientName}', true)" style="width:100%; padding:10px; border:none; border-radius:8px; background:var(--occupied); color:white; font-weight:bold; cursor:pointer; margin-bottom:8px;">
+            const btnExtend = `<button onclick="openReservation('${r.id}', '${r.numero}', null, '${clientName}', true)" style="width:100%; padding:10px; border:none; border-radius:8px; background:#22c55e; color:white; font-weight:bold; cursor:pointer; margin-bottom:8px;">
                                 <i class="fas fa-calendar-plus"></i> Extender Estadía
                            </button>`;
 
             // Pass isExtension = false
-            const btnNewRes = `<button onclick="openReservation('${r.id}', '${r.numero}', null, '', false)" style="width:100%; padding:10px; border:none; border-radius:8px; background:var(--primary); color:white; font-weight:bold; cursor:pointer;">
+            const btnNewRes = `<button onclick="openReservation('${r.id}', '${r.numero}', null, '', false)" style="width:100%; padding:10px; border:none; border-radius:8px; background:#eab308; color:white; font-weight:bold; cursor:pointer;">
                                 <i class="fas fa-calendar-alt"></i> Nueva Reserva
                            </button>`;
 
             actionsHtml = btnFinish + btnExtend + btnNewRes;
-        } else if (statusNorm === 'sucio' || statusNorm === 'mantenimiento') {
-            actionsHtml = `<span style="color:#64748B; font-size:0.9rem; font-style:italic;">No disponible</span>`;
+        } else if (statusNorm === 'mantenimiento') {
+            actionsHtml = `<span style="color:#64748B; font-size:0.9rem; font-style:italic;">No disponible (Mantenimiento)</span>`;
         } else if (statusNorm === 'reservado') {
             actionsHtml = `
                <div style="display:flex; gap:5px;">
