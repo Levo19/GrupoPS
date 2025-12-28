@@ -416,6 +416,10 @@
                 <div
                     style="background:#e0f2fe; padding:10px; border-radius:8px; margin-bottom:15px; color:#0369a1; font-weight:bold; text-align:center;">
                     <span id="checkInRoomNum">Habitación X</span>
+                    <select id="checkInRoomSelect" class="form-input"
+                        style="display:none; text-align:center; font-weight:bold; color:#0369a1; border:none; background:transparent;">
+                        <!-- Populated by JS -->
+                    </select>
                 </div>
 
                 <div class="form-group">
@@ -424,13 +428,13 @@
                 </div>
 
                 <div class="form-group">
-                    <label class="form-label">Fecha Entrada</label>
-                    <input type="datetime-local" id="checkInEntrada" class="form-input" required>
+                    <label class="form-label">Fecha Entrada (Check-In 11:00)</label>
+                    <input type="date" id="checkInEntrada" class="form-input" required onchange="updateEndDate()">
                 </div>
 
                 <div class="form-group">
-                    <label class="form-label">Fecha Salida</label>
-                    <input type="datetime-local" id="checkInSalida" class="form-input" required>
+                    <label class="form-label">Fecha Salida (Check-Out 14:00)</label>
+                    <input type="date" id="checkInSalida" class="form-input" required>
                 </div>
 
                 <div class="form-group">
