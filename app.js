@@ -970,7 +970,7 @@ async function processCheckIn(e) {
     e.preventDefault();
 
     const submitBtn = e.target.querySelector('button[type="submit"]');
-    const originalText = submitBtn.innerText;
+    // const originalText = submitBtn.innerText;
     submitBtn.innerText = 'Procesando...';
     submitBtn.disabled = true;
 
@@ -978,7 +978,7 @@ async function processCheckIn(e) {
     const fechaEntrada = document.getElementById('checkInEntrada').value;
 
     const data = {
-        action: 'checkIn',
+        action: 'checkIn', // Default
         habitacionId: document.getElementById('checkInRoomId').value,
         cliente: document.getElementById('checkInCliente').value,
         fechaEntrada: fechaEntrada,
@@ -988,95 +988,94 @@ async function processCheckIn(e) {
         isExtension: (checkInMode === 'extension')
     };
 
-    if (!data.fechaEntrada || !data.fechaSalida || !data.cliente) {
+    // Extension Logic Override
+    if (data.isExtension) {
+        data.action = 'extendReservation';
+        data.newCheckOutDate = data.fechaSalida;
+    }
+
+    if ((!data.isExtension && !data.fechaEntrada) || !data.fechaSalida || !data.cliente) {
         alert('Por favor complete todos los campos.');
+        submitBtn.innerText = 'Confirmar'; // Reset
+        submitBtn.disabled = false;
         return;
     }
 
     // Modal close
+    closeCheckIn();
     document.getElementById('modalCheckIn').classList.remove('active');
 
     // OPTIMISTIC UPDATE
-    const tempId = 'TEMP-' + new Date().getTime();
+    if (data.isExtension) {
+        const activeRes = currentReservationsList.find(r =>
+            (String(r.habitacionId) === String(data.habitacionId) || String(r.habitacionNumero) === String(data.habitacionId)) &&
+            (r.estado === 'Activa' || r.estado === 'Ocupada')
+        );
+        if (activeRes) {
+            // Update locally to reflect change immediately
+            activeRes.fechaSalida = data.fechaSalida + ' 11:00';
+            // Also need to update the grid view?
+            // renderCalendar() will pick this up.
+        }
+    } else {
+        const tempId = 'TEMP-' + new Date().getTime();
+        let tempStatus = 'Activa';
+        if (data.isReservation) tempStatus = 'Reserva';
 
-    // Determine status: Extension -> Activa, Reservation -> Reserva
-    let tempStatus = 'Activa';
-    if (data.isReservation) tempStatus = 'Reserva';
-    if (data.isExtension) tempStatus = 'Activa';
-    // Wait, Extension IS basically an active record, just new dates.
+        const newRes = {
+            id: tempId,
+            habitacionId: data.habitacionId,
+            cliente: data.cliente,
+            fechaEntrada: data.fechaEntrada + ' 14:00',
+            fechaSalida: data.fechaSalida + ' 11:00',
+            estado: tempStatus,
+            notas: data.notas
+        };
+        currentReservationsList.push(newRes);
 
-    let label = 'Ocupado';
-    if (tempStatus === 'Reserva') label = 'Reserva';
-
-    const newRes = {
-        id: tempId,
-        habitacionId: data.habitacionId,
-        cliente: data.cliente,
-        fechaEntrada: data.fechaEntrada,
-        fechaSalida: data.fechaSalida,
-        estado: tempStatus,
-        notas: data.notas
-    };
-
-    currentReservationsList.push(newRes);
-
-    // Update Room Status in UI if needed (Immediate Check-in or Extension)
-    if (!data.isReservation || data.isExtension) {
-        const roomIdx = currentRoomsList.findIndex(r => r.id == data.habitacionId);
-        if (roomIdx !== -1) {
-            currentRoomsList[roomIdx].estado = 'Ocupado';
-            currentRoomsList[roomIdx].cliente = data.cliente;
+        if (!data.isReservation) {
+            const roomIdx = currentRoomsList.findIndex(r => r.id == data.habitacionId);
+            if (roomIdx !== -1) {
+                currentRoomsList[roomIdx].estado = 'Ocupado';
+                currentRoomsList[roomIdx].cliente = data.cliente;
+            }
         }
     }
 
-    // 4. Update UI Immediately
-    closeCheckIn();
-
+    // Update UI
     if (document.getElementById('view-calendar').style.display === 'block') {
-        renderCalendarTimeline(currentRoomsList, currentReservationsList);
+        renderCalendar();
+    } else {
+        renderRooms();
     }
-    loadRoomsView(); // Refreshes badges
 
-    // 5. Background Sync
-    // ------------------------------------------------
     try {
-        const res = await fetch(CONFIG.API_URL, {
+        const response = await fetch(API_URL, {
             method: 'POST',
             body: JSON.stringify(data)
         });
-        const result = await res.json();
+        const result = await response.json();
 
         if (result.success) {
-            // Success: Silent refresh to get real IDs and clean up temp
-            // We could update the temp ID in place, but reloading is safer for consistency
-            // Wait a moment so user doesn't see flicker? No, just load.
-
-            // Only blocking alert if something critical? No, just silent.
-            // Maybe show a toast/notification? For now, nothing.
-
-            // Update the temp object with real ID if we wanted to be fancy, 
-            // but let's just re-fetch in background.
-            loadCalendarView(); // Helper will fetch and re-render
-            // We don't call loadRoomsView again if we don't need to, but ensures ID is valid for next click.
-
+            alert(data.isExtension ? '¡Estadía extendida correctamente!' : (data.isReservation ? '¡Reserva creada!' : '¡Check-In exitoso!'));
+            // Reload real data
+            loadReservations();
+            loadRooms();
         } else {
-            alert('❌ Error guardando en servidor: ' + result.error);
-            // Revert!
-            // Simplest revert: reload everything from server
-            await Promise.all([
-                loadRoomsView(),
-                loadCalendarView()
-            ]);
+            alert('Error: ' + result.error);
+            // Revert optimistic?
+            loadReservations();
         }
     } catch (error) {
-        alert('❌ Error de conexión: ' + error.message);
-        // Revert
-        window.location.reload(); // Hard revert if connection fail
+        console.error('Error:', error);
+        alert('Error de conexión');
     } finally {
-        submitBtn.innerText = originalText;
+        submitBtn.innerText = 'Confirmar'; // Reset text just in case re-opened
         submitBtn.disabled = false;
     }
 }
+
+
 
 // ===== CHECK OUT LOGIC =====
 window.openCheckOut = function (roomId) {
