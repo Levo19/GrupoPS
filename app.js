@@ -273,23 +273,26 @@ function renderRooms(rooms) {
         let statusText = r.estado || 'Desconocido';
         let statusLabel = statusText;
 
-        if (statusText.toLowerCase() === 'ocupado') {
+        // Normalize status
+        const normStatus = statusText.toLowerCase();
+
+        if (normStatus === 'ocupado') {
             statusClass = 'status-ocupado';
             statusLabel = 'OCUPADO';
         }
-        else if (statusText.toLowerCase() === 'mantenimiento') {
+        else if (normStatus === 'mantenimiento') {
             statusClass = 'status-mantenimiento';
             statusLabel = 'MANTENIMIENTO';
         }
-        else if (statusText.toLowerCase() === 'sucio') {
+        else if (normStatus === 'sucio') {
             statusClass = 'status-sucio';
             statusLabel = 'SUCIO';
         }
-        else if (statusText.toLowerCase() === 'disponible') {
+        else if (normStatus === 'disponible') {
             statusClass = 'status-disponible';
             statusLabel = 'DISPONIBLE';
-        } else if (statusText.toLowerCase() === 'reservado') {
-            statusClass = 'status-mantenimiento'; // Use warning color
+        } else if (normStatus === 'reservado') {
+            statusClass = 'status-mantenimiento'; // Use warning color/orange
             statusLabel = 'RESERVADO';
         }
 
@@ -303,6 +306,40 @@ function renderRooms(rooms) {
                 mainImg = r.fotos;
             }
         } catch (e) { }
+
+        // Actions Logic
+        let actionsHtml = '';
+
+        // Common Reserve Button (Available for all except maybe Maintenance?)
+        const btnReservar = `<button onclick="openReservation('${r.id}', '${r.numero}')" style="background:#eab308; color:white; border:none; padding:6px 10px; border-radius:6px; cursor:pointer; font-size:0.85rem; display:flex; align-items:center; gap:5px;"><i class="fas fa-calendar-plus"></i> Reservar</button>`;
+
+        if (normStatus === 'disponible') {
+            actionsHtml = `
+               <div style="display:flex; gap:5px;">
+                    <button onclick="openCheckIn('${r.id}', '${r.numero}')" style="background:#22c55e; color:white; border:none; padding:6px 10px; border-radius:6px; cursor:pointer; font-size:0.85rem; display:flex; align-items:center; gap:5px;"><i class="fas fa-check"></i> Check-In</button>
+                    ${btnReservar}
+               </div>
+            `;
+        } else if (normStatus === 'ocupado') {
+            // Show Reserve for future, but Check-In is disabled
+            actionsHtml = `
+               <div style="display:flex; gap:5px;">
+                    <button style="background:#ef4444; color:white; border:none; padding:6px 12px; border-radius:6px; cursor:not-allowed; opacity:0.8; font-size:0.85rem;" disabled><i class="fas fa-ban"></i> Ocupado</button>
+                    ${btnReservar}
+               </div>
+            `;
+        } else if (normStatus === 'reservado') {
+            // If Reserved, allow Check-In (to confirm arrival) and Reserve (for later)
+            actionsHtml = `
+               <div style="display:flex; gap:5px;">
+                    <button onclick="openCheckIn('${r.id}', '${r.numero}')" style="background:#22c55e; color:white; border:none; padding:6px 10px; border-radius:6px; cursor:pointer; font-size:0.85rem; display:flex; align-items:center; gap:5px;"><i class="fas fa-check"></i> Llegada</button>
+                    ${btnReservar}
+               </div>
+            `;
+        } else {
+            // Maintenance / Dirty
+            actionsHtml = `<span style="color:#64748B; font-size:0.9rem; font-style:italic;">No disponible</span>`;
+        }
 
         html += `
         <div class="room-card fade-in">
@@ -325,18 +362,10 @@ function renderRooms(rooms) {
                 </div>
 
                 <div class="room-actions" style="justify-content:space-between; width:100%;">
-                    ${statusText.toLowerCase() === 'disponible'
-                ? `<div style="display:flex; gap:5px;">
-                                <button onclick="openCheckIn('${r.id}', '${r.numero}')" style="background:#22c55e; color:white; border:none; padding:6px 10px; border-radius:6px; cursor:pointer; font-size:0.85rem; display:flex; align-items:center; gap:5px;"><i class="fas fa-check"></i> Check-In</button>
-                                <button onclick="openReservation('${r.id}', '${r.numero}')" style="background:#eab308; color:white; border:none; padding:6px 10px; border-radius:6px; cursor:pointer; font-size:0.85rem; display:flex; align-items:center; gap:5px;"><i class="fas fa-calendar-plus"></i> Reservar</button>
-                           </div>`
-                : statusText.toLowerCase() === 'ocupado'
-                    ? `<button style="background:#ef4444; color:white; border:none; padding:6px 12px; border-radius:6px; cursor:not-allowed; opacity:0.8; font-size:0.85rem;" disabled><i class="fas fa-ban"></i> Ocupado</button>`
-                    : ''
-            }
+                    ${actionsHtml}
                     <div style="display:flex; gap:5px;">
                         <button class="btn-icon" title="Editar" onclick="editRoom('${r.id}')"><i class="fas fa-pen"></i></button>
-                        ${statusText.toLowerCase() === 'sucio' ? `<button class="btn-icon" title="Marcar Limpio" style="color:var(--primary);"><i class="fas fa-broom"></i></button>` : ''}
+                        ${normStatus === 'sucio' ? `<button class="btn-icon" title="Marcar Limpio" style="color:var(--primary);"><i class="fas fa-broom"></i></button>` : ''}
                     </div>
                 </div>
             </div>
@@ -407,10 +436,14 @@ async function processCheckIn(e) {
     submitBtn.innerText = 'Procesando...';
     submitBtn.disabled = true;
 
+    // Safely get value even if disabled
+    const fechaEntrada = document.getElementById('checkInEntrada').value;
+
     const data = {
         action: 'checkIn',
         habitacionId: document.getElementById('checkInRoomId').value,
         cliente: document.getElementById('checkInCliente').value,
+        fechaEntrada: fechaEntrada,
         fechaSalida: document.getElementById('checkInSalida').value,
         notas: document.getElementById('checkInNotas').value,
         isReservation: (checkInMode === 'reservation')
@@ -427,13 +460,16 @@ async function processCheckIn(e) {
             alert('✅ Operación exitosa');
             closeCheckIn();
             loadRoomsView();
+            // If in calendar view, refresh it too
+            if (document.getElementById('view-calendar').style.display === 'block') {
+                loadCalendarView();
+            }
         } else {
             alert('❌ Error: ' + result.error);
         }
     } catch (error) {
         alert('❌ Error de conexión: ' + error.message);
     } finally {
-        // Restore button state
         submitBtn.innerText = originalText;
         submitBtn.disabled = false;
     }
@@ -815,9 +851,13 @@ function renderCalendarTimeline(rooms, reservations) {
                 <button onclick="changeCalendarDate(15)" style="border:1px solid #cbd5e1; background:white; padding:5px 10px; border-radius:6px; cursor:pointer;"><i class="fas fa-chevron-right"></i></button>
             </div>
             
-            <div style="font-size:0.9rem; color:#64748B;">
-                <span style="display:inline-block; width:12px; height:12px; background:${colorActive}; border-radius:50%; margin-right:5px;"></span>Ocupado
-                <span style="display:inline-block; width:12px; height:12px; background:${colorFuture}; border-radius:50%; margin-right:5px; margin-left:10px;"></span>Reservado
+            <div style="display:flex; align-items:center; gap:20px;">
+                <div style="font-size:0.9rem; color:#64748B;">
+                    <span style="display:inline-block; width:12px; height:12px; background:${colorActive}; border-radius:50%; margin-right:5px;"></span>Ocupado
+                    <span style="display:inline-block; width:12px; height:12px; background:${colorFuture}; border-radius:50%; margin-right:5px; margin-left:10px;"></span>Reservado
+                </div>
+                <!-- Generic Reservation Button -->
+                <button onclick="openReservation('', '')" style="background:var(--primary); color:white; border:none; padding:8px 16px; border-radius:6px; font-weight:bold; cursor:pointer;">+ Nueva Reserva</button>
             </div>
         </div>
 
