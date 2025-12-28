@@ -803,6 +803,43 @@ async function processCheckIn(e) {
         isReservation: (checkInMode === 'reservation')
     };
 
+    // OPTIMISTIC UPDATE
+    // ------------------------------------------------
+    const tempId = 'temp-' + Date.now();
+
+    // 1. Create Local Reservation Object
+    const newRes = {
+        id: tempId,
+        habitacionId: data.habitacionId,
+        cliente: data.cliente,
+        fechaEntrada: data.fechaEntrada,
+        fechaSalida: data.fechaSalida,
+        estado: data.isReservation ? 'Reserva' : 'Activa', // or 'Ocupada' depending on your logic
+        notas: data.notas
+    };
+
+    // 2. Update Reservations List
+    if (!currentReservationsList) currentReservationsList = [];
+    currentReservationsList.push(newRes);
+
+    // 3. Update Room Status Local (if Check-In)
+    if (!data.isReservation) {
+        const roomIdx = currentRoomsList.findIndex(r => r.id == data.habitacionId);
+        if (roomIdx !== -1) {
+            currentRoomsList[roomIdx].estado = 'Ocupado';
+        }
+    }
+
+    // 4. Update UI Immediately
+    closeCheckIn();
+
+    if (document.getElementById('view-calendar').style.display === 'block') {
+        renderCalendarTimeline(currentRoomsList, currentReservationsList);
+    }
+    loadRoomsView(); // Refreshes badges
+
+    // 5. Background Sync
+    // ------------------------------------------------
     try {
         const res = await fetch(CONFIG.API_URL, {
             method: 'POST',
@@ -811,18 +848,31 @@ async function processCheckIn(e) {
         const result = await res.json();
 
         if (result.success) {
-            alert('✅ Operación exitosa');
-            closeCheckIn();
-            loadRoomsView();
-            // If in calendar view, refresh it too
-            if (document.getElementById('view-calendar').style.display === 'block') {
-                loadCalendarView();
-            }
+            // Success: Silent refresh to get real IDs and clean up temp
+            // We could update the temp ID in place, but reloading is safer for consistency
+            // Wait a moment so user doesn't see flicker? No, just load.
+
+            // Only blocking alert if something critical? No, just silent.
+            // Maybe show a toast/notification? For now, nothing.
+
+            // Update the temp object with real ID if we wanted to be fancy, 
+            // but let's just re-fetch in background.
+            loadCalendarView(); // Helper will fetch and re-render
+            // We don't call loadRoomsView again if we don't need to, but ensures ID is valid for next click.
+
         } else {
-            alert('❌ Error: ' + result.error);
+            alert('❌ Error guardando en servidor: ' + result.error);
+            // Revert!
+            // Simplest revert: reload everything from server
+            await Promise.all([
+                loadRoomsView(),
+                loadCalendarView()
+            ]);
         }
     } catch (error) {
         alert('❌ Error de conexión: ' + error.message);
+        // Revert
+        window.location.reload(); // Hard revert if connection fail
     } finally {
         submitBtn.innerText = originalText;
         submitBtn.disabled = false;
