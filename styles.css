@@ -661,4 +661,28 @@ body {
         opacity: 1;
         transform: scale(1);
     }
+
+}
+
+/* =========================================
+   FILTER STYLES (Added for Red Neon Effect)
+   ========================================= */
+@keyframes neonRedPulse {
+    0% {
+        box-shadow: 0 0 5px #ef4444, 0 0 10px #ef4444;
+    }
+
+    100% {
+        box-shadow: 0 0 10px #ef4444, 0 0 20px #ef4444, 0 0 30px #ef4444;
+    }
+}
+
+.filter-btn-active {
+    animation: neonRedPulse 1.2s infinite alternate !important;
+    background: #ef4444 !important;
+    /* Red */
+    color: white !important;
+    border: 1px solid #fca5a5 !important;
+    transform: scale(1.05);
+    transition: all 0.3s ease;
 }
