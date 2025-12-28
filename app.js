@@ -419,7 +419,7 @@ async function ensureReservationsLoaded() {
         });
         const result = await res.json();
         if (result.success) {
-            currentReservationsList = result.data;
+            currentReservationsList = result.reservas; // Fix mismatch (was result.data)
             if (pickerState.roomId) initDatePicker(pickerState.roomId);
         }
     } catch (e) { console.error('Error loading reservations for picker', e); }
