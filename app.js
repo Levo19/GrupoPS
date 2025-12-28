@@ -406,17 +406,17 @@ function renderRooms(rooms) {
             const clientName = r.cliente_actual || '';
 
             const btnFinish = `<button onclick="openCheckOut('${r.id}', '${r.numero}', '${clientName}')" style="width:100%; padding:10px; border:none; border-radius:8px; background:#ef4444; color:white; font-weight:bold; cursor:pointer; margin-bottom:8px;">
-                                <i class="fas fa-sign-out-alt"></i> Finalizar (Check-Out)
+                                <i class="fas fa-sign-out-alt"></i> Finalizar
                            </button>`;
 
             // Pass isExtension = true
             const btnExtend = `<button onclick="openReservation('${r.id}', '${r.numero}', null, '${clientName}', true)" style="width:100%; padding:10px; border:none; border-radius:8px; background:#22c55e; color:white; font-weight:bold; cursor:pointer; margin-bottom:8px;">
-                                <i class="fas fa-calendar-plus"></i> Extender Estadía
+                                <i class="fas fa-calendar-plus"></i> Extender
                            </button>`;
 
             // Pass isExtension = false
             const btnNewRes = `<button onclick="openReservation('${r.id}', '${r.numero}', null, '', false)" style="width:100%; padding:10px; border:none; border-radius:8px; background:#eab308; color:white; font-weight:bold; cursor:pointer;">
-                                <i class="fas fa-calendar-alt"></i> Nueva Reserva
+                                <i class="fas fa-calendar-alt"></i> Reservar
                            </button>`;
 
             actionsHtml = btnFinish + btnExtend + btnNewRes;
@@ -642,7 +642,9 @@ function getDateDetails(roomId, dateStr) {
     // 2. Find all matches
     const matches = currentReservationsList.filter(r => {
         if (String(r.habitacionId) !== String(roomId) && String(r.habitacionId) !== String(r.habitacionNumero)) return false;
-        if (r.estado === 'Cancelada' || r.estado === 'Finalizada') return false;
+        if (r.estado === 'Cancelada') return false;
+        // We include Finalizada now to color them gray, but maybe exclude from collision logic elsewhere?
+        // Actually for getDateDetails we WANT to see them if we color them.
 
         const start = r.fechaEntrada.substring(0, 10);
         const end = r.fechaSalida.substring(0, 10);
@@ -662,6 +664,7 @@ function getDateDetails(roomId, dateStr) {
         const end = r.fechaSalida.substring(0, 10);
 
         if (r.estado === 'Activa' || r.estado === 'Ocupada') status = 'occupied';
+        if (r.estado === 'Finalizada') status = 'finalized';
 
         if (dateStr > start && dateStr < end) hasFull = true;
         if (dateStr === start) hasStart = true;
@@ -669,10 +672,27 @@ function getDateDetails(roomId, dateStr) {
     });
 
     // Determine specific type
-    if (hasFull) return { type: 'full', color: status === 'occupied' ? 'green' : 'yellow' };
-    if (hasStart && hasEnd) return { type: 'full-split', color: 'split' }; // One leaves, one arrives -> Full day busy
-    if (hasStart) return { type: 'checkin-pm', color: status === 'occupied' ? 'green' : 'yellow' }; // Arriving PM, AM free
-    if (hasEnd) return { type: 'checkout-am', color: status === 'occupied' ? 'green' : 'yellow' }; // Leaving AM, PM free
+    if (hasFull) {
+        if (status === 'finalized') return { type: 'full', color: '#94a3b8' }; // Gray
+        return { type: 'full', color: status === 'occupied' ? 'green' : 'yellow' };
+    }
+    // Logic for splits with Finalized?
+    // If Start is Finalized -> CheckIn-PM Gray? 
+    // If End is Finalized -> CheckOut-AM Gray?
+    // Complicated if mixing Statuses. Assuming simple dominance for now.
+
+    if (hasStart && hasEnd) return { type: 'full-split', color: 'split' };
+
+    if (hasStart) {
+        let col = status === 'occupied' ? 'green' : 'yellow';
+        if (status === 'finalized') col = '#94a3b8';
+        return { type: 'checkin-pm', color: col };
+    }
+    if (hasEnd) {
+        let col = status === 'occupied' ? 'green' : 'yellow';
+        if (status === 'finalized') col = '#94a3b8';
+        return { type: 'checkout-am', color: col };
+    }
 
     return { type: 'free', color: 'white' };
 }
@@ -844,18 +864,53 @@ window.openReservation = function (roomId, roomNum, startDate, clientName, isExt
 
     if (btn) {
         btn.innerText = isExtension ? 'Confirmar Extensión' : 'Crear Reserva';
-        btn.style.background = isExtension ? 'var(--occupied)' : 'var(--primary)'; // Green or Blue
+        // Force Green if Extension (#22c55e), Yellow if Reserve (#eab308)
+        btn.style.background = isExtension ? '#22c55e' : '#eab308';
+        btn.style.color = 'white';
     }
 
-    setupCheckInModal(roomId, roomNum, startDate);
+    // Determine correct Start Date for Extension (Active CheckOut)
+    let finalStartDate = startDate;
+    if (isExtension) {
+        // Find active reservation check-out date
+        const activeRes = currentReservationsList.find(res =>
+            (String(res.habitacionId) === String(roomId) || String(res.habitacionId) === String(roomNum)) &&
+            (res.estado === 'Activa' || res.estado === 'Ocupada')
+        );
+        if (activeRes) {
+            // Cut off time part if exists
+            finalStartDate = activeRes.fechaSalida.split(' ')[0] || activeRes.fechaSalida.substring(0, 10);
+        }
+    }
+
+    setupCheckInModal(roomId, roomNum, finalStartDate);
 
     // Pre-fill Client Name if provided (e.g. extending stay)
     // Must be done AFTER setupCheckInModal because it calls form.reset()
     const clientInput = document.getElementById('checkInCliente');
     if (clientInput && clientName) {
         clientInput.value = clientName;
-        // Optionally lock it if extension? 
-        // clientInput.readOnly = isExtension; 
+        // Lock Client Name if Extension
+        if (isExtension) {
+            clientInput.readOnly = true;
+            clientInput.style.backgroundColor = '#e2e8f0'; // Gray out
+            clientInput.title = "El nombre no se puede cambiar en una extensión.";
+        } else {
+            clientInput.readOnly = false;
+            clientInput.style.backgroundColor = '';
+        }
+    }
+
+    // Lock Start Date Logic if Extension
+    // We handle this by setting picker state but we might need UI feedback or just prevent changing start.
+    // For now, relies on user picking End Date, but if they click another start... 
+    // Ideally we lock the start in the picker.
+    if (isExtension && finalStartDate) {
+        // We can visualize this lock in renderDatePicker if needed, 
+        // or just rely on 'Locked Start' class if we add it.
+        // Let's manually trigger the picker's "First click" state?
+        // This requires exposing the picker state. 
+        // Simplest: Just inform user "Seleccione la nueva fecha de salida".
     }
 }
 
