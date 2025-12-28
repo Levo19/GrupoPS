@@ -1814,21 +1814,23 @@ function openRoomDetail(roomId) {
 
     if (status === 'disponible' || status === 'sucio') {
         // Check In & Reserve
-        btns += `<button class="rd-btn btn-checkin" onclick="closeRoomDetail(); openCheckIn('${r.id}', '${r.numero}')"><i class="fas fa-check"></i> Check-In (Ingreso)</button>`;
-        btns += `<button class="rd-btn btn-reserve" onclick="closeRoomDetail(); openReservation('${r.id}', '${r.numero}')"><i class="fas fa-calendar-alt"></i> Crear Reserva</button>`;
+        btns += `<button class="rd-btn btn-checkin" style="background:#22c55e; color:white;" onclick="closeRoomDetail(); openCheckIn('${r.id}', '${r.numero}')"><i class="fas fa-check"></i> Check-In</button>`;
+        btns += `<button class="rd-btn btn-reserve" style="background:#eab308; color:white;" onclick="closeRoomDetail(); openReservation('${r.id}', '${r.numero}')"><i class="fas fa-calendar-alt"></i> Reservar</button>`;
         if (status === 'sucio') {
-            btns += `<button class="rd-btn btn-clean" onclick="closeRoomDetail(); alert('Funcionalidad de limpieza rápida pendiente')"><i class="fas fa-broom"></i> Marcar Limpio</button>`;
+            btns += `<button class="rd-btn btn-clean" style="border:1px dashed #64748B; color:#64748B;" onclick="closeRoomDetail(); alert('Funcionalidad de limpieza rápida pendiente')"><i class="fas fa-broom"></i> Marcar Limpio</button>`;
         }
     } else if (status === 'ocupado') {
         // Check Out & Extend
-        btns += `<button class="rd-btn btn-checkout" onclick="closeRoomDetail(); openCheckOut('${r.id}')"><i class="fas fa-sign-out-alt"></i> Finalizar (Check-Out)</button>`;
-        btns += `<button class="rd-btn btn-reserve" onclick="closeRoomDetail(); openReservation('${r.id}', '${r.numero}', '', '${clientName}')"><i class="fas fa-calendar-plus"></i> Extender Estadía</button>`;
+        btns += `<button class="rd-btn btn-checkout" style="background:#ef4444; color:white;" onclick="closeRoomDetail(); openCheckOut('${r.id}')"><i class="fas fa-sign-out-alt"></i> Finalizar</button>`;
+
+        // Green Extend Button, passing isExtension=true
+        btns += `<button class="rd-btn btn-reserve" style="background:#22c55e; color:white;" onclick="closeRoomDetail(); openReservation('${r.id}', '${r.numero}', '', '${clientName}', true)"><i class="fas fa-calendar-plus"></i> Extender</button>`;
     } else if (status === 'reservado') {
-        // Check In & Cancel
-        btns += `<button class="rd-btn btn-checkin" onclick="closeRoomDetail(); openCheckIn('${r.id}', '${r.numero}')"><i class="fas fa-check"></i> Confirmar Llegada</button>`;
-        btns += `<button class="rd-btn btn-reserve" onclick="closeRoomDetail(); openReservation('${r.id}', '${r.numero}')"><i class="fas fa-edit"></i> Modificar Reserva</button>`;
+        // Check In & Edit
+        btns += `<button class="rd-btn btn-checkin" style="background:#22c55e; color:white;" onclick="closeRoomDetail(); openCheckIn('${r.id}', '${r.numero}')"><i class="fas fa-check"></i> Llegada</button>`;
+        btns += `<button class="rd-btn btn-reserve" style="background:#eab308; color:white;" onclick="closeRoomDetail(); openReservation('${r.id}', '${r.numero}')"><i class="fas fa-edit"></i> Modificar</button>`;
     } else {
-        btns += `<div style="text-align:center; color:#64748B;">No hay acciones disponibles para mantenimiento.</div>`;
+        btns += `<div style="text-align:center; color:#64748B;">No hay acciones disponibles.</div>`;
     }
 
     // Always Edit
