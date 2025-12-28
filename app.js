@@ -813,14 +813,18 @@ window.openCheckIn = function (roomId, roomNum) {
     setupCheckInModal(roomId, roomNum, null);
 }
 
-window.openReservation = function (roomId, roomNum, startDate, clientName) {
-    checkInMode = 'reservation';
+window.openReservation = function (roomId, roomNum, startDate, clientName, isExtension = false) {
+    checkInMode = isExtension ? 'extension' : 'reservation';
     const title = document.getElementById('modalTitleCheckIn');
     const btn = document.getElementById('btnSubmitCheckIn');
-    if (title) title.innerHTML = '📅 Nueva Reserva';
+
+    if (title) {
+        title.innerHTML = isExtension ? '🔄 Extender Estadía (Continuar)' : '📅 Nueva Reserva';
+    }
+
     if (btn) {
-        btn.innerText = 'Crear Reserva';
-        btn.style.background = 'var(--primary)';
+        btn.innerText = isExtension ? 'Confirmar Extensión' : 'Crear Reserva';
+        btn.style.background = isExtension ? 'var(--occupied)' : 'var(--primary)'; // Green or Blue
     }
 
     setupCheckInModal(roomId, roomNum, startDate);
@@ -830,6 +834,8 @@ window.openReservation = function (roomId, roomNum, startDate, clientName) {
     const clientInput = document.getElementById('checkInCliente');
     if (clientInput && clientName) {
         clientInput.value = clientName;
+        // Optionally lock it if extension? 
+        // clientInput.readOnly = isExtension; 
     }
 }
 
@@ -903,34 +909,48 @@ async function processCheckIn(e) {
         fechaEntrada: fechaEntrada,
         fechaSalida: document.getElementById('checkInSalida').value,
         notas: document.getElementById('checkInNotas').value,
-        isReservation: (checkInMode === 'reservation')
+        isReservation: (checkInMode === 'reservation'),
+        isExtension: (checkInMode === 'extension')
     };
 
-    // OPTIMISTIC UPDATE
-    // ------------------------------------------------
-    const tempId = 'temp-' + Date.now();
-    const statusLabel = data.isReservation ? 'Reserva' : 'Activa'; // Local status naming
+    if (!data.fechaEntrada || !data.fechaSalida || !data.cliente) {
+        alert('Por favor complete todos los campos.');
+        return;
+    }
 
-    // 1. Create Local Reservation Object
+    // Modal close
+    document.getElementById('modalCheckIn').classList.remove('active');
+
+    // OPTIMISTIC UPDATE
+    const tempId = 'TEMP-' + new Date().getTime();
+
+    // Determine status: Extension -> Activa, Reservation -> Reserva
+    let tempStatus = 'Activa';
+    if (data.isReservation) tempStatus = 'Reserva';
+    if (data.isExtension) tempStatus = 'Activa';
+    // Wait, Extension IS basically an active record, just new dates.
+
+    let label = 'Ocupado';
+    if (tempStatus === 'Reserva') label = 'Reserva';
+
     const newRes = {
         id: tempId,
         habitacionId: data.habitacionId,
         cliente: data.cliente,
         fechaEntrada: data.fechaEntrada,
         fechaSalida: data.fechaSalida,
-        estado: statusLabel,
+        estado: tempStatus,
         notas: data.notas
     };
 
-    // 2. Update Reservations List
-    if (!currentReservationsList) currentReservationsList = [];
     currentReservationsList.push(newRes);
 
-    // 3. Update Room Status Local (if Check-In)
-    if (!data.isReservation) {
+    // Update Room Status in UI if needed (Immediate Check-in or Extension)
+    if (!data.isReservation || data.isExtension) {
         const roomIdx = currentRoomsList.findIndex(r => r.id == data.habitacionId);
         if (roomIdx !== -1) {
             currentRoomsList[roomIdx].estado = 'Ocupado';
+            currentRoomsList[roomIdx].cliente = data.cliente;
         }
     }
 
