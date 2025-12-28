@@ -18,11 +18,42 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (token && user) {
         currentUser = JSON.parse(user);
+        preloadAppSession(); // Preload data in background
         initDashboard();
     } else {
         showLogin();
     }
 });
+
+// ===== PRELOADING =====
+async function preloadAppSession() {
+    console.log('🚀 Preloading App Data...');
+    try {
+        const [resRooms, resProds, resUsers, resRes] = await Promise.all([
+            fetch(CONFIG.API_URL, { method: 'POST', body: JSON.stringify({ action: 'getHabitaciones' }) }).then(r => r.json()),
+            fetch(CONFIG.API_URL, { method: 'POST', body: JSON.stringify({ action: 'getProductos' }) }).then(r => r.json()),
+            fetch(CONFIG.API_URL, { method: 'POST', body: JSON.stringify({ action: 'getUsuarios' }) }).then(r => r.json()),
+            fetch(CONFIG.API_URL, { method: 'POST', body: JSON.stringify({ action: 'getReservas' }) }).then(r => r.json())
+        ]);
+
+        if (resRooms.success) currentRoomsList = resRooms.habitaciones;
+        if (resProds.success) currentProductsList = resProds.productos;
+        if (resUsers.success) currentUsersList = resUsers.usuarios;
+        if (resRes.success) currentReservationsList = resRes.reservas;
+
+        console.log('✅ Data Preloaded!');
+
+        // If we are already on a view that needs this data, refresh it safely
+        const currentId = document.querySelector('.nav-item.active')?.getAttribute('onclick')?.match(/'(.*)'/)?.[1];
+        if (currentId === 'rooms') renderRooms(currentRoomsList);
+        if (currentId === 'products') renderProducts(currentProductsList);
+        if (currentId === 'users') renderUsers(currentUsersList);
+        // Calendar is complex, leave it for now or refresh if visible
+
+    } catch (e) {
+        console.error('⚠️ Error preloading data', e);
+    }
+}
 
 function showLogin() {
     document.getElementById('loginScreen').style.display = 'flex';
@@ -81,6 +112,9 @@ function loginSuccess(data) {
     // Animación de salida login
     const screen = document.getElementById('loginScreen');
     screen.style.opacity = '0';
+
+    preloadAppSession(); // Start fetching immediately
+
     setTimeout(() => {
         screen.style.display = 'none';
         initDashboard();
@@ -144,14 +178,21 @@ function navigate(viewId) {
 // ===== ROOMS MODULE =====
 async function loadRoomsView() {
     const container = document.getElementById('view-rooms');
-    container.innerHTML = `
-        <div style="text-align:center; padding: 50px;">
-            <i class="fas fa-spinner fa-spin" style="font-size: 2rem; color: var(--primary);"></i>
-            <p style="margin-top:15px; color:#64748B;">Cargando habitaciones...</p>
-        </div>
-    `;
+
+    // 1. Optimistic Render (Instant)
+    if (currentRoomsList.length > 0) {
+        renderRooms(currentRoomsList);
+    } else {
+        container.innerHTML = `
+            <div style="text-align:center; padding: 50px;">
+                <i class="fas fa-spinner fa-spin" style="font-size: 2rem; color: var(--primary);"></i>
+                <p style="margin-top:15px; color:#64748B;">Cargando habitaciones...</p>
+            </div>
+        `;
+    }
 
     try {
+        // 2. Silent Fetch (Update in background)
         const res = await fetch(CONFIG.API_URL, {
             method: 'POST',
             body: JSON.stringify({ action: 'getHabitaciones' })
@@ -159,12 +200,15 @@ async function loadRoomsView() {
         const data = await res.json();
 
         if (data.success) {
+            currentRoomsList = data.habitaciones;
             renderRooms(data.habitaciones);
-        } else {
+        } else if (currentRoomsList.length === 0) {
             container.innerHTML = `<div style="color:red; text-align:center;">Error: ${data.error}</div>`;
         }
     } catch (e) {
-        container.innerHTML = `<div style="color:red; text-align:center;">Error de conexión: ${e.message}</div>`;
+        if (currentRoomsList.length === 0) {
+            container.innerHTML = `<div style="color:red; text-align:center;">Error de conexión: ${e.message}</div>`;
+        }
     }
 }
 
@@ -216,11 +260,10 @@ async function saveRoom(e) {
     const btn = e.target.querySelector('button[type="submit"]');
     const originalText = btn.innerText;
 
-    btn.disabled = true;
-    btn.innerText = 'Guardando...';
-
+    // 1. Get Data
+    const id = document.getElementById('editRoomId').value;
     const roomData = {
-        id: document.getElementById('editRoomId').value,
+        id: id,
         numero: document.getElementById('editNum').value,
         tipo: document.getElementById('editTipo').value,
         precio: document.getElementById('editPrecio').value,
@@ -228,6 +271,23 @@ async function saveRoom(e) {
         fotos: document.getElementById('editFoto').value
     };
 
+    // 2. Optimistic Update
+    if (id) {
+        // Edit
+        const index = currentRoomsList.findIndex(r => r.id == id);
+        if (index !== -1) {
+            currentRoomsList[index] = { ...currentRoomsList[index], ...roomData };
+        }
+    } else {
+        // New (Temp ID for display)
+        currentRoomsList.push({ ...roomData, id: 'temp-' + Date.now() });
+    }
+
+    // Render Immediately & Close
+    renderRooms(currentRoomsList);
+    closeRoomEditor();
+
+    // 3. Background Sync
     try {
         const res = await fetch(CONFIG.API_URL, {
             method: 'POST',
@@ -238,17 +298,19 @@ async function saveRoom(e) {
         });
         const data = await res.json();
 
-        if (data.success) {
-            closeRoomEditor();
-            loadRoomsView(); // Refresh list
+        if (!data.success) {
+            alert('❌ Error guardando en servidor: ' + data.error);
+            // Revert or Refresh
+            loadRoomsView();
         } else {
-            alert('Error: ' + data.error);
+            // Success: Update list with real data from server (to get real ID)
+            // loadRoomsView(); // Optional: keeps data strictly synced
+            // For now, let's just silently refresh to get the real ID
+            loadRoomsView();
         }
     } catch (err) {
-        alert('Error de conexión: ' + err.message);
-    } finally {
-        btn.disabled = false;
-        btn.innerText = originalText;
+        alert('❌ Error de conexión: ' + err.message);
+        loadRoomsView(); // Revert
     }
 }
 
@@ -770,12 +832,17 @@ let currentUsersList = [];
 
 async function loadUsersView() {
     const container = document.getElementById('view-users');
-    container.innerHTML = `
-        <div style="text-align:center; padding: 50px;">
-            <i class="fas fa-spinner fa-spin" style="font-size: 2rem; color: var(--primary);"></i>
-            <p style="margin-top:15px; color:#64748B;">Cargando usuarios...</p>
-        </div>
-    `;
+
+    if (currentUsersList.length > 0) {
+        renderUsers(currentUsersList);
+    } else {
+        container.innerHTML = `
+            <div style="text-align:center; padding: 50px;">
+                <i class="fas fa-spinner fa-spin" style="font-size: 2rem; color: var(--primary);"></i>
+                <p style="margin-top:15px; color:#64748B;">Cargando usuarios...</p>
+            </div>
+        `;
+    }
 
     try {
         const res = await fetch(CONFIG.API_URL, {
@@ -787,11 +854,13 @@ async function loadUsersView() {
         if (data.success) {
             currentUsersList = data.usuarios;
             renderUsers(data.usuarios);
-        } else {
+        } else if (currentUsersList.length === 0) {
             container.innerHTML = `<div style="color:red; text-align:center;">Error: ${data.error}</div>`;
         }
     } catch (e) {
-        container.innerHTML = `<div style="color:red; text-align:center;">Error de conexión: ${e.message}</div>`;
+        if (currentUsersList.length === 0) {
+            container.innerHTML = `<div style="color:red; text-align:center;">Error de conexión: ${e.message}</div>`;
+        }
     }
 }
 
@@ -873,11 +942,12 @@ function closeUserEditor() {
 async function saveUser(e) {
     e.preventDefault();
     const btn = e.target.querySelector('button[type="submit"]');
-    btn.innerText = 'Guardando...';
-    btn.disabled = true;
+    const originalText = btn.innerText;
 
+    // 1. Get Data
+    const id = document.getElementById('editUserId').value;
     const userData = {
-        id: document.getElementById('editUserId').value,
+        id: id,
         nombre: document.getElementById('editUserNombre').value,
         email: document.getElementById('editUserEmail').value,
         password: document.getElementById('editUserPass').value,
@@ -885,6 +955,23 @@ async function saveUser(e) {
         estado: document.getElementById('editUserEstado').value,
     };
 
+    // 2. Optimistic Update
+    if (id) {
+        // Edit
+        const index = currentUsersList.findIndex(u => u.id == id);
+        if (index !== -1) {
+            currentUsersList[index] = { ...currentUsersList[index], ...userData };
+        }
+    } else {
+        // New
+        currentUsersList.push({ ...userData, id: 'temp-' + Date.now() });
+    }
+
+    // Render & Close
+    renderUsers(currentUsersList);
+    closeUserEditor();
+
+    // 3. Background Sync
     try {
         const res = await fetch(CONFIG.API_URL, {
             method: 'POST',
@@ -892,18 +979,15 @@ async function saveUser(e) {
         });
         const data = await res.json();
 
-        if (data.success) {
-            closeUserEditor();
+        if (!data.success) {
+            alert('❌ Error guardando en servidor: ' + data.error);
             loadUsersView();
-            // Re-login if updating self? No, keep simple.
         } else {
-            alert('Error: ' + data.error);
+            loadUsersView(); // Silent refresh
         }
     } catch (err) {
-        alert('Error: ' + err.message);
-    } finally {
-        btn.innerText = 'Guardar Usuario';
-        btn.disabled = false;
+        alert('❌ Error de conexión: ' + err.message);
+        loadUsersView();
     }
 }
 
@@ -913,12 +997,18 @@ let currentProductsList = [];
 
 async function loadProductsView() {
     const container = document.getElementById('view-products');
-    container.innerHTML = `
-        <div style="text-align:center; padding: 50px;">
-            <i class="fas fa-spinner fa-spin" style="font-size: 2rem; color: var(--primary);"></i>
-            <p style="margin-top:15px; color:#64748B;">Cargando inventario...</p>
-        </div>
-    `;
+
+    // Optimistic
+    if (currentProductsList.length > 0) {
+        renderProducts(currentProductsList);
+    } else {
+        container.innerHTML = `
+            <div style="text-align:center; padding: 50px;">
+                <i class="fas fa-spinner fa-spin" style="font-size: 2rem; color: var(--primary);"></i>
+                <p style="margin-top:15px; color:#64748B;">Cargando inventario...</p>
+            </div>
+        `;
+    }
 
     try {
         const res = await fetch(CONFIG.API_URL, {
@@ -930,11 +1020,13 @@ async function loadProductsView() {
         if (data.success) {
             currentProductsList = data.productos;
             renderProducts(data.productos);
-        } else {
+        } else if (currentProductsList.length === 0) {
             container.innerHTML = `<div style="color:red; text-align:center;">Error: ${data.error}</div>`;
         }
     } catch (e) {
-        container.innerHTML = `<div style="color:red; text-align:center;">Error de conexión: ${e.message}</div>`;
+        if (currentProductsList.length === 0) {
+            container.innerHTML = `<div style="color:red; text-align:center;">Error de conexión: ${e.message}</div>`;
+        }
     }
 }
 
@@ -1042,11 +1134,12 @@ function closeProductEditor() {
 async function saveProduct(e) {
     e.preventDefault();
     const btn = e.target.querySelector('button[type="submit"]');
-    btn.innerText = 'Guardando...';
-    btn.disabled = true;
+    const originalText = btn.innerText;
 
+    // 1. Get Data
+    const id = document.getElementById('editProdId').value;
     const prodData = {
-        id: document.getElementById('editProdId').value,
+        id: id,
         categoria: document.getElementById('editProdCat').value,
         nombre: document.getElementById('editProdNombre').value,
         descripcion: document.getElementById('editProdDesc').value,
@@ -1057,23 +1150,39 @@ async function saveProduct(e) {
         empresa: document.getElementById('editProdEmpresa').value
     };
 
+    // 2. Optimistic Update
+    if (id) {
+        // Edit
+        const index = currentProductsList.findIndex(p => p.id == id);
+        if (index !== -1) {
+            currentProductsList[index] = { ...currentProductsList[index], ...prodData };
+        }
+    } else {
+        // New
+        currentProductsList.push({ ...prodData, id: 'temp-' + Date.now() });
+    }
+
+    // Render & Close
+    renderProducts(currentProductsList);
+    closeProductEditor();
+
+    // 3. Background Sync
     try {
         const res = await fetch(CONFIG.API_URL, {
             method: 'POST',
             body: JSON.stringify({ action: 'saveProducto', producto: prodData })
         });
         const data = await res.json();
-        if (data.success) {
-            closeProductEditor();
+
+        if (!data.success) {
+            alert('❌ Error guardando en servidor: ' + data.error);
             loadProductsView();
         } else {
-            alert('Error: ' + data.error);
+            loadProductsView(); // Silent refresh
         }
     } catch (err) {
-        alert('Error: ' + err.message);
-    } finally {
-        btn.innerText = 'Guardar';
-        btn.disabled = false;
+        alert('❌ Error de conexión: ' + err.message);
+        loadProductsView();
     }
 }
 
@@ -1082,29 +1191,38 @@ let calendarStartDate = new Date();
 
 async function loadCalendarView() {
     const container = document.getElementById('view-calendar');
-    container.innerHTML = `
-        <div style="text-align:center; padding: 50px;">
-            <i class="fas fa-spinner fa-spin" style="font-size: 2rem; color: var(--primary);"></i>
-            <p style="margin-top:15px;" class="text-slate-500">Cargando calendario...</p>
-        </div>
-    `;
+
+    // 1. Optimistic Render
+    if (currentRoomsList.length > 0 && currentReservationsList.length > 0) {
+        renderCalendarTimeline(currentRoomsList, currentReservationsList);
+    } else {
+        container.innerHTML = `
+            <div style="text-align:center; padding: 50px;">
+                <i class="fas fa-spinner fa-spin" style="font-size: 2rem; color: var(--primary);"></i>
+                <p style="margin-top:15px;" class="text-slate-500">Cargando calendario...</p>
+            </div>
+        `;
+    }
 
     try {
-        // Fetch Rooms & Reservations in parallel
+        // 2. Silent Parallel Fetch
         const [resRooms, resRes] = await Promise.all([
             fetch(CONFIG.API_URL, { method: 'POST', body: JSON.stringify({ action: 'getHabitaciones' }) }).then(r => r.json()),
             fetch(CONFIG.API_URL, { method: 'POST', body: JSON.stringify({ action: 'getReservas' }) }).then(r => r.json())
         ]);
 
-        if (!resRooms.success || !resRes.success) throw new Error('Error cargando datos');
-
-        const rooms = resRooms.habitaciones;
-        const reservations = resRes.reservas;
-
-        renderCalendarTimeline(rooms, reservations);
+        if (resRooms.success && resRes.success) {
+            currentRoomsList = resRooms.habitaciones;
+            currentReservationsList = resRes.reservas; // Ensure sync
+            renderCalendarTimeline(currentRoomsList, currentReservationsList);
+        } else if (currentRoomsList.length === 0) {
+            throw new Error('Error cargando datos');
+        }
 
     } catch (e) {
-        container.innerHTML = `<div style="color:red; text-align:center;">Error: ${e.message}</div>`;
+        if (currentRoomsList.length === 0) {
+            container.innerHTML = `<div style="color:red; text-align:center;">Error: ${e.message}</div>`;
+        }
     }
 }
 
