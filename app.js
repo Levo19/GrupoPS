@@ -413,7 +413,10 @@ function openReservation(roomId, roomNum, startInfo) {
 async function ensureReservationsLoaded() {
     if (typeof currentReservationsList !== 'undefined' && currentReservationsList.length > 0) return;
     try {
-        const res = await fetch(CONFIG.API_URL + '?action=getReservas');
+        const res = await fetch(CONFIG.API_URL, {
+            method: 'POST',
+            body: JSON.stringify({ action: 'getReservas' })
+        });
         const result = await res.json();
         if (result.success) {
             currentReservationsList = result.data;
