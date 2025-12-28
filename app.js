@@ -823,14 +823,14 @@ window.openReservation = function (roomId, roomNum, startDate, clientName) {
         btn.style.background = 'var(--primary)';
     }
 
-    // Pre-fill Client Name if provided (e.g. extending stay)
-    const clientInput = document.getElementById('checkInCliente');
-    if (clientInput) {
-        clientInput.value = clientName || '';
-        // If extending, maybe we want to lock it? Or just prefill. detailed instructions said "Jalar el nombre"
-    }
-
     setupCheckInModal(roomId, roomNum, startDate);
+
+    // Pre-fill Client Name if provided (e.g. extending stay)
+    // Must be done AFTER setupCheckInModal because it calls form.reset()
+    const clientInput = document.getElementById('checkInCliente');
+    if (clientInput && clientName) {
+        clientInput.value = clientName;
+    }
 }
 
 function setupCheckInModal(roomId, roomNum, preSelectedDate) {
