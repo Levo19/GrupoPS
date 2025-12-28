@@ -1,6 +1,14 @@
 // ===== STATE =====
 let currentUser = null;
 let currentView = 'dashboard';
+let currentReservationsList = []; // Moved to top
+let checkInMode = 'checkin'; // 'checkin' or 'reservation'
+let pickerState = {
+    roomId: null,
+    currentMonth: new Date(),
+    startDate: null,
+    endDate: null
+};
 
 // ===== INIT =====
 document.addEventListener('DOMContentLoaded', () => {
@@ -379,15 +387,9 @@ function renderRooms(rooms) {
 
 // ===== CHECK-IN LOGIC (PHASE 5) =====
 // ===== CHECK-IN / RESERVATION LOGIC =====
-let currentReservationsList = []; // [NEW] - Fix ReferenceError
-let checkInMode = 'checkin'; // 'checkin' or 'reservation'
-// [NEW] Picker State
-let pickerState = {
-    roomId: null,
-    currentMonth: new Date(),
-    startDate: null,
-    endDate: null
-};
+// ===== CHECK-IN LOGIC (PHASE 5) =====
+// ===== CHECK-IN / RESERVATION LOGIC =====
+// Variables moved to top of file
 
 function openCheckIn(roomId, roomNum) {
     checkInMode = 'checkin';
@@ -423,18 +425,28 @@ async function ensureReservationsLoaded() {
 // [NEW] Date Picker Implementation
 function initDatePicker(roomId, preDate = null) {
     pickerState.roomId = roomId;
-    pickerState.currentMonth = preDate ? new Date(preDate) : new Date();
+    pickerState.currentMonth = new Date(); // Always start at current month
 
-    // Reset or Set values
-    if (preDate) {
-        pickerState.startDate = preDate; // ISO String expected
-        // Default 1 night?
-        let d = new Date(preDate);
-        d.setDate(d.getDate() + 1);
-        pickerState.endDate = d.toISOString().split('T')[0];
-    } else {
-        pickerState.startDate = null;
+    // Strict Logic for Check-In
+    if (checkInMode === 'checkin') {
+        // Force Start Date = Today
+        const today = new Date();
+        const isoToday = today.toISOString().split('T')[0];
+        pickerState.startDate = isoToday;
         pickerState.endDate = null;
+
+    } else {
+        // Reservation Mode
+        if (preDate) {
+            pickerState.startDate = preDate;
+            let d = new Date(preDate);
+            d.setDate(d.getDate() + 1);
+            pickerState.endDate = d.toISOString().split('T')[0];
+            pickerState.currentMonth = new Date(preDate);
+        } else {
+            pickerState.startDate = null;
+            pickerState.endDate = null;
+        }
     }
 
     // Sync Hidden Inputs
@@ -451,32 +463,45 @@ function changePickerMonth(d) {
 
 function selectPickerDate(dateStr) {
     const { startDate, endDate, roomId } = pickerState;
+    const today = new Date().toISOString().split('T')[0];
 
-    // Logic: 
-    // 1. If nothing selected or both selected -> Start fresh
-    // 2. If start selected -> Select end (if valid)
+    // 1. Strict Check-In Logic
+    if (checkInMode === 'checkin') {
+        // Cannot change start date (it's locked to today)
+        // Can only select End Date > Today
 
-    if (!startDate || (startDate && endDate)) {
-        // Start new range
-        pickerState.startDate = dateStr;
-        pickerState.endDate = null;
+        if (dateStr <= startDate) return; // Ignore clicks before/on start date
+
+        // Validate range
+        if (isRangeBlocked(roomId, startDate, dateStr)) {
+            alert('⚠️ El rango incluye fechas ocupadas.');
+            return;
+        }
+
+        pickerState.endDate = dateStr;
+
     } else {
-        // We have start, trying to select end
-        if (dateStr < startDate) {
-            // New start
+        // 2. Reservation Logic (Flexible)
+        // Prevent past dates
+        if (dateStr < today) return;
+
+        if (!startDate || (startDate && endDate)) {
+            // Start new range
             pickerState.startDate = dateStr;
-        } else if (dateStr > startDate) {
-            // Validate range (check if any blocked date in between)
-            if (isRangeBlocked(roomId, startDate, dateStr)) {
-                alert('⚠️ El rango seleccionado incluye fechas ocupadas.');
-                return;
-            }
-            pickerState.endDate = dateStr;
+            pickerState.endDate = null;
         } else {
-            // Same day? Usually min 1 night. Let's allow same day ONLY if we treat it as day-use? 
-            // Standard hotel: End date is checkout. So same day is invalid for overnight.
-            // Let's assume min 1 night
-            pickerState.endDate = null; // Unselect logic?
+            // We have start
+            if (dateStr < startDate) {
+                pickerState.startDate = dateStr;
+            } else if (dateStr > startDate) {
+                if (isRangeBlocked(roomId, startDate, dateStr)) {
+                    alert('⚠️ El rango incluye fechas ocupadas.');
+                    return;
+                }
+                pickerState.endDate = dateStr;
+            } else {
+                pickerState.endDate = null;
+            }
         }
     }
 
@@ -488,16 +513,20 @@ function selectPickerDate(dateStr) {
 }
 
 function isDateBlocked(roomId, dateStr) {
+    // 1. Block Past Dates universally
+    const today = new Date().toISOString().split('T')[0];
+    if (dateStr < today) return true;
+
     if (!roomId || !currentReservationsList) return false;
-    // Check conflicts
-    // A date is blocked if it falls inside an existing reservation range (Start <= Date < End)
-    // Usually Checkout day is free for Checkin. So Start (inclusive) to End (exclusive).
 
     return currentReservationsList.some(r => {
         if (String(r.habitacionId) !== String(roomId) && String(r.habitacionId) !== String(r.habitacionNumero)) return false;
-        if (r.estado === 'Cancelada' || r.estado === 'Finalizada') return false; // Maybe verify Finalized?
+        // Don't block if Cancelled/Finalized? Depends on "Finalized". 
+        // If Finalized means Checkout done today, then today IS free. 
+        // For simplicity: Finalized = Free.
+        if (r.estado === 'Cancelada' || r.estado === 'Finalizada') return false;
 
-        const start = r.fechaEntrada.split('T')[0]; // ISO YYYY-MM-DD
+        const start = r.fechaEntrada.split('T')[0];
         const end = r.fechaSalida.split('T')[0];
 
         return dateStr >= start && dateStr < end;
@@ -579,9 +608,15 @@ function renderDatePicker() {
             onclick = '';
         }
 
-        // Selected?
-        if (pickerState.startDate === iso || pickerState.endDate === iso) {
-            classes += ' selected';
+        // Visual Lock for Start Date in Check-In Mode
+        if (checkInMode === 'checkin' && pickerState.startDate === iso) {
+            classes += ' selected locked-start';
+            onclick = ''; // Cannot unselect
+        } else {
+            // Normal Selected
+            if (pickerState.startDate === iso || pickerState.endDate === iso) {
+                classes += ' selected';
+            }
         }
 
         // Range?
