@@ -587,23 +587,32 @@ function getDateDetails(roomId, dateStr) {
 
     if (!roomId || !currentReservationsList) return 'free';
 
-    // 2. Occupied / Reserved
-    for (const r of currentReservationsList) {
-        if (String(r.habitacionId) !== String(roomId) && String(r.habitacionId) !== String(r.habitacionNumero)) continue;
-        if (r.estado === 'Cancelada' || r.estado === 'Finalizada') continue;
+    // 2. Find all matching reservations for this day
+    const matches = currentReservationsList.filter(r => {
+        if (String(r.habitacionId) !== String(roomId) && String(r.habitacionId) !== String(r.habitacionNumero)) return false;
+        if (r.estado === 'Cancelada' || r.estado === 'Finalizada') return false;
 
-        const start = r.fechaEntrada.split('T')[0];
-        const end = r.fechaSalida.split('T')[0];
+        // Clean Date Strings (YYYY-MM-DD)
+        const start = r.fechaEntrada.substring(0, 10);
+        const end = r.fechaSalida.substring(0, 10);
 
-        if (dateStr >= start && dateStr < end) {
-            // Found a hit. Check type.
-            if (r.estado === 'Activa' || r.estado === 'Ocupada') return 'occupied';
-            if (r.estado === 'Reserva' || r.estado === 'Pendiente') return 'reserved';
-            return 'occupied'; // Default fallback
-        }
-    }
+        return dateStr >= start && dateStr < end;
+    });
 
-    return 'free';
+    if (matches.length === 0) return 'free';
+
+    // 3. Prioritize Status: Occupied (3) > Reserved (2) > Other (1)
+    const priority = { 'Activa': 3, 'Ocupada': 3, 'Reserva': 2, 'Pendiente': 2 };
+
+    // Sort descending by priority
+    matches.sort((a, b) => (priority[b.estado] || 0) - (priority[a.estado] || 0));
+
+    const topRes = matches[0];
+
+    if (topRes.estado === 'Activa' || topRes.estado === 'Ocupada') return 'occupied';
+    if (topRes.estado === 'Reserva' || topRes.estado === 'Pendiente') return 'reserved';
+
+    return 'occupied'; // Default
 }
 
 function isDateBlocked(roomId, dateStr) {
@@ -1396,8 +1405,11 @@ function renderCalendarTimeline(rooms, reservations) {
                     <span style="display:inline-block; width:12px; height:12px; background:${colorActive}; border-radius:50%; margin-right:5px;"></span>Ocupado
                     <span style="display:inline-block; width:12px; height:12px; background:${colorFuture}; border-radius:50%; margin-right:5px; margin-left:10px;"></span>Reservado
                 </div>
-                <!-- Generic Reservation Button -->
-                <button onclick="openReservation('', '')" style="background:var(--primary); color:white; border:none; padding:8px 16px; border-radius:6px; font-weight:bold; cursor:pointer;">+ Nueva Reserva</button>
+                <!-- Action Buttons in Header -->
+                <div style="display:flex; gap:10px;">
+                     <button onclick="openCheckIn('', '')" style="background:#22c55e; color:white; border:none; padding:8px 16px; border-radius:6px; font-weight:bold; cursor:pointer; display:flex; align-items:center; gap:5px;"><i class="fas fa-check-circle"></i> Check-In</button>
+                     <button onclick="openReservation('', '')" style="background:var(--primary); color:white; border:none; padding:8px 16px; border-radius:6px; font-weight:bold; cursor:pointer; display:flex; align-items:center; gap:5px;"><i class="fas fa-calendar-plus"></i> Nueva Reserva</button>
+                </div>
             </div>
         </div>
 
@@ -1420,7 +1432,7 @@ function renderCalendarTimeline(rooms, reservations) {
 
     rooms.forEach(r => {
         html += `<tr style="border-bottom:1px solid #f1f5f9;">
-                    <td style="padding:15px 10px; font-weight:bold; color:var(--primary);">
+                    <td style="padding:15px 10px; font-weight:bold; color:var(--primary); cursor:pointer;" onclick="openRoomDetail('${r.id}')" title="Ver detalle de habitación">
                         ${r.numero} <br>
                         <span style="font-size:0.7rem; color:#94a3b8; font-weight:normal;">${r.tipo}</span>
                     </td>`;
@@ -1430,17 +1442,17 @@ function renderCalendarTimeline(rooms, reservations) {
             let cellTitle = '';
             let cellText = '';
 
+            // Standardize Date for comparison (YYYY-MM-DD)
+            const isoDate = date.toISOString().split('T')[0];
+
             const matches = reservations.filter(res => {
                 if (String(res.habitacionId) !== String(r.id) && String(res.habitacionId) !== String(r.numero)) return false;
-                const start = new Date(res.fechaEntrada);
-                const end = new Date(res.fechaSalida);
-                const current = new Date(date).setHours(0, 0, 0, 0);
-                const s = new Date(start).setHours(0, 0, 0, 0);
-                // Ensure at least 1 day block if start == end (checked out same day)
-                let eTime = new Date(end).setHours(0, 0, 0, 0);
-                if (eTime <= s) eTime = s + 86400000;
+                if (res.estado === 'Cancelada') return false; // Ignore cancelled
 
-                return current >= s && current < eTime;
+                const start = res.fechaEntrada.substring(0, 10);
+                const end = res.fechaSalida.substring(0, 10);
+
+                return isoDate >= start && isoDate < end;
             });
 
             let res = null;
@@ -1472,11 +1484,6 @@ function renderCalendarTimeline(rooms, reservations) {
                             </div>
                         </td>`;
             } else {
-                // Clickable empty cell
-                const dateStr = date.getFullYear() + '-' + (date.getMonth() + 1) + '-' + date.getDate(); // Simple format, better safe with pads usually but openReservation handles Date obj construction if well formatted
-                // Better pass ISO substring
-                const isoDate = date.toISOString().split('T')[0];
-
                 html += `<td style="padding:5px; text-align:center;">
                             <div onclick="openReservation('${r.id}', '${r.numero}', '${isoDate}')" style="height:30px; border-radius:6px; cursor:pointer; background:#f8fafc;" class="cell-hover" title="Reservar este día"></div>
                         </td>`;
@@ -1490,4 +1497,89 @@ function renderCalendarTimeline(rooms, reservations) {
     `;
 
     container.innerHTML = html;
+}
+
+// ===== ROOM DETAIL CARD LOGIC =====
+function openRoomDetail(roomId) {
+    const r = currentRoomsList.find(x => x.id == roomId);
+    if (!r) return;
+
+    // Elements
+    const img = document.getElementById('rdImg');
+    const badge = document.getElementById('rdStatus');
+    const title = document.getElementById('rdTitle');
+    const type = document.getElementById('rdType');
+    const price = document.getElementById('rdPrice');
+    const cap = document.getElementById('rdCap');
+    const beds = document.getElementById('rdBeds');
+    const actions = document.getElementById('rdActions');
+
+    // 1. Image
+    let imgUrl = 'https://images.unsplash.com/photo-1611892440504-42a792e24d32?q=80&w=600';
+    try {
+        if (r.fotos && r.fotos.startsWith('[')) imgUrl = JSON.parse(r.fotos)[0] || imgUrl;
+        else if (r.fotos && r.fotos.startsWith('http')) imgUrl = r.fotos;
+    } catch (e) { }
+    img.src = imgUrl;
+
+    // 2. Info
+    title.innerText = 'Habitación ' + r.numero;
+    type.innerText = r.tipo;
+    price.innerText = 'S/ ' + r.precio;
+    cap.innerText = (r.capacidad || 2) + ' Personas';
+    beds.innerText = (r.camas || 1) + ' Cama';
+
+    // 3. Status & Colors
+    const status = (r.estado || 'Disponible').toLowerCase();
+    let statusText = 'DISPONIBLE';
+    let badgeColor = '#10b981'; // green
+
+    if (status === 'ocupado') {
+        statusText = 'OCUPADO';
+        badgeColor = '#ef4444';
+    } else if (status === 'mantenimiento') {
+        statusText = 'MANTENIMIENTO';
+        badgeColor = '#f59e0b';
+    } else if (status === 'reservado') {
+        statusText = 'RESERVADO';
+        badgeColor = '#eab308';
+    } else if (status === 'sucio') {
+        statusText = 'LIMPIEZA';
+        badgeColor = '#3b82f6';
+    }
+    badge.innerText = statusText;
+    badge.style.backgroundColor = badgeColor;
+
+    // 4. Dynamic Actions
+    let btns = '';
+
+    if (status === 'disponible' || status === 'sucio') {
+        // Check In & Reserve
+        btns += `<button class="rd-btn btn-checkin" onclick="closeRoomDetail(); openCheckIn('${r.id}', '${r.numero}')"><i class="fas fa-check"></i> Check-In (Ingreso)</button>`;
+        btns += `<button class="rd-btn btn-reserve" onclick="closeRoomDetail(); openReservation('${r.id}', '${r.numero}')"><i class="fas fa-calendar-alt"></i> Crear Reserva</button>`;
+        if (status === 'sucio') {
+            btns += `<button class="rd-btn btn-clean" onclick="closeRoomDetail(); alert('Funcionalidad de limpieza rápida pendiente')"><i class="fas fa-broom"></i> Marcar Limpio</button>`;
+        }
+    } else if (status === 'ocupado') {
+        // Check Out & Extend
+        btns += `<button class="rd-btn btn-checkout" onclick="closeRoomDetail(); openCheckOut('${r.id}')"><i class="fas fa-sign-out-alt"></i> Finalizar (Check-Out)</button>`;
+        btns += `<button class="rd-btn btn-reserve" onclick="closeRoomDetail(); openReservation('${r.id}', '${r.numero}')"><i class="fas fa-calendar-plus"></i> Extender Estadía</button>`;
+    } else if (status === 'reservado') {
+        // Check In & Cancel
+        btns += `<button class="rd-btn btn-checkin" onclick="closeRoomDetail(); openCheckIn('${r.id}', '${r.numero}')"><i class="fas fa-check"></i> Confirmar Llegada</button>`;
+        btns += `<button class="rd-btn btn-reserve" onclick="closeRoomDetail(); openReservation('${r.id}', '${r.numero}')"><i class="fas fa-edit"></i> Modificar Reserva</button>`;
+    } else {
+        btns += `<div style="text-align:center; color:#64748B;">No hay acciones disponibles para mantenimiento.</div>`;
+    }
+
+    // Always Edit
+    btns += `<button class="rd-btn" style="background:#f1f5f9; color:#64748B;" onclick="closeRoomDetail(); editRoom('${r.id}')"><i class="fas fa-cog"></i> Editar Propiedades</button>`;
+
+    actions.innerHTML = btns;
+
+    document.getElementById('modalRoomDetail').style.display = 'flex';
+}
+
+function closeRoomDetail() {
+    document.getElementById('modalRoomDetail').style.display = 'none';
 }
