@@ -714,3 +714,139 @@ async function saveProduct(e) {
         btn.disabled = false;
     }
 }
+
+// ===== CALENDAR MODULE (PHASE 6) =====
+async function loadCalendarView() {
+    const container = document.getElementById('view-calendar');
+    container.innerHTML = `
+        <div style="text-align:center; padding: 50px;">
+            <i class="fas fa-spinner fa-spin" style="font-size: 2rem; color: var(--primary);"></i>
+            <p style="margin-top:15px;" class="text-slate-500">Cargando calendario...</p>
+        </div>
+    `;
+
+    try {
+        // Fetch Rooms & Reservations in parallel
+        const [resRooms, resRes] = await Promise.all([
+            fetch(CONFIG.API_URL, { method: 'POST', body: JSON.stringify({ action: 'getHabitaciones' }) }).then(r => r.json()),
+            fetch(CONFIG.API_URL, { method: 'POST', body: JSON.stringify({ action: 'getReservas' }) }).then(r => r.json())
+        ]);
+
+        if (!resRooms.success || !resRes.success) throw new Error('Error cargando datos');
+
+        const rooms = resRooms.habitaciones;
+        const reservations = resRes.reservas;
+
+        renderCalendarTimeline(rooms, reservations);
+
+    } catch (e) {
+        container.innerHTML = `<div style="color:red; text-align:center;">Error: ${e.message}</div>`;
+    }
+}
+
+function renderCalendarTimeline(rooms, reservations) {
+    const container = document.getElementById('view-calendar');
+
+    // Config: Show next 14 days
+    const daysToShow = 14;
+    const today = new Date();
+    const dates = [];
+
+    for (let i = 0; i < daysToShow; i++) {
+        const d = new Date();
+        d.setDate(today.getDate() + i);
+        dates.push(d);
+    }
+
+    // Colors
+    const colorActive = '#22c55e'; // Green
+    const colorFuture = '#eab308'; // Yellow
+    const colorPast = '#94a3b8'; // Gray
+
+    let html = `
+    <div style="background:white; border-radius:12px; padding:20px; box-shadow:0 4px 6px -1px rgba(0,0,0,0.05); overflow-x:auto;">
+        <div style="display:flex; justify-content:space-between; margin-bottom:15px;">
+            <h2 style="color:var(--primary); font-size:1.5rem;">📅 Ocupación (15 Días)</h2>
+            <div style="font-size:0.9rem; color:#64748B;">
+                <span style="display:inline-block; width:12px; height:12px; background:${colorActive}; border-radius:50%; margin-right:5px;"></span>Ocupado
+                <span style="display:inline-block; width:12px; height:12px; background:${colorFuture}; border-radius:50%; margin-right:5px; margin-left:10px;"></span>Reservado
+            </div>
+        </div>
+
+        <table style="width:100%; border-collapse:collapse; min-width:800px;">
+            <thead>
+                <tr>
+                    <th style="padding:10px; text-align:left; border-bottom:2px solid #e2e8f0; width:100px;">Hab.</th>
+                    ${dates.map(d => {
+        const dayName = d.toLocaleDateString('es-ES', { weekday: 'short' });
+        const dayNum = d.getDate();
+        return `<th style="padding:10px; text-align:center; border-bottom:2px solid #e2e8f0; font-size:0.85rem; color:#64748B;">
+                                    <div>${dayName}</div>
+                                    <div style="font-weight:bold; font-size:1.1rem; color:var(--text-main);">${dayNum}</div>
+                                </th>`;
+    }).join('')}
+                </tr>
+            </thead>
+            <tbody>
+    `;
+
+    rooms.forEach(r => {
+        html += `<tr style="border-bottom:1px solid #f1f5f9;">
+                    <td style="padding:15px 10px; font-weight:bold; color:var(--primary);">
+                        ${r.numero} <br>
+                        <span style="font-size:0.7rem; color:#94a3b8; font-weight:normal;">${r.tipo}</span>
+                    </td>`;
+
+        dates.forEach(date => {
+            // Find overlaps
+            // Simple logic: Is this date >= checkIn AND < checkOut?
+            let cellColor = '';
+            let cellTitle = '';
+            let cellText = ''; // e.g. Guest Name
+
+            const res = reservations.find(res => {
+                // Check room match (ID or Number)
+                if (String(res.habitacionId) !== String(r.id) && String(res.habitacionId) !== String(r.numero)) return false;
+                // Parse dates
+                const start = new Date(res.fechaEntrada);
+                const end = new Date(res.fechaSalida);
+                // Normalize to midnight for comparison
+                const current = new Date(date).setHours(0, 0, 0, 0);
+                const s = new Date(start).setHours(0, 0, 0, 0);
+                const e = new Date(end).setHours(0, 0, 0, 0);
+
+                return current >= s && current < e; // Exclusive end date usually
+            });
+
+            if (res) {
+                if (res.estado === 'Activa' || res.estado === 'Ocupada') {
+                    cellColor = colorActive;
+                    cellTitle = 'Ocupado por: ' + res.cliente;
+                } else if (res.estado === 'Reserva' || res.estado === 'Pendiente') {
+                    cellColor = colorFuture;
+                    cellTitle = 'Reservado: ' + res.cliente;
+                }
+                cellText = res.cliente.split(' ')[0]; // First name
+            }
+
+            if (cellColor) {
+                html += `<td style="padding:5px;">
+                            <div style="background:${cellColor}; color:white; font-size:0.75rem; padding:5px; border-radius:6px; text-align:center; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; cursor:pointer;" title="${cellTitle}">
+                                ${cellText}
+                            </div>
+                        </td>`;
+            } else {
+                html += `<td style="padding:5px; text-align:center;">
+                            <div style="height:30px; border-radius:6px; cursor:pointer; background:#f8fafc;" class="cell-hover"></div>
+                        </td>`;
+            }
+        });
+        html += `</tr>`;
+    });
+
+    html += `</tbody></table></div>
+    <style>.cell-hover:hover{background:#e2e8f0 !important;}</style>
+    `;
+
+    container.innerHTML = html;
+}
