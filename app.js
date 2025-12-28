@@ -1422,7 +1422,7 @@ function renderCalendarTimeline(rooms, reservations) {
             let cellTitle = '';
             let cellText = '';
 
-            const res = reservations.find(res => {
+            const matches = reservations.filter(res => {
                 if (String(res.habitacionId) !== String(r.id) && String(res.habitacionId) !== String(r.numero)) return false;
                 const start = new Date(res.fechaEntrada);
                 const end = new Date(res.fechaSalida);
@@ -1434,6 +1434,14 @@ function renderCalendarTimeline(rooms, reservations) {
 
                 return current >= s && current < eTime;
             });
+
+            let res = null;
+            if (matches.length > 0) {
+                // Priority: Activa/Ocupada (3) > Reserva/Pendiente (2) > Finalizada (1)
+                const priority = { 'Activa': 3, 'Ocupada': 3, 'Reserva': 2, 'Pendiente': 2, 'Finalizada': 1 };
+                matches.sort((a, b) => (priority[b.estado] || 0) - (priority[a.estado] || 0));
+                res = matches[0];
+            }
 
             if (res) {
                 if (res.estado === 'Activa' || res.estado === 'Ocupada') {
