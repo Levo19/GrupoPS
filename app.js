@@ -831,7 +831,7 @@ async function processCheckIn(e) {
 
 // ===== CHECK OUT LOGIC =====
 function openCheckOut(roomId) {
-    const room = currentRoomsList.find(r => r.id === roomId);
+    const room = currentRoomsList.find(r => r.id == roomId);
     if (!room) return;
 
     document.getElementById('checkOutRoomId').value = roomId;
