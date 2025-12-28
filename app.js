@@ -739,6 +739,34 @@ function renderDatePicker() {
     }
 }
 
+// ===== OPERATIONS VALIDATION =====
+// checkInMode is defined at global scope
+
+
+window.openCheckIn = function (roomId, roomNum) {
+    checkInMode = 'checkin';
+    const title = document.getElementById('modalTitleCheckIn');
+    const btn = document.getElementById('btnSubmitCheckIn');
+    if (title) title.innerHTML = '🏨 Check-In (Ingreso)';
+    if (btn) {
+        btn.innerText = 'Confirmar Ingreso';
+        btn.style.background = 'var(--accent)'; // Orange/Red
+    }
+    setupCheckInModal(roomId, roomNum, null);
+}
+
+window.openReservation = function (roomId, roomNum, startDate) {
+    checkInMode = 'reservation';
+    const title = document.getElementById('modalTitleCheckIn');
+    const btn = document.getElementById('btnSubmitCheckIn');
+    if (title) title.innerHTML = '📅 Nueva Reserva';
+    if (btn) {
+        btn.innerText = 'Crear Reserva';
+        btn.style.background = 'var(--primary)'; // Blue/Teal
+    }
+    setupCheckInModal(roomId, roomNum, startDate);
+}
+
 function setupCheckInModal(roomId, roomNum, preSelectedDate) {
     const form = document.getElementById('formCheckIn');
     form.reset();
@@ -815,6 +843,7 @@ async function processCheckIn(e) {
     // OPTIMISTIC UPDATE
     // ------------------------------------------------
     const tempId = 'temp-' + Date.now();
+    const statusLabel = data.isReservation ? 'Reserva' : 'Activa'; // Local status naming
 
     // 1. Create Local Reservation Object
     const newRes = {
@@ -823,7 +852,7 @@ async function processCheckIn(e) {
         cliente: data.cliente,
         fechaEntrada: data.fechaEntrada,
         fechaSalida: data.fechaSalida,
-        estado: data.isReservation ? 'Reserva' : 'Activa', // or 'Ocupada' depending on your logic
+        estado: statusLabel,
         notas: data.notas
     };
 
@@ -1444,10 +1473,11 @@ function renderCalendarTimeline(rooms, reservations) {
 
             // Standardize Date for comparison (YYYY-MM-DD)
             const isoDate = date.toISOString().split('T')[0];
+            const todayIso = new Date().toISOString().split('T')[0];
 
             const matches = reservations.filter(res => {
                 if (String(res.habitacionId) !== String(r.id) && String(res.habitacionId) !== String(r.numero)) return false;
-                if (res.estado === 'Cancelada') return false; // Ignore cancelled
+                if (res.estado === 'Cancelada') return false;
 
                 const start = res.fechaEntrada.substring(0, 10);
                 const end = res.fechaSalida.substring(0, 10);
@@ -1463,18 +1493,29 @@ function renderCalendarTimeline(rooms, reservations) {
                 res = matches[0];
             }
 
+            // Fallback: If Room is Physically Occupied TODAY but no reservation found
+            if (!res && String(r.estado).toLowerCase() === 'ocupado' && isoDate === todayIso) {
+                res = {
+                    habitacionId: r.id,
+                    cliente: 'Ocupado (Manual)',
+                    estado: 'Ocupada',
+                    startDate: todayIso,
+                    op: 'fallback'
+                };
+            }
+
             if (res) {
                 if (res.estado === 'Activa' || res.estado === 'Ocupada') {
                     cellColor = colorActive;
-                    cellTitle = 'Ocupado por: ' + res.cliente;
-                } else if (res.estado === 'Reserva' || res.estado === 'Pendiente') {
+                    cellTitle = 'Ocupado por: ' + (res.cliente || 'Anónimo');
+                } else if (res.estado === 'Reserva' || res.estado === 'Reserva') { // Typo fixed 'Pendiente'
                     cellColor = colorFuture;
-                    cellTitle = 'Reservado: ' + res.cliente;
+                    cellTitle = 'Reservado: ' + (res.cliente || 'Anónimo');
                 } else if (res.estado === 'Finalizada') {
-                    cellColor = colorPast; // Grey
-                    cellTitle = 'Finalizado: ' + res.cliente;
+                    cellColor = colorPast;
+                    cellTitle = 'Finalizado: ' + (res.cliente || 'Anónimo');
                 }
-                cellText = res.cliente ? res.cliente.split(' ')[0] : 'N/A';
+                cellText = res.cliente ? res.cliente.split(' ')[0] : 'Ocupado';
             }
 
             if (cellColor) {
