@@ -101,11 +101,12 @@ function navigate(viewId) {
     // In real app, we iterate based on viewId to set active class
 
     // Hide all views
-    document.getElementById('view-dashboard').style.display = 'none';
-    document.getElementById('view-rooms').style.display = 'none';
-    document.getElementById('view-calendar').style.display = 'none';
-    document.getElementById('view-users').style.display = 'none';
-    document.getElementById('view-products').style.display = 'none';
+    // Hide all views safely
+    const views = ['view-dashboard', 'view-rooms', 'view-calendar', 'view-users', 'view-products'];
+    views.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.style.display = 'none';
+    });
 
     // Show Target
     const title = document.getElementById('pageTitle');
