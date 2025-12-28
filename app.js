@@ -662,13 +662,31 @@ function isDateBlocked(roomId, dateStr) {
     return details.type === 'full' || details.type === 'full-split';
 }
 
-// ... isRangeBlocked uses isDateBlocked, which now allows partial days. 
-// Ideally range check should be stricter? 
-// For range: curr must be available. 
-// If curr is 'checkout-am': it is available as START, but NOT as middle.
-// If curr is 'checkin-pm': it is available as END, but NOT as middle.
-// Simplified: isDateBlocked only blocks FULL. We need detailed range check? 
-// Let's stick to basic for now, selectPickerDate does the heavy lifting.
+function isRangeBlocked(roomId, startStr, endStr) {
+    // Check every day from start to end-1
+    let curr = new Date(startStr);
+    const end = new Date(endStr);
+
+    while (curr < end) {
+        const s = curr.toISOString().split('T')[0];
+        // We only care if the date is fully blocked for a new reservation
+        // If s is 'checkout-am', it's available as START (handled by start select)
+        // If s is 'checkin-pm', it's available as END (handled by end select)
+
+        // But for a range PASSING THROUGH 's', 's' must be completely free or compatible?
+        // Actually, if we select Start=29 (Checkout AM) and End=31. 
+        // 29 is 'checkout-am'. isDateBlocked(29) -> false (because it returns true only for full).
+        // So loop passes 29. Correct.
+        // 30 is Free. Loop passes. Correct.
+        // 31 is End. Loop stops before 31. Correct.
+
+        // What if 29 is 'full'? isDateBlocked -> true. Returns true. Blocked. Correct.
+
+        if (isDateBlocked(roomId, s)) return true;
+        curr.setDate(curr.getDate() + 1);
+    }
+    return false;
+}
 
 function renderDatePicker() {
     const container = document.getElementById('customDatePicker');
