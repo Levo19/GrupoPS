@@ -104,6 +104,8 @@ function navigate(viewId) {
     document.getElementById('view-dashboard').style.display = 'none';
     document.getElementById('view-rooms').style.display = 'none';
     document.getElementById('view-calendar').style.display = 'none';
+    document.getElementById('view-users').style.display = 'none';
+    document.getElementById('view-products').style.display = 'none';
 
     // Show Target
     const title = document.getElementById('pageTitle');
