@@ -830,9 +830,13 @@ async function processCheckIn(e) {
 }
 
 // ===== CHECK OUT LOGIC =====
-function openCheckOut(roomId) {
+window.openCheckOut = function (roomId) {
+    console.log('Open CheckOut for:', roomId);
     const room = currentRoomsList.find(r => r.id == roomId);
-    if (!room) return;
+    if (!room) {
+        console.error('Room not found in list', roomId, currentRoomsList);
+        return;
+    }
 
     document.getElementById('checkOutRoomId').value = roomId;
     document.getElementById('checkOutSummary').innerHTML = `
