@@ -379,6 +379,7 @@ function renderRooms(rooms) {
 
 // ===== CHECK-IN LOGIC (PHASE 5) =====
 // ===== CHECK-IN / RESERVATION LOGIC =====
+let currentReservationsList = []; // [NEW] - Fix ReferenceError
 let checkInMode = 'checkin'; // 'checkin' or 'reservation'
 // [NEW] Picker State
 let pickerState = {
