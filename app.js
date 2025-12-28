@@ -1118,6 +1118,7 @@ async function saveUser(e) {
 
 // ===== PRODUCTS MODULE =====
 let currentProductsList = [];
+let currentProductFilter = 'Todos';
 
 async function loadProductsView() {
     const container = document.getElementById('view-products');
@@ -1158,13 +1159,15 @@ function renderProducts(products) {
     const container = document.getElementById('view-products');
 
     // Group by category for cleaner view if needed, but table is fine for now
+    const btnClass = (cat) => currentProductFilter === cat ? 'btn-login filter-btn-active' : 'btn-login';
+
     let html = `
     <div style="display:flex; justify-content:space-between; margin-bottom:20px;">
         <div style="display:flex; gap:10px;">
-             <button class="btn-login" style="width:auto; background:#64748B;" onclick="renderProducts(currentProductsList)">Todos</button>
-             <button class="btn-login" style="width:auto; background:#eab308;" onclick="filterProducts('Snacks')">Snacks</button>
-             <button class="btn-login" style="width:auto; background:#3b82f6;" onclick="filterProducts('Bebidas')">Bebidas</button>
-             <button class="btn-login" style="width:auto; background:#10b981;" onclick="filterProducts('Tours')">Tours</button>
+             <button class="${btnClass('Todos')}" style="width:auto; background:#64748B;" onclick="filterProducts('Todos')">Todos</button>
+             <button class="${btnClass('Snacks')}" style="width:auto; background:#eab308;" onclick="filterProducts('Snacks')">Snacks</button>
+             <button class="${btnClass('Bebidas')}" style="width:auto; background:#3b82f6;" onclick="filterProducts('Bebidas')">Bebidas</button>
+             <button class="${btnClass('Otros')}" style="width:auto; background:#8b5cf6;" onclick="filterProducts('Otros')">Otros</button>
         </div>
         <button class="btn-login" style="width:auto;" onclick="openNewProduct()">+ Nuevo Producto</button>
     </div>
@@ -1176,7 +1179,7 @@ function renderProducts(products) {
                     <th style="padding:15px;">Img</th>
                     <th style="padding:15px;">Producto</th>
                     <th style="padding:15px;">Categoría</th>
-                    <th style="padding:15px;">Empresa</th>
+
                     <th style="padding:15px;">Precio</th>
                     <th style="padding:15px;">Stock</th>
                     <th style="padding:15px;">Estado</th>
@@ -1188,7 +1191,7 @@ function renderProducts(products) {
 
     products.forEach(p => {
         let catColor = '#64748B';
-        if (p.categoria === 'Tours') catColor = '#10b981';
+        if (p.categoria === 'Otros') catColor = '#8b5cf6'; // Purple
         if (p.categoria === 'Bebidas') catColor = '#3b82f6';
         if (p.categoria === 'Snacks') catColor = '#eab308';
 
@@ -1202,7 +1205,7 @@ function renderProducts(products) {
                 <div style="font-size:0.8rem; color:#94a3b8;">${p.descripcion || ''}</div>
             </td>
             <td style="padding:15px;"><span style="color:${catColor}; font-weight:bold;">${p.categoria}</span></td>
-            <td style="padding:15px;">${p.empresa}</td>
+
             <td style="padding:15px;">S/ ${p.precio}</td>
             <td style="padding:15px; font-weight:bold;">${p.stock}</td>
             <td style="padding:15px;">${p.activo}</td>
@@ -1217,8 +1220,13 @@ function renderProducts(products) {
 }
 
 function filterProducts(cat) {
-    const filtered = currentProductsList.filter(p => p.categoria === cat);
-    renderProducts(filtered);
+    currentProductFilter = cat;
+    if (cat === 'Todos') {
+        renderProducts(currentProductsList);
+    } else {
+        const filtered = currentProductsList.filter(p => p.categoria === cat);
+        renderProducts(filtered);
+    }
 }
 
 function openNewProduct() {
@@ -1230,7 +1238,7 @@ function openNewProduct() {
     document.getElementById('editProdStock').value = '';
     document.getElementById('editProdImg').value = '';
     document.getElementById('editProdActivo').value = 'Activo';
-    document.getElementById('editProdEmpresa').value = 'CasaMunay';
+
     document.getElementById('modalProductEditor').style.display = 'flex';
 }
 
@@ -1246,7 +1254,7 @@ function editProduct(id) {
     document.getElementById('editProdStock').value = p.stock;
     document.getElementById('editProdImg').value = p.imagen_url;
     document.getElementById('editProdActivo').value = p.activo;
-    document.getElementById('editProdEmpresa').value = p.empresa;
+
 
     document.getElementById('modalProductEditor').style.display = 'flex';
 }
@@ -1271,7 +1279,7 @@ async function saveProduct(e) {
         stock: document.getElementById('editProdStock').value,
         imagen_url: document.getElementById('editProdImg').value,
         activo: document.getElementById('editProdActivo').value,
-        empresa: document.getElementById('editProdEmpresa').value
+
     };
 
     // 2. Optimistic Update
