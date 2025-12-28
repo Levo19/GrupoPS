@@ -272,9 +272,24 @@ function renderRooms(rooms) {
         // Status Badge Logic
         let statusClass = 'status-disponible';
         let statusText = r.estado || 'Desconocido';
-        if (statusText.toLowerCase() === 'ocupado') statusClass = 'status-ocupado';
-        else if (statusText.toLowerCase() === 'mantenimiento') statusClass = 'status-mantenimiento';
-        else if (statusText.toLowerCase() === 'sucio') statusClass = 'status-sucio';
+        let statusLabel = statusText;
+
+        if (statusText.toLowerCase() === 'ocupado') {
+            statusClass = 'status-ocupado';
+            statusLabel = 'OCUPADO';
+        }
+        else if (statusText.toLowerCase() === 'mantenimiento') {
+            statusClass = 'status-mantenimiento';
+            statusLabel = 'MANTENIMIENTO';
+        }
+        else if (statusText.toLowerCase() === 'sucio') {
+            statusClass = 'status-sucio';
+            statusLabel = 'SUCIO';
+        }
+        else if (statusText.toLowerCase() === 'disponible') {
+            statusClass = 'status-disponible';
+            statusLabel = 'DISPONIBLE';
+        }
 
         // Image Logic (Check if it's a URL or JSON string)
         let mainImg = 'https://images.unsplash.com/photo-1611892440504-42a792e24d32?q=80&w=600';
@@ -290,7 +305,7 @@ function renderRooms(rooms) {
         html += `
         <div class="room-card fade-in">
             <div class="room-img-box">
-                <span class="room-status-badge ${statusClass}">${statusText}</span>
+                <span class="room-status-badge ${statusClass}">${statusLabel}</span>
                 <img src="${mainImg}" class="room-img" alt="Foto">
             </div>
             <div class="room-body">
