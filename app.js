@@ -755,15 +755,23 @@ window.openCheckIn = function (roomId, roomNum) {
     setupCheckInModal(roomId, roomNum, null);
 }
 
-window.openReservation = function (roomId, roomNum, startDate) {
+window.openReservation = function (roomId, roomNum, startDate, clientName) {
     checkInMode = 'reservation';
     const title = document.getElementById('modalTitleCheckIn');
     const btn = document.getElementById('btnSubmitCheckIn');
     if (title) title.innerHTML = '📅 Nueva Reserva';
     if (btn) {
         btn.innerText = 'Crear Reserva';
-        btn.style.background = 'var(--primary)'; // Blue/Teal
+        btn.style.background = 'var(--primary)';
     }
+
+    // Pre-fill Client Name if provided (e.g. extending stay)
+    const clientInput = document.getElementById('checkInCliente');
+    if (clientInput) {
+        clientInput.value = clientName || '';
+        // If extending, maybe we want to lock it? Or just prefill. detailed instructions said "Jalar el nombre"
+    }
+
     setupCheckInModal(roomId, roomNum, startDate);
 }
 
@@ -1475,6 +1483,7 @@ function renderCalendarTimeline(rooms, reservations) {
             const isoDate = date.toISOString().split('T')[0];
             const todayIso = new Date().toISOString().split('T')[0];
 
+            // 1. Find ALL events touching this date (inclusive of end)
             const matches = reservations.filter(res => {
                 if (String(res.habitacionId) !== String(r.id) && String(res.habitacionId) !== String(r.numero)) return false;
                 if (res.estado === 'Cancelada') return false;
@@ -1482,51 +1491,81 @@ function renderCalendarTimeline(rooms, reservations) {
                 const start = res.fechaEntrada.substring(0, 10);
                 const end = res.fechaSalida.substring(0, 10);
 
-                return isoDate >= start && isoDate < end;
+                // Include End Date for Split View
+                return isoDate >= start && isoDate <= end;
             });
 
-            let res = null;
-            if (matches.length > 0) {
-                // Priority: Activa/Ocupada (3) > Reserva/Pendiente (2) > Finalizada (1)
-                const priority = { 'Activa': 3, 'Ocupada': 3, 'Reserva': 2, 'Pendiente': 2, 'Finalizada': 1 };
-                matches.sort((a, b) => (priority[b.estado] || 0) - (priority[a.estado] || 0));
-                res = matches[0];
+            let leftType = null;  // Color for Left Half (Morning)
+            let rightType = null; // Color for Right Half (Afternoon)
+            let leftTitle = '';
+            let rightTitle = '';
+            let labelProps = { text: '', color: '' }; // For text label
+
+            // Priority colors
+            const getCol = (st) => {
+                if (st === 'Activa' || st === 'Ocupada') return colorActive;
+                if (st === 'Finalizada') return colorPast;
+                return colorFuture;
+            };
+
+            // Fallback for Today (Physical Occupancy)
+            if (matches.length === 0 && String(r.estado).toLowerCase() === 'ocupado' && isoDate === todayIso) {
+                leftType = colorActive;
+                rightType = colorActive;
+                labelProps.text = 'Ocupado';
+                leftTitle = 'Ocupado Manual';
             }
 
-            // Fallback: If Room is Physically Occupied TODAY but no reservation found
-            if (!res && String(r.estado).toLowerCase() === 'ocupado' && isoDate === todayIso) {
-                res = {
-                    habitacionId: r.id,
-                    cliente: 'Ocupado (Manual)',
-                    estado: 'Ocupada',
-                    startDate: todayIso,
-                    op: 'fallback'
-                };
-            }
+            matches.forEach(res => {
+                const start = res.fechaEntrada.substring(0, 10);
+                const end = res.fechaSalida.substring(0, 10);
+                const col = getCol(res.estado);
+                const name = (res.cliente || 'Anónimo').split(' ')[0];
 
-            if (res) {
-                if (res.estado === 'Activa' || res.estado === 'Ocupada') {
-                    cellColor = colorActive;
-                    cellTitle = 'Ocupado por: ' + (res.cliente || 'Anónimo');
-                } else if (res.estado === 'Reserva' || res.estado === 'Reserva') { // Typo fixed 'Pendiente'
-                    cellColor = colorFuture;
-                    cellTitle = 'Reservado: ' + (res.cliente || 'Anónimo');
-                } else if (res.estado === 'Finalizada') {
-                    cellColor = colorPast;
-                    cellTitle = 'Finalizado: ' + (res.cliente || 'Anónimo');
+                if (isoDate > start && isoDate < end) {
+                    // Full Day
+                    leftType = col;
+                    rightType = col;
+                    labelProps.text = name;
+                    leftTitle = res.estado + ': ' + res.cliente;
+                } else if (isoDate === end) {
+                    // Ends Today -> Left Half
+                    leftType = col;
+                    // Dont override rightType if already set
+                    if (!rightType) labelProps.text = 'Salida';
+                } else if (isoDate === start) {
+                    // Starts Today -> Right Half
+                    rightType = col;
+                    labelProps.text = name;
+                    rightTitle = 'Entrada: ' + res.cliente;
                 }
-                cellText = res.cliente ? res.cliente.split(' ')[0] : 'Ocupado';
-            }
+            });
 
-            if (cellColor) {
+            // 3. Render Cell
+            if (leftType || rightType) {
+                let bgStyle = '';
+                if (leftType && rightType) {
+                    if (leftType === rightType) {
+                        bgStyle = `background:${leftType};`; // Solid
+                    } else {
+                        bgStyle = `background: linear-gradient(90deg, ${leftType} 50%, ${rightType} 50%);`; // Split
+                    }
+                } else if (leftType) {
+                    // Only Left (Checkout)
+                    bgStyle = `background: linear-gradient(90deg, ${leftType} 50%, white 50%);`;
+                } else if (rightType) {
+                    // Only Right (Checkin)
+                    bgStyle = `background: linear-gradient(90deg, white 50%, ${rightType} 50%);`;
+                }
+
                 html += `<td style="padding:5px;">
-                            <div style="background:${cellColor}; color:white; font-size:0.75rem; padding:5px; border-radius:6px; text-align:center; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; cursor:pointer;" title="${cellTitle}">
-                                ${cellText}
+                            <div style="${bgStyle} color:white; font-size:0.75rem; padding:5px; border-radius:6px; text-align:center; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; cursor:pointer; text-shadow:0 1px 2px rgba(0,0,0,0.3);" title="${leftTitle} ${rightTitle}">
+                                ${labelProps.text}
                             </div>
                         </td>`;
             } else {
                 html += `<td style="padding:5px; text-align:center;">
-                            <div onclick="openReservation('${r.id}', '${r.numero}', '${isoDate}')" style="height:30px; border-radius:6px; cursor:pointer; background:#f8fafc;" class="cell-hover" title="Reservar este día"></div>
+                            <div onclick="openReservation('${r.id}', '${r.numero}', '${isoDate}', '')" style="height:30px; border-radius:6px; cursor:pointer; background:#f8fafc;" class="cell-hover" title="Reservar"></div>
                         </td>`;
             }
         });
@@ -1554,6 +1593,13 @@ function openRoomDetail(roomId) {
     const cap = document.getElementById('rdCap');
     const beds = document.getElementById('rdBeds');
     const actions = document.getElementById('rdActions');
+
+    // Lookup Active Reservation for Client Name
+    const activeRes = currentReservationsList.find(res =>
+        (String(res.habitacionId) === String(r.id) || String(res.habitacionId) === String(r.numero)) &&
+        (res.estado === 'Activa' || res.estado === 'Ocupada')
+    );
+    const clientName = activeRes ? activeRes.cliente : '';
 
     // 1. Image
     let imgUrl = 'https://images.unsplash.com/photo-1611892440504-42a792e24d32?q=80&w=600';
@@ -1604,7 +1650,7 @@ function openRoomDetail(roomId) {
     } else if (status === 'ocupado') {
         // Check Out & Extend
         btns += `<button class="rd-btn btn-checkout" onclick="closeRoomDetail(); openCheckOut('${r.id}')"><i class="fas fa-sign-out-alt"></i> Finalizar (Check-Out)</button>`;
-        btns += `<button class="rd-btn btn-reserve" onclick="closeRoomDetail(); openReservation('${r.id}', '${r.numero}')"><i class="fas fa-calendar-plus"></i> Extender Estadía</button>`;
+        btns += `<button class="rd-btn btn-reserve" onclick="closeRoomDetail(); openReservation('${r.id}', '${r.numero}', '', '${clientName}')"><i class="fas fa-calendar-plus"></i> Extender Estadía</button>`;
     } else if (status === 'reservado') {
         // Check In & Cancel
         btns += `<button class="rd-btn btn-checkin" onclick="closeRoomDetail(); openCheckIn('${r.id}', '${r.numero}')"><i class="fas fa-check"></i> Confirmar Llegada</button>`;
