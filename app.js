@@ -547,19 +547,34 @@ function selectPickerDate(dateStr) {
 
         pickerState.endDate = dateStr;
 
-    } else {
         // 2. Reservation Logic (Flexible)
         // Prevent past dates
         if (dateStr < today) return;
 
         if (!startDate || (startDate && endDate)) {
             // Start new range
+            // Validate: Start Date cannot be 'occupied' or 'reserved' (Check-in time taken)
+            if (isDateBlocked(roomId, dateStr)) {
+                // Check if it's strictly a "Check-out" gap? 
+                // Currently isDateBlocked returns true for Start Date. 
+                // If previous res ends today (29), it returns 'free' (because < end logic).
+                // So if isDateBlocked returns true, it's truly occupied.
+                alert('⚠️ Fecha no disponible para ingreso.');
+                return;
+            }
+
             pickerState.startDate = dateStr;
             pickerState.endDate = null;
         } else {
             // We have start
             if (dateStr < startDate) {
+                // Restart with this date
+                if (isDateBlocked(roomId, dateStr)) {
+                    alert('⚠️ Fecha no disponible para ingreso.');
+                    return;
+                }
                 pickerState.startDate = dateStr;
+                pickerState.endDate = null;
             } else if (dateStr > startDate) {
                 if (isRangeBlocked(roomId, startDate, dateStr)) {
                     alert('⚠️ El rango incluye fechas ocupadas.');
@@ -694,19 +709,19 @@ function renderDatePicker() {
 
         if (status === 'past') {
             classes += ' blocked';
-            onclick = '';
+            onclick = ''; // Past is always blocked
         } else if (status === 'occupied') {
-            classes += ' status-occupied'; // Green
-            onclick = '';
+            classes += ' status-occupied';
+            // onclick kept! Validated in logic
         } else if (status === 'reserved') {
-            classes += ' status-reserved'; // Yellow
-            onclick = '';
+            classes += ' status-reserved';
+            // onclick kept!
         }
 
-        // Visual Lock for Start Date in Check-In Mode
+        // Visual Lock for Start Date in Check-CheckIn Mode
         if (checkInMode === 'checkin' && pickerState.startDate === iso) {
             classes += ' selected locked-start';
-            onclick = ''; // Cannot unselect
+            onclick = '';
         } else {
             // Normal Selected
             if (pickerState.startDate === iso || pickerState.endDate === iso) {
@@ -1595,11 +1610,23 @@ function openRoomDetail(roomId) {
     const actions = document.getElementById('rdActions');
 
     // Lookup Active Reservation for Client Name
+    // Relaxed match: ID or Number, Status Activa OR Ocupada
+    let clientName = '';
     const activeRes = currentReservationsList.find(res =>
         (String(res.habitacionId) === String(r.id) || String(res.habitacionId) === String(r.numero)) &&
         (res.estado === 'Activa' || res.estado === 'Ocupada')
     );
-    const clientName = activeRes ? activeRes.cliente : '';
+    if (activeRes) clientName = activeRes.cliente;
+    // Fallback: Check if room has "reservado" status but 'Reserva' object?
+    if (!clientName && r.estado === 'ocupado') {
+        // Maybe manual check-in stored elsewhere or just use generic text?
+        // Let's check 'Reserva' status too just in case of mismatch
+        const pendingRes = currentReservationsList.find(res =>
+            (String(res.habitacionId) === String(r.id) || String(res.habitacionId) === String(r.numero)) &&
+            (res.estado === 'Reserva')
+        );
+        if (pendingRes) clientName = pendingRes.cliente;
+    }
 
     // 1. Image
     let imgUrl = 'https://images.unsplash.com/photo-1611892440504-42a792e24d32?q=80&w=600';
