@@ -426,6 +426,7 @@ body {
     color: var(--primary-dark);
     font-size: 1.1rem;
 }
+
 /* =========================================
    CUSTOM DATE PICKER (PIXEL CALENDAR)
    ========================================= */
@@ -478,7 +479,7 @@ body {
     border-color: var(--primary);
     background: #f0fdfa;
     transform: scale(1.1);
-    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
     z-index: 10;
 }
 
@@ -499,7 +500,8 @@ body {
 }
 
 .pixel-day.in-range {
-    background: #ccfbf1; /* Light primary */
+    background: #ccfbf1;
+    /* Light primary */
     color: var(--primary-dark);
     border-color: #ccfbf1;
 }
@@ -522,3 +524,19 @@ body {
     font-weight: 600;
 }
 
+/* Locked Start Date Styling */
+.pixel-day.selected.locked-start {
+    background: #0284c7;
+    /* Different Blue to show it's auto-selected */
+    border-color: #0284c7;
+    position: relative;
+    cursor: not-allowed;
+}
+
+.pixel-day.selected.locked-start::after {
+    content: '🔒';
+    font-size: 0.6rem;
+    position: absolute;
+    top: -2px;
+    right: -2px;
+}
