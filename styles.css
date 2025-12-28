@@ -426,3 +426,99 @@ body {
     color: var(--primary-dark);
     font-size: 1.1rem;
 }
+/* =========================================
+   CUSTOM DATE PICKER (PIXEL CALENDAR)
+   ========================================= */
+.pixel-calendar {
+    background: #f8fafc;
+    border-radius: 12px;
+    padding: 15px;
+    border: 1px solid #cbd5e1;
+    margin-bottom: 20px;
+}
+
+.pixel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+    font-weight: 700;
+    color: var(--primary);
+}
+
+.pixel-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 5px;
+}
+
+.pixel-day-header {
+    text-align: center;
+    font-size: 0.75rem;
+    color: #94a3b8;
+    font-weight: 600;
+    margin-bottom: 5px;
+}
+
+.pixel-day {
+    aspect-ratio: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.9rem;
+    cursor: pointer;
+    border-radius: 6px;
+    background: white;
+    border: 1px solid #e2e8f0;
+    transition: all 0.2s;
+    color: var(--text-main);
+}
+
+.pixel-day:hover:not(.blocked):not(.empty) {
+    border-color: var(--primary);
+    background: #f0fdfa;
+    transform: scale(1.1);
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    z-index: 10;
+}
+
+.pixel-day.blocked {
+    background: #ffeeee;
+    color: #fca5a5;
+    cursor: not-allowed;
+    text-decoration: line-through;
+    border-color: transparent;
+}
+
+.pixel-day.selected {
+    background: var(--primary);
+    color: white;
+    font-weight: bold;
+    border-color: var(--primary);
+    box-shadow: 0 0 10px rgba(15, 118, 110, 0.4);
+}
+
+.pixel-day.in-range {
+    background: #ccfbf1; /* Light primary */
+    color: var(--primary-dark);
+    border-color: #ccfbf1;
+}
+
+.pixel-day.empty {
+    background: transparent;
+    border: none;
+    cursor: default;
+}
+
+.picker-summary {
+    background: #f0f9ff;
+    border: 1px solid #bae6fd;
+    padding: 10px;
+    border-radius: 8px;
+    margin-bottom: 15px;
+    text-align: center;
+    font-size: 0.9rem;
+    color: #0284c7;
+    font-weight: 600;
+}
+
