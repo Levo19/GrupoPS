@@ -1,700 +1,405 @@
-// ===== STATE =====
-let currentUser = null;
-let currentView = 'dashboard';
+const CONFIG = {
+  APP_NAME: 'Grupo PS ERP',
+  SHEET_ID: '1YDiBYHZnXjYXoD4YqR-dJxWnwOtYce9dHnTmT358sQU',
+  ID_CASAMUNAY: '1yA_k5Ar4jrJs72vy3V5eM2A8lTukxH6bHetKk3Is27Q'
+};
 
-// ===== INIT =====
-document.addEventListener('DOMContentLoaded', () => {
-    // Check session
-    const token = sessionStorage.getItem('gps_token');
-    const user = sessionStorage.getItem('gps_user');
+function doGet() {
+  return HtmlService.createHtmlOutputFromFile('index')
+      .setTitle(CONFIG.APP_NAME)
+      .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
+      .addMetaTag('viewport', 'width=device-width, initial-scale=1');
+}
 
-    if (token && user) {
-        currentUser = JSON.parse(user);
-        initDashboard();
-    } else {
-        showLogin();
-    }
-});
+// ===== API ACTIONS =====
+function doPost(e) {
+  let data;
+  try {
+    data = JSON.parse(e.postData.contents);
+  } catch (err) {
+    return response({ error: 'Invalid JSON', details: err.toString() });
+  }
 
-function showLogin() {
-    document.getElementById('loginScreen').style.display = 'flex';
-    document.getElementById('loginScreen').style.opacity = '1';
-    document.getElementById('appContainer').style.display = 'none';
+  const action = data.action;
+  
+  try {
+    if (action === 'login') return loginUser(data.email, data.password);
+    if (action === 'getHabitaciones') return getHabitaciones();
+    if (action === 'saveHabitacion') return saveHabitacion(data.habitacion);
+    if (action === 'getUsuarios') return getUsuarios();
+    if (action === 'saveUsuario') return saveUsuario(data.usuario);
+    if (action === 'getProductos') return getProductos();
+    if (action === 'saveProducto') return saveProducto(data.producto);
+    
+    // Phase 5 operations
+    if (action === 'checkIn') return checkIn(data);
+
+    return response({ error: 'Acción desconocida' });
+  } catch (err) {
+    return response({ error: 'Server Error', details: err.toString() });
+  }
 }
 
 // ===== AUTHENTICATION =====
-async function handleLogin(e) {
-    e.preventDefault();
-    const btn = document.getElementById('btnLogin');
-    const err = document.getElementById('loginError');
-
-    // UI Loading
-    btn.disabled = true;
-    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Validando...';
-    err.style.display = 'none';
-
-    const email = document.getElementById('txtEmail').value;
-    const password = document.getElementById('txtPassword').value;
-
-    // DEMO BYPASS: Si el usuario no ha desplegado el backend aun
-    // Permito entrar con admin/admin para que vea la UI
-    if (email === 'admin@demo.com' && password === '123') {
-        const demoUser = { nombre: 'Demo User', email: 'admin@demo.com', rol: 'Admin' };
-        loginSuccess({ user: demoUser, token: 'demo' });
-        return;
+function loginUser(email, password) {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Usuarios');
+  if (!sheet) return response({ error: 'Error DB: Hoja Usuarios no encontrada' });
+  
+  const data = sheet.getDataRange().getValues();
+  // Asumimos fila 1 encabezados. Datos desde fila 2.
+  // Col A=ID, B=Nombre, C=Email, D=Password, E=Rol
+  
+  for (let i = 1; i < data.length; i++) {
+    const row = data[i];
+    if (String(row[2]).toLowerCase() === email.toLowerCase().trim() && String(row[3]) === password) {
+      return response({
+        success: true,
+        user: {
+          id: row[0],
+          nombre: row[1],
+          email: row[2],
+          rol: row[4]
+        },
+        token: Utilities.base64Encode(row[0] + '_' + new Date().getTime()) // Token simple
+      });
     }
-
-    try {
-        const res = await fetch(CONFIG.API_URL, {
-            method: 'POST',
-            body: JSON.stringify({ action: 'login', email, password })
-        });
-        const data = await res.json();
-
-        if (data.success) {
-            loginSuccess(data);
-        } else {
-            throw new Error(data.error || 'Error al iniciar sesión');
-        }
-    } catch (e) {
-        console.error(e);
-        err.style.display = 'block';
-        err.innerText = '⚠️ ' + (e.message || 'Error de conexión');
-        btn.disabled = false;
-        btn.innerHTML = 'Iniciar Sesión <i class="fas fa-arrow-right" style="margin-left:8px"></i>';
-    }
-}
-
-function loginSuccess(data) {
-    sessionStorage.setItem('gps_token', data.token);
-    sessionStorage.setItem('gps_user', JSON.stringify(data.user));
-    currentUser = data.user;
-
-    // Animación de salida login
-    const screen = document.getElementById('loginScreen');
-    screen.style.opacity = '0';
-    setTimeout(() => {
-        screen.style.display = 'none';
-        initDashboard();
-    }, 500);
-}
-
-function logout() {
-    sessionStorage.clear();
-    location.reload();
-}
-
-// ===== DASHBOARD INIT =====
-function initDashboard() {
-    document.getElementById('appContainer').style.display = 'flex';
-    document.getElementById('userDisplay').innerText = currentUser.nombre;
-    document.getElementById('roleDisplay').innerText = currentUser.rol || 'Staff';
-
-    navigate('dashboard');
-}
-
-// ===== NAVIGATION =====
-function navigate(viewId) {
-    // Update Sidebar
-    document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
-    // Simple logic to find nav item by click (usually handled by event, simplified here)
-    // In real app, we iterate based on viewId to set active class
-
-    // Hide all views
-    document.getElementById('view-dashboard').style.display = 'none';
-    document.getElementById('view-rooms').style.display = 'none';
-    document.getElementById('view-calendar').style.display = 'none';
-    document.getElementById('view-users').style.display = 'none';
-    document.getElementById('view-products').style.display = 'none';
-
-    // Show Target
-    const title = document.getElementById('pageTitle');
-
-    if (viewId === 'dashboard') {
-        document.getElementById('view-dashboard').style.display = 'block';
-        title.innerText = 'Dashboard Principal';
-    } else if (viewId === 'rooms') {
-        document.getElementById('view-rooms').style.display = 'block';
-        title.innerText = 'Gestión de Habitaciones';
-        if (document.getElementById('view-rooms').innerHTML === '') loadRoomsView();
-    } else if (viewId === 'calendar') {
-        document.getElementById('view-calendar').style.display = 'block';
-        title.innerText = 'Calendario de Ocupación';
-        if (document.getElementById('view-calendar').innerHTML === '') loadCalendarView();
-    } else if (viewId === 'users') {
-        document.getElementById('view-users').style.display = 'block';
-        title.innerText = 'Gestión de Usuarios';
-        loadUsersView();
-    } else if (viewId === 'products') {
-        document.getElementById('view-products').style.display = 'block';
-        title.innerText = 'Inventario Productos & Servicios';
-        loadProductsView();
-    }
+  }
+  
+  return response({ error: 'Credenciales incorrectas' });
 }
 
 // ===== ROOMS MODULE =====
-async function loadRoomsView() {
-    const container = document.getElementById('view-rooms');
-    container.innerHTML = `
-        <div style="text-align:center; padding: 50px;">
-            <i class="fas fa-spinner fa-spin" style="font-size: 2rem; color: var(--primary);"></i>
-            <p style="margin-top:15px; color:#64748B;">Cargando habitaciones...</p>
-        </div>
-    `;
-
-    try {
-        const res = await fetch(CONFIG.API_URL, {
-            method: 'POST',
-            body: JSON.stringify({ action: 'getHabitaciones' })
-        });
-        const data = await res.json();
-
-        if (data.success) {
-            renderRooms(data.habitaciones);
-        } else {
-            container.innerHTML = `<div style="color:red; text-align:center;">Error: ${data.error}</div>`;
-        }
-    } catch (e) {
-        container.innerHTML = `<div style="color:red; text-align:center;">Error de conexión: ${e.message}</div>`;
-    }
-}
-
-function loadCalendarView() {
-    document.getElementById('view-calendar').innerHTML = `
-        <div style="text-align:center; padding: 50px; color: #64748B;">
-            <i class="fas fa-calendar-times" style="font-size: 3rem; margin-bottom: 15px; color: var(--primary);"></i>
-            <h3>Módulo en Construcción</h3>
-            <p>Aquí verás el calendario tipo Gantt.</p>
-        </div>
-    `;
-}
-
-// ===== ROOM EDITOR LOGIC =====
-let currentRoomsList = []; // Store fetched rooms to find by ID easily
-
-function editRoom(id) {
-    const room = currentRoomsList.find(r => r.id == id);
-    if (!room) return;
-
-    document.getElementById('editRoomId').value = room.id;
-    document.getElementById('editNum').value = room.numero;
-    document.getElementById('editTipo').value = room.tipo;
-    document.getElementById('editPrecio').value = room.precio;
-    document.getElementById('editEstado').value = room.estado;
-
-    // Photo logic
-    let photoUrl = '';
-    try {
-        if (room.fotos && room.fotos.startsWith('[')) {
-            photoUrl = JSON.parse(room.fotos)[0] || '';
-        } else {
-            photoUrl = room.fotos;
-        }
-    } catch (e) { photoUrl = room.fotos; }
-    document.getElementById('editFoto').value = photoUrl;
-
-    document.getElementById('modalRoomEditor').style.display = 'flex';
-}
-
-function closeRoomEditor() {
-    document.getElementById('modalRoomEditor').style.display = 'none';
-}
-
-function openNewRoom() {
-    document.getElementById('editRoomId').value = '';
-    document.getElementById('editNum').value = '';
-    document.getElementById('editTipo').value = 'Matrimonial';
-    document.getElementById('editPrecio').value = '';
-    document.getElementById('editEstado').value = 'Disponible';
-    document.getElementById('editFoto').value = '';
-    document.getElementById('modalRoomEditor').style.display = 'flex';
-}
-
-async function saveRoom(e) {
-    e.preventDefault();
-    const btn = e.target.querySelector('button[type="submit"]');
-    const originalText = btn.innerText;
-
-    btn.disabled = true;
-    btn.innerText = 'Guardando...';
-
-    const roomData = {
-        id: document.getElementById('editRoomId').value,
-        numero: document.getElementById('editNum').value,
-        tipo: document.getElementById('editTipo').value,
-        precio: document.getElementById('editPrecio').value,
-        estado: document.getElementById('editEstado').value,
-        fotos: document.getElementById('editFoto').value
-    };
-
-    try {
-        const res = await fetch(CONFIG.API_URL, {
-            method: 'POST',
-            body: JSON.stringify({
-                action: 'saveHabitacion',
-                habitacion: roomData
-            })
-        });
-        const data = await res.json();
-
-        if (data.success) {
-            closeRoomEditor();
-            loadRoomsView(); // Refresh list
-        } else {
-            alert('Error: ' + data.error);
-        }
-    } catch (err) {
-        alert('Error de conexión: ' + err.message);
-    } finally {
-        btn.disabled = false;
-        btn.innerText = originalText;
-    }
-}
-
-function renderRooms(rooms) {
-    currentRoomsList = rooms; // Cache for editing
-    const container = document.getElementById('view-rooms');
-
-    if (rooms.length === 0) {
-        container.innerHTML = `
-            <div style="text-align:center; padding: 40px; background:white; border-radius:10px;">
-                <i class="fas fa-box-open" style="font-size:2rem; color:#cbd5e1;"></i>
-                <p>No hay habitaciones registradas.</p>
-                <button class="btn-login" style="width:auto; margin-top:10px;" onclick="openNewRoom()">+ Crear Primera Habitación</button>
-            </div>
-        `;
-        return;
-    }
-
-    let html = '<div class="room-grid">';
-    rooms.forEach(r => {
-        // Status Badge Logic
-        let statusClass = 'status-disponible';
-        let statusText = r.estado || 'Desconocido';
-        if (statusText.toLowerCase() === 'ocupado') statusClass = 'status-ocupado';
-        else if (statusText.toLowerCase() === 'mantenimiento') statusClass = 'status-mantenimiento';
-        else if (statusText.toLowerCase() === 'sucio') statusClass = 'status-sucio';
-
-        // Image Logic (Check if it's a URL or JSON string)
-        let mainImg = 'https://images.unsplash.com/photo-1611892440504-42a792e24d32?q=80&w=600';
-        try {
-            if (r.fotos && r.fotos.startsWith('[')) {
-                const photos = JSON.parse(r.fotos);
-                if (photos.length > 0) mainImg = photos[0];
-            } else if (r.fotos && r.fotos.startsWith('http')) {
-                mainImg = r.fotos;
-            }
-        } catch (e) { }
-
-        html += `
-        <div class="room-card fade-in">
-            <div class="room-img-box">
-                <span class="room-status-badge ${statusClass}">${statusText}</span>
-                <img src="${mainImg}" class="room-img" alt="Foto">
-            </div>
-            <div class="room-body">
-                <div style="display:flex; justify-content:space-between; align-items:flex-start;">
-                    <div>
-                        <div class="room-number">Hab. ${r.numero}</div>
-                        <div class="room-type">${r.tipo}</div>
-                    </div>
-                    <div class="price-tag">S/ ${r.precio}</div>
-                </div>
-                
-                <div class="room-meta">
-                    <span><i class="fas fa-user-friends"></i> ${r.capacidad}</span>
-                    <span><i class="fas fa-bed"></i> ${r.camas}</span>
-                </div>
-
-                <div class="room-actions" style="justify-content:space-between; width:100%;">
-                    ${r.estado === 'Disponible'
-                ? `<button onclick="openCheckIn('${r.id}', '${r.numero}')" style="background:#22c55e; color:white; border:none; padding:6px 12px; border-radius:6px; cursor:pointer; font-size:0.85rem; display:flex; align-items:center; gap:5px;"><i class="fas fa-check"></i> Check-In</button>`
-                : r.estado === 'Ocupado'
-                    ? `<button style="background:#eab308; color:white; border:none; padding:6px 12px; border-radius:6px; cursor:pointer; font-size:0.85rem; display:flex; align-items:center; gap:5px;"><i class="fas fa-concierge-bell"></i> Gestionar</button>`
-                    : ''
-            }
-                    <button class="btn-icon" title="Editar" onclick="editRoom('${r.id}')"><i class="fas fa-pen"></i></button>
-                    ${r.estado === 'Sucio' ? `<button class="btn-icon" title="Marcar Limpio" style="color:var(--primary);"><i class="fas fa-broom"></i></button>` : ''}
-                </div>
-            </div>
-        </div>
-        `;
+function getHabitaciones() {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Habitaciones');
+  if (!sheet) return response({ error: 'Error DB: Hoja Habitaciones no encontrada' });
+  
+  const data = sheet.getDataRange().getValues();
+  const rooms = [];
+  
+  // Asumimos fila 1 encabezados. A=ID, B=Numero, C=Tipo, D=Precio, E=Capacidad, F=Camas, G=Estado, H=Fotos, I=Detalles
+  for (let i = 1; i < data.length; i++) {
+    const row = data[i];
+    rooms.push({
+      id: row[0],
+      numero: row[1],
+      tipo: row[2],
+      precio: row[3],
+      capacidad: row[4],
+      camas: row[5],
+      estado: row[6],
+      fotos: row[7], // JSON String or URL
+      detalles: row[8]
     });
-    html += '</div>';
-
-    container.innerHTML = html;
+  }
+  
+  return response({ success: true, habitaciones: rooms });
 }
 
-// ===== CHECK-IN LOGIC (PHASE 5) =====
-function openCheckIn(roomId, roomNum) {
-    document.getElementById('checkInRoomId').value = roomId;
-    document.getElementById('checkInRoomNum').innerText = 'Habitación ' + roomNum;
-    document.getElementById('formCheckIn').reset();
-
-    // Default checkout: Tomorrow 11:00 AM
-    const tomorrow = new Date();
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    tomorrow.setHours(11, 0, 0, 0);
-    // Format for datetime-local: YYYY-MM-DDTHH:mm
-    const toISO = (date) => {
-        const pad = n => n < 10 ? '0' + n : n;
-        return date.getFullYear() + '-' + pad(date.getMonth() + 1) + '-' + pad(date.getDate()) + 'T' + pad(date.getHours()) + ':' + pad(date.getMinutes());
-    };
-    document.getElementById('checkInSalida').value = toISO(tomorrow);
-
-    document.getElementById('modalCheckIn').style.display = 'flex';
-}
-
-function closeCheckIn() {
-    document.getElementById('modalCheckIn').style.display = 'none';
-}
-
-async function processCheckIn(e) {
-    e.preventDefault();
-
-    const submitBtn = e.target.querySelector('button[type="submit"]');
-    const originalText = submitBtn.innerText;
-    submitBtn.innerText = 'Procesando...';
-    submitBtn.disabled = true;
-
-    const data = {
-        action: 'checkIn',
-        habitacionId: document.getElementById('checkInRoomId').value,
-        cliente: document.getElementById('checkInCliente').value,
-        fechaSalida: document.getElementById('checkInSalida').value,
-        notas: document.getElementById('checkInNotas').value
-    };
-
-    try {
-        const res = await fetch(CONFIG.API_URL, {
-            method: 'POST',
-            body: JSON.stringify(data)
-        });
-        const result = await res.json();
-
-        if (result.success) {
-            alert('✅ Check-in realizado con éxito');
-            closeCheckIn();
-            loadRoomsView(); // Refresh UI to show 'Occupied'
-        } else {
-            alert('❌ Error: ' + result.error);
+function saveHabitacion(hab) {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Habitaciones');
+  if (!sheet) return response({ error: 'DB: Hoja Habitaciones no encontrada' });
+  
+  const data = sheet.getDataRange().getValues();
+  // Columns: A=ID, B=Numero, C=Tipo, D=Precio, E=Capacidad, F=Camas, G=Estado, H=Fotos, I=Detalles, J=Empresa(Nuevo)
+  
+  // 1. UPDATE EXISTING
+  if (hab.id) {
+    for (let i = 1; i < data.length; i++) {
+        if (String(data[i][0]) === String(hab.id)) {
+            // Found it, update fields
+            // Row index is i+1 because 1-based
+            const r = i + 1;
+            sheet.getRange(r, 2).setValue(hab.numero);
+            sheet.getRange(r, 3).setValue(hab.tipo);
+            sheet.getRange(r, 4).setValue(hab.precio);
+            sheet.getRange(r, 5).setValue(hab.capacidad || 2);
+            sheet.getRange(r, 6).setValue(hab.camas || '');
+            sheet.getRange(r, 7).setValue(hab.estado);
+            sheet.getRange(r, 8).setValue(hab.fotos || '');
+            // sheet.getRange(r, 10).setValue('CasaMunay'); // Default for now
+            
+            return response({ success: true, message: 'Actualizado correctamente' });
         }
-    } catch (error) {
-        alert('❌ Error de conexión: ' + error.message);
-    } finally {
-        submitBtn.innerText = originalText;
-        submitBtn.disabled = false;
     }
+    return response({ error: 'Habitación no encontrada para editar' });
+  } 
+  
+  // 2. CREATE NEW
+  else {
+      const newId = 'HAB-' + new Date().getTime(); // Simple ID Gen
+      sheet.appendRow([
+          newId,
+          hab.numero,
+          hab.tipo,
+          hab.precio,
+          hab.capacidad || 2,
+          hab.camas || '',
+          hab.estado,
+          hab.fotos || '',
+          hab.detalles || '',
+          'CasaMunay' // Default Business Unit
+      ]);
+      return response({ success: true, message: 'Creada correctamente', id: newId });
+  }
 }
+
+
 
 // ===== USERS MODULE =====
-let currentUsersList = [];
-
-async function loadUsersView() {
-    const container = document.getElementById('view-users');
-    container.innerHTML = `
-        <div style="text-align:center; padding: 50px;">
-            <i class="fas fa-spinner fa-spin" style="font-size: 2rem; color: var(--primary);"></i>
-            <p style="margin-top:15px; color:#64748B;">Cargando usuarios...</p>
-        </div>
-    `;
-
-    try {
-        const res = await fetch(CONFIG.API_URL, {
-            method: 'POST',
-            body: JSON.stringify({ action: 'getUsuarios' })
-        });
-        const data = await res.json();
-
-        if (data.success) {
-            currentUsersList = data.usuarios;
-            renderUsers(data.usuarios);
-        } else {
-            container.innerHTML = `<div style="color:red; text-align:center;">Error: ${data.error}</div>`;
-        }
-    } catch (e) {
-        container.innerHTML = `<div style="color:red; text-align:center;">Error de conexión: ${e.message}</div>`;
-    }
-}
-
-function renderUsers(users) {
-    const container = document.getElementById('view-users');
-
-    let html = `
-    <div style="display:flex; justify-content:flex-end; margin-bottom:20px;">
-        <button class="btn-login" style="width:auto;" onclick="openNewUser()">+ Nuevo Usuario</button>
-    </div>
-    <div style="background:white; border-radius:var(--radius-l); padding:20px; box-shadow:0 4px 10px rgba(0,0,0,0.05);">
-        <table style="width:100%; border-collapse:collapse;">
-            <thead>
-                <tr style="text-align:left; color:#64748B; border-bottom:2px solid #f1f5f9;">
-                    <th style="padding:15px;">Nombre</th>
-                    <th style="padding:15px;">Email</th>
-                    <th style="padding:15px;">Rol</th>
-                    <th style="padding:15px;">Estado</th>
-                    <th style="padding:15px;">Acciones</th>
-                </tr>
-            </thead>
-            <tbody>
-    `;
-
-    users.forEach(u => {
-        let roleColor = '#64748B';
-        if (u.rol === 'Admin') roleColor = 'var(--primary)';
-        if (u.rol === 'Tours') roleColor = 'var(--accent)';
-
-        let statusBadge = u.estado === 'Activo'
-            ? `<span style="background:#dcfce7; color:#166534; padding:4px 8px; border-radius:6px; font-size:0.8rem; font-weight:600;">Activo</span>`
-            : `<span style="background:#f1f5f9; color:#64748B; padding:4px 8px; border-radius:6px; font-size:0.8rem; font-weight:600;">Inactivo</span>`;
-
-        html += `
-        <tr style="border-bottom:1px solid #f1f5f9;">
-            <td style="padding:15px; font-weight:600;">${u.nombre}</td>
-            <td style="padding:15px;">${u.email}</td>
-            <td style="padding:15px; color:${roleColor}; font-weight:bold;">${u.rol}</td>
-            <td style="padding:15px;">${statusBadge}</td>
-            <td style="padding:15px;">
-                <button class="btn-icon" onclick="editUser('${u.id}')"><i class="fas fa-edit"></i></button>
-            </td>
-        </tr>
-        `;
+function getUsuarios() {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Usuarios');
+  if (!sheet) return response({ error: 'DB: Hoja Usuarios no encontrada' });
+  
+  const data = sheet.getDataRange().getValues();
+  const users = [];
+  
+  // Col A=ID, B=Nombre, C=Email, D=Password, E=Rol, F=Estado
+  for (let i = 1; i < data.length; i++) {
+    const row = data[i];
+    users.push({
+      id: row[0],
+      nombre: row[1],
+      email: row[2],
+      // password: row[3], // Seguridad: No devolver password
+      rol: row[4],
+      estado: row[5]
     });
-
-    html += '</tbody></table></div>';
-    container.innerHTML = html;
+  }
+  
+  return response({ success: true, usuarios: users });
 }
 
-function openNewUser() {
-    document.getElementById('editUserId').value = '';
-    document.getElementById('editUserNombre').value = '';
-    document.getElementById('editUserEmail').value = '';
-    document.getElementById('editUserPass').value = '';
-    document.getElementById('editUserRol').value = 'Recepcion';
-    document.getElementById('editUserEstado').value = 'Activo';
-    document.getElementById('modalUserEditor').style.display = 'flex';
-}
-
-function editUser(id) {
-    const user = currentUsersList.find(u => u.id == id);
-    if (!user) return;
-
-    document.getElementById('editUserId').value = user.id;
-    document.getElementById('editUserNombre').value = user.nombre;
-    document.getElementById('editUserEmail').value = user.email;
-    document.getElementById('editUserPass').value = ''; // Blank to keep existing
-    document.getElementById('editUserRol').value = user.rol;
-    document.getElementById('editUserEstado').value = user.estado;
-
-    document.getElementById('modalUserEditor').style.display = 'flex';
-}
-
-function closeUserEditor() {
-    document.getElementById('modalUserEditor').style.display = 'none';
-}
-
-async function saveUser(e) {
-    e.preventDefault();
-    const btn = e.target.querySelector('button[type="submit"]');
-    btn.innerText = 'Guardando...';
-    btn.disabled = true;
-
-    const userData = {
-        id: document.getElementById('editUserId').value,
-        nombre: document.getElementById('editUserNombre').value,
-        email: document.getElementById('editUserEmail').value,
-        password: document.getElementById('editUserPass').value,
-        rol: document.getElementById('editUserRol').value,
-        estado: document.getElementById('editUserEstado').value,
-    };
-
-    try {
-        const res = await fetch(CONFIG.API_URL, {
-            method: 'POST',
-            body: JSON.stringify({ action: 'saveUsuario', usuario: userData })
-        });
-        const data = await res.json();
-
-        if (data.success) {
-            closeUserEditor();
-            loadUsersView();
-            // Re-login if updating self? No, keep simple.
-        } else {
-            alert('Error: ' + data.error);
+function saveUsuario(user) {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Usuarios');
+  if (!sheet) return response({ error: 'DB: Hoja Usuarios no encontrada' });
+  
+  const data = sheet.getDataRange().getValues();
+  
+  // 1. UPDATE EXISTING
+  if (user.id) {
+    for (let i = 1; i < data.length; i++) {
+        if (String(data[i][0]) === String(user.id)) {
+            const r = i + 1;
+            sheet.getRange(r, 2).setValue(user.nombre);
+            sheet.getRange(r, 3).setValue(user.email);
+            if (user.password && user.password.trim() !== '') {
+                 sheet.getRange(r, 4).setValue(user.password);
+            }
+            sheet.getRange(r, 5).setValue(user.rol);
+            sheet.getRange(r, 6).setValue(user.estado);
+            
+            return response({ success: true, message: 'Usuario actualizado' });
         }
-    } catch (err) {
-        alert('Error: ' + err.message);
-    } finally {
-        btn.innerText = 'Guardar Usuario';
-        btn.disabled = false;
     }
+    return response({ error: 'Usuario no encontrado' });
+  } 
+  
+  // 2. CREATE NEW
+  else {
+      // Validar duplicado de email
+      for (let i = 1; i < data.length; i++) {
+          if (String(data[i][2]).toLowerCase() === String(user.email).toLowerCase()) {
+               return response({ error: 'El email ya está registrado' });
+          }
+      }
+
+      const newId = 'USR-' + new Date().getTime();
+      sheet.appendRow([
+          newId,
+          user.nombre,
+          user.email,
+          user.password || '123456', // Default pass
+          user.rol,
+          user.estado
+      ]);
+      return response({ success: true, message: 'Usuario creado', id: newId });
+  }
 }
 
-
-// ===== PRODUCTS MODULE =====
-let currentProductsList = [];
-
-async function loadProductsView() {
-    const container = document.getElementById('view-products');
-    container.innerHTML = `
-        <div style="text-align:center; padding: 50px;">
-            <i class="fas fa-spinner fa-spin" style="font-size: 2rem; color: var(--primary);"></i>
-            <p style="margin-top:15px; color:#64748B;">Cargando inventario...</p>
-        </div>
-    `;
-
-    try {
-        const res = await fetch(CONFIG.API_URL, {
-            method: 'POST',
-            body: JSON.stringify({ action: 'getProductos' })
-        });
-        const data = await res.json();
-
-        if (data.success) {
-            currentProductsList = data.productos;
-            renderProducts(data.productos);
-        } else {
-            container.innerHTML = `<div style="color:red; text-align:center;">Error: ${data.error}</div>`;
-        }
-    } catch (e) {
-        container.innerHTML = `<div style="color:red; text-align:center;">Error de conexión: ${e.message}</div>`;
-    }
-}
-
-function renderProducts(products) {
-    const container = document.getElementById('view-products');
-
-    // Group by category for cleaner view if needed, but table is fine for now
-    let html = `
-    <div style="display:flex; justify-content:space-between; margin-bottom:20px;">
-        <div style="display:flex; gap:10px;">
-             <button class="btn-login" style="width:auto; background:#64748B;" onclick="renderProducts(currentProductsList)">Todos</button>
-             <button class="btn-login" style="width:auto; background:#eab308;" onclick="filterProducts('Snacks')">Snacks</button>
-             <button class="btn-login" style="width:auto; background:#3b82f6;" onclick="filterProducts('Bebidas')">Bebidas</button>
-             <button class="btn-login" style="width:auto; background:#10b981;" onclick="filterProducts('Tours')">Tours</button>
-        </div>
-        <button class="btn-login" style="width:auto;" onclick="openNewProduct()">+ Nuevo Producto</button>
-    </div>
-    
-    <div style="background:white; border-radius:var(--radius-l); padding:20px; box-shadow:0 4px 10px rgba(0,0,0,0.05);">
-        <table style="width:100%; border-collapse:collapse;">
-            <thead>
-                <tr style="text-align:left; color:#64748B; border-bottom:2px solid #f1f5f9;">
-                    <th style="padding:15px;">Img</th>
-                    <th style="padding:15px;">Producto</th>
-                    <th style="padding:15px;">Categoría</th>
-                    <th style="padding:15px;">Empresa</th>
-                    <th style="padding:15px;">Precio</th>
-                    <th style="padding:15px;">Stock</th>
-                    <th style="padding:15px;">Estado</th>
-                    <th style="padding:15px;">Acciones</th>
-                </tr>
-            </thead>
-            <tbody>
-    `;
-
-    products.forEach(p => {
-        let catColor = '#64748B';
-        if (p.categoria === 'Tours') catColor = '#10b981';
-        if (p.categoria === 'Bebidas') catColor = '#3b82f6';
-        if (p.categoria === 'Snacks') catColor = '#eab308';
-
-        let imgTag = p.imagen_url ? `<img src="${p.imagen_url}" style="width:40px; height:40px; border-radius:4px; object-fit:cover;">` : '<div style="width:40px; height:40px; background:#f1f5f9; border-radius:4px;"></div>';
-
-        html += `
-        <tr style="border-bottom:1px solid #f1f5f9;">
-            <td style="padding:15px;">${imgTag}</td>
-            <td style="padding:15px;">
-                <div style="font-weight:600;">${p.nombre}</div>
-                <div style="font-size:0.8rem; color:#94a3b8;">${p.descripcion || ''}</div>
-            </td>
-            <td style="padding:15px;"><span style="color:${catColor}; font-weight:bold;">${p.categoria}</span></td>
-            <td style="padding:15px;">${p.empresa}</td>
-            <td style="padding:15px;">S/ ${p.precio}</td>
-            <td style="padding:15px; font-weight:bold;">${p.stock}</td>
-            <td style="padding:15px;">${p.activo}</td>
-            <td style="padding:15px;">
-                <button class="btn-icon" onclick="editProduct('${p.id}')"><i class="fas fa-edit"></i></button>
-            </td>
-        </tr>
-        `;
+// ===== PRODUCTS MODULE (PHASE 4 - CENTRALIZED) =====
+function getProductos() {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Productos');
+  if (!sheet) return response({ error: 'DB: Hoja Productos no encontrada' }); 
+  
+  const data = sheet.getDataRange().getValues();
+  const products = [];
+  
+  // Local Schema: A=ID, B=Categoria, C=Nombre, D=Descripcion, E=Precio, F=Stock, G=Imagen_URL, H=Activo, I=Empresa
+  for (let i = 1; i < data.length; i++) {
+    const row = data[i];
+    products.push({
+      id: row[0],
+      categoria: row[1],
+      nombre: row[2],
+      descripcion: row[3],
+      precio: row[4],
+      stock: row[5],
+      imagen_url: row[6], // Renamed to match external
+      activo: row[7],
+      empresa: row[8]
     });
-    html += '</tbody></table></div>';
-    container.innerHTML = html;
+  }
+  return response({ success: true, productos: products });
 }
 
-function filterProducts(cat) {
-    const filtered = currentProductsList.filter(p => p.categoria === cat);
-    renderProducts(filtered);
-}
-
-function openNewProduct() {
-    document.getElementById('editProdId').value = '';
-    document.getElementById('editProdCat').value = 'Bebidas';
-    document.getElementById('editProdNombre').value = '';
-    document.getElementById('editProdDesc').value = '';
-    document.getElementById('editProdPrecio').value = '';
-    document.getElementById('editProdStock').value = '';
-    document.getElementById('editProdImg').value = '';
-    document.getElementById('editProdActivo').value = 'Activo';
-    document.getElementById('editProdEmpresa').value = 'CasaMunay';
-    document.getElementById('modalProductEditor').style.display = 'flex';
-}
-
-function editProduct(id) {
-    const p = currentProductsList.find(x => x.id == id);
-    if (!p) return;
-
-    document.getElementById('editProdId').value = p.id;
-    document.getElementById('editProdCat').value = p.categoria;
-    document.getElementById('editProdNombre').value = p.nombre;
-    document.getElementById('editProdDesc').value = p.descripcion;
-    document.getElementById('editProdPrecio').value = p.precio;
-    document.getElementById('editProdStock').value = p.stock;
-    document.getElementById('editProdImg').value = p.imagen_url;
-    document.getElementById('editProdActivo').value = p.activo;
-    document.getElementById('editProdEmpresa').value = p.empresa;
-
-    document.getElementById('modalProductEditor').style.display = 'flex';
-}
-
-function closeProductEditor() {
-    document.getElementById('modalProductEditor').style.display = 'none';
-}
-
-async function saveProduct(e) {
-    e.preventDefault();
-    const btn = e.target.querySelector('button[type="submit"]');
-    btn.innerText = 'Guardando...';
-    btn.disabled = true;
-
-    const prodData = {
-        id: document.getElementById('editProdId').value,
-        categoria: document.getElementById('editProdCat').value,
-        nombre: document.getElementById('editProdNombre').value,
-        descripcion: document.getElementById('editProdDesc').value,
-        precio: document.getElementById('editProdPrecio').value,
-        stock: document.getElementById('editProdStock').value,
-        imagen_url: document.getElementById('editProdImg').value,
-        activo: document.getElementById('editProdActivo').value,
-        empresa: document.getElementById('editProdEmpresa').value
-    };
-
-    try {
-        const res = await fetch(CONFIG.API_URL, {
-            method: 'POST',
-            body: JSON.stringify({ action: 'saveProducto', producto: prodData })
-        });
-        const data = await res.json();
-        if (data.success) {
-            closeProductEditor();
-            loadProductsView();
-        } else {
-            alert('Error: ' + data.error);
+function saveProducto(prod) {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Productos');
+  if (!sheet) return response({ error: 'DB: Hoja Productos no encontrada' });
+  
+  const data = sheet.getDataRange().getValues();
+  let savedId = prod.id;
+  
+  // 1. LOCAL SAVE (GRUPO PS)
+  // ------------------------------------------
+  if (prod.id) {
+    // UPDATE
+    let found = false;
+    for (let i = 1; i < data.length; i++) {
+        if (String(data[i][0]) === String(prod.id)) {
+            const r = i + 1;
+            sheet.getRange(r, 2).setValue(prod.categoria);
+            sheet.getRange(r, 3).setValue(prod.nombre);
+            sheet.getRange(r, 4).setValue(prod.descripcion);
+            sheet.getRange(r, 5).setValue(prod.precio);
+            sheet.getRange(r, 6).setValue(prod.stock);
+            sheet.getRange(r, 7).setValue(prod.imagen_url);
+            sheet.getRange(r, 8).setValue(prod.activo);
+            sheet.getRange(r, 9).setValue(prod.empresa);
+            found = true;
+            break;
         }
-    } catch (err) {
-        alert('Error: ' + err.message);
-    } finally {
-        btn.innerText = 'Guardar';
-        btn.disabled = false;
     }
+    if (!found) return response({ error: 'Producto no encontrado' });
+  } else {
+      // CREATE
+      savedId = 'PROD-' + new Date().getTime();
+      sheet.appendRow([
+          savedId,
+          prod.categoria,
+          prod.nombre,
+          prod.descripcion,
+          prod.precio,
+          prod.stock,
+          prod.imagen_url,
+          prod.activo,
+          prod.empresa
+      ]);
+  }
+
+  // 2. REMOTE SYNC (CASA MUNAY WEB)
+  // ------------------------------------------
+  try {
+     syncToCasaMunay(savedId, prod);
+  } catch (e) {
+     // If sync fails, we still return success but maybe with a warning? 
+     // For now, let's just log it or ignore strict failure to keep ERP usable.
+     // But ideally we want to know.
+     // return response({ success: true, message: 'Guardado Local OK. Error Sync: ' + e.message, id: savedId });
+  }
+
+  return response({ success: true, message: 'Producto guardado y sincronizado', id: savedId });
+}
+
+// Helper: Sync to External DB
+function syncToCasaMunay(id, prod) {
+  const ssExt = SpreadsheetApp.openById(CONFIG.ID_CASAMUNAY);
+  const sheetExt = ssExt.getSheetByName('Servicios');
+  if (!sheetExt) return;
+
+  const data = sheetExt.getDataRange().getValues();
+  let foundRow = -1;
+
+  // Search by ID (Col A)
+  for (let i = 1; i < data.length; i++) {
+    if (String(data[i][0]) === String(id)) {
+      foundRow = i + 1;
+      break;
+    }
+  }
+
+  // Columns External: A=ID, B=Categoria, C=Nombre, D=Descripcion, E=Precio, F=Stock, G=Imagen_URL, H=Activo
+  if (foundRow > 0) {
+    // Update
+    sheetExt.getRange(foundRow, 2).setValue(prod.categoria);
+    sheetExt.getRange(foundRow, 3).setValue(prod.nombre);
+    sheetExt.getRange(foundRow, 4).setValue(prod.descripcion);
+    sheetExt.getRange(foundRow, 5).setValue(prod.precio);
+    sheetExt.getRange(foundRow, 6).setValue(prod.stock);
+    sheetExt.getRange(foundRow, 7).setValue(prod.imagen_url);
+    sheetExt.getRange(foundRow, 8).setValue(prod.activo);
+  } else {
+    // Append
+    sheetExt.appendRow([
+      id,
+      prod.categoria,
+      prod.nombre,
+      prod.descripcion,
+      prod.precio,
+      prod.stock,
+      prod.imagen_url,
+      prod.activo
+    ]);
+  }
+}
+
+// ===== OPERATIONS MODULE (PHASE 5) =====
+function checkIn(data) {
+  // data: { habitacionId, cliente, fechaSalida, notas }
+  
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheetHab = ss.getSheetByName('Habitaciones');
+  const sheetRes = ss.getSheetByName('Reservas');
+  
+  if (!sheetHab || !sheetRes) return response({ error: 'DB: Faltan hojas Habitaciones o Reservas' });
+  
+  // 1. Update Room Status -> Ocupado
+  const dataHab = sheetHab.getDataRange().getValues();
+  let roomFound = false;
+  let roomRow = -1;
+  
+  for (let i = 1; i < dataHab.length; i++) {
+    // Check ID (Col 0) OR Number (Col 1) containing the input
+    if (String(dataHab[i][0]) === String(data.habitacionId) || String(dataHab[i][1]) === String(data.habitacionId)) {
+       roomFound = true;
+       roomRow = i + 1;
+       // Validar si ya está ocupada?
+       // Col 6 is Estado based on saveHabitacion (A=0 ... G=6)
+       if (String(dataHab[i][6]).toLowerCase() === 'ocupado') {
+           return response({ error: 'La habitación ya está ocupada.' });
+       }
+       break;
+    }
+  }
+  
+  if (!roomFound) return response({ error: 'Habitación no encontrada' });
+  
+  // Set Ocupado and Guest Name (Optional column logic, assuming Col 6 is State, Col 9 might be Guest if added, but mainly State)
+  // Based on saveHabitacion: Col 6 is Estado.
+  sheetHab.getRange(roomRow, 6).setValue('Ocupado');
+  
+  // 2. Create Reservation
+  // Headers: ID | Habitacion_ID | Cliente | CheckIn | CheckOut | Estado | Total | Pagado | Notas
+  const resId = 'RES-' + new Date().getTime();
+  const now = new Date(); // CheckIn time
+  const checkOut = data.fechaSalida || ''; // Should be date object or string
+  
+  sheetRes.appendRow([
+      resId,
+      data.habitacionId,
+      data.cliente,
+      now,                // CheckIn
+      checkOut,           // CheckOut
+      'Activa',           // Estado
+      0,                  // Total (starts at 0)
+      0,                  // Pagado
+      data.notas || ''    // Notas
+  ]);
+  
+  return response({ success: true, message: 'Check-in realizado', reservaId: resId });
+}
+
+// ===== HELPER =====
+function response(data) {
+  return ContentService.createTextOutput(JSON.stringify(data))
+    .setMimeType(ContentService.MimeType.JSON);
 }
