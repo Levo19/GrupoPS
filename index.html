@@ -470,6 +470,42 @@
         </div>
     </div>
 
+    <!-- MODAL CHECK OUT -->
+    <div id="modalCheckOut" class="modal-overlay" style="display:none;">
+        <div class="modal-card">
+            <h2 class="modal-title"><i class="fas fa-sign-out-alt"></i> Procesar Salida (Check-Out)</h2>
+            <form id="formCheckOut" onsubmit="processCheckOut(event)">
+                <input type="hidden" id="checkOutRoomId">
+
+                <div class="form-group">
+                    <label>Resumen de Salida</label>
+                    <div id="checkOutSummary"
+                        style="padding:10px; background:#f8fafc; border-radius:8px; font-size:0.9rem; color:#475569;">
+                        <!-- JS populated -->
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Fecha y Hora REAL de Salida</label>
+                    <input type="datetime-local" id="checkOutFecha" class="form-input" required>
+                    <small style="color:#64748B;">Se usará esta fecha para cerrar la reserva y calcular costos
+                        finales.</small>
+                </div>
+
+                <div class="form-group">
+                    <label>Notas de Salida / Incidencias</label>
+                    <textarea id="checkOutNotas" class="form-input" rows="3"
+                        placeholder="Ej: Consumo de minibar pendiente, daños, etc."></textarea>
+                </div>
+
+                <div class="modal-actions">
+                    <button type="button" class="btn-cancel" onclick="closeCheckOut()">Cancelar</button>
+                    <button type="submit" class="btn-submit" style="background:var(--accent);">Confirmar Salida</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <script src="app.js"></script>
 </body>
 
