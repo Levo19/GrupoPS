@@ -306,7 +306,7 @@ function renderRooms(rooms) {
 
                 <div class="room-actions" style="justify-content:space-between; width:100%;">
                     ${r.estado === 'Disponible'
-                ? `<button onclick="openCheckIn('${r.numero}')" style="background:#22c55e; color:white; border:none; padding:6px 12px; border-radius:6px; cursor:pointer; font-size:0.85rem; display:flex; align-items:center; gap:5px;"><i class="fas fa-check"></i> Check-In</button>`
+                ? `<button onclick="openCheckIn('${r.id}', '${r.numero}')" style="background:#22c55e; color:white; border:none; padding:6px 12px; border-radius:6px; cursor:pointer; font-size:0.85rem; display:flex; align-items:center; gap:5px;"><i class="fas fa-check"></i> Check-In</button>`
                 : r.estado === 'Ocupado'
                     ? `<button style="background:#eab308; color:white; border:none; padding:6px 12px; border-radius:6px; cursor:pointer; font-size:0.85rem; display:flex; align-items:center; gap:5px;"><i class="fas fa-concierge-bell"></i> Gestionar</button>`
                     : ''
@@ -324,8 +324,8 @@ function renderRooms(rooms) {
 }
 
 // ===== CHECK-IN LOGIC (PHASE 5) =====
-function openCheckIn(roomNum) {
-    document.getElementById('checkInRoomId').value = roomNum;
+function openCheckIn(roomId, roomNum) {
+    document.getElementById('checkInRoomId').value = roomId;
     document.getElementById('checkInRoomNum').innerText = 'Habitación ' + roomNum;
     document.getElementById('formCheckIn').reset();
 
