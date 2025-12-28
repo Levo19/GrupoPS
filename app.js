@@ -356,7 +356,9 @@ function renderRooms(rooms) {
         }
         else if (normStatus === 'sucio') {
             statusClass = 'status-sucio';
-            statusLabel = 'SUCIO';
+            statusLabel = 'LIMPIEZA';
+            // User requested that 'Cleaning' means 'Available but Dirty'
+            // We can add a quick 'Clean' action later if needed
         }
         else if (normStatus === 'disponible') {
             statusClass = 'status-disponible';
@@ -383,7 +385,7 @@ function renderRooms(rooms) {
         // Common Reserve Button (Available for all except maybe Maintenance?)
         const btnReservar = `<button onclick="openReservation('${r.id}', '${r.numero}')" style="background:#eab308; color:white; border:none; padding:6px 10px; border-radius:6px; cursor:pointer; font-size:0.85rem; display:flex; align-items:center; gap:5px;"><i class="fas fa-calendar-plus"></i> Reservar</button>`;
 
-        if (normStatus === 'disponible') {
+        if (normStatus === 'disponible' || normStatus === 'sucio') {
             actionsHtml = `
                <div style="display:flex; gap:5px;">
                     <button onclick="openCheckIn('${r.id}', '${r.numero}')" style="background:#22c55e; color:white; border:none; padding:6px 10px; border-radius:6px; cursor:pointer; font-size:0.85rem; display:flex; align-items:center; gap:5px;"><i class="fas fa-check"></i> Check-In</button>
@@ -391,10 +393,10 @@ function renderRooms(rooms) {
                </div>
             `;
         } else if (normStatus === 'ocupado') {
-            // Show Reserve for future, but Check-In is disabled
+            // Check-Out Button
             actionsHtml = `
                <div style="display:flex; gap:5px;">
-                    <button style="background:#ef4444; color:white; border:none; padding:6px 12px; border-radius:6px; cursor:not-allowed; opacity:0.8; font-size:0.85rem;" disabled><i class="fas fa-ban"></i> Ocupado</button>
+                    <button onclick="openCheckOut('${r.id}')" style="background:#f97316; color:white; border:none; padding:6px 12px; border-radius:6px; cursor:pointer; font-size:0.85rem; display:flex; align-items:center; gap:5px;"><i class="fas fa-sign-out-alt"></i> Salida</button>
                     ${btnReservar}
                </div>
             `;
@@ -824,6 +826,74 @@ async function processCheckIn(e) {
     } finally {
         submitBtn.innerText = originalText;
         submitBtn.disabled = false;
+    }
+}
+
+// ===== CHECK OUT LOGIC =====
+function openCheckOut(roomId) {
+    const room = currentRoomsList.find(r => r.id === roomId);
+    if (!room) return;
+
+    document.getElementById('checkOutRoomId').value = roomId;
+    document.getElementById('checkOutSummary').innerHTML = `
+        <strong>Habitación ${room.numero}</strong><br>
+        <span style="font-size:0.8rem">Confirmar salida de huéspedes.</span>
+    `;
+
+    // Default val: NOW
+    const now = new Date();
+    // Adjust to local ISO string (dumb way but works for simple local)
+    // Or just use library. Here manual format YYYY-MM-DDTHH:MM
+    const localIso = new Date(now.getTime() - (now.getTimezoneOffset() * 60000)).toISOString().slice(0, 16);
+    document.getElementById('checkOutFecha').value = localIso;
+    document.getElementById('checkOutNotas').value = '';
+
+    document.getElementById('modalCheckOut').style.display = 'flex';
+}
+
+function closeCheckOut() {
+    document.getElementById('modalCheckOut').style.display = 'none';
+}
+
+async function processCheckOut(e) {
+    e.preventDefault();
+    const btn = e.target.querySelector('button[type="submit"]');
+    const originalText = btn.innerText;
+    btn.innerText = 'Procesando...';
+    btn.disabled = true;
+
+    const data = {
+        action: 'checkOut',
+        habitacionId: document.getElementById('checkOutRoomId').value,
+        fechaSalidaReal: document.getElementById('checkOutFecha').value,
+        notas: document.getElementById('checkOutNotas').value
+    };
+
+    try {
+        const res = await fetch(CONFIG.API_URL, {
+            method: 'POST',
+            body: JSON.stringify(data)
+        });
+        const result = await res.json();
+
+        if (result.success) {
+            alert('✅ Check-Out Exitoso. Habitación marcada como SUCIO.');
+            closeCheckOut();
+
+            // Update UI Optimistically?? Or just reload since state change is complex
+            // Let's reload to be safe with sync
+            await Promise.all([
+                loadRoomsView(), // Will show 'Sucio'
+                loadCalendarView()
+            ]);
+        } else {
+            alert('❌ Error: ' + result.error);
+        }
+    } catch (err) {
+        alert('❌ Error de conexión: ' + err.message);
+    } finally {
+        btn.innerText = originalText;
+        btn.disabled = false;
     }
 }
 
