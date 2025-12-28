@@ -406,7 +406,7 @@
         <div class="login-card fade-in"
             style="width: 450px; max-width: 95%; background: white; color: var(--text-main); margin: auto; text-align: left;">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
-                <h2 style="color:var(--primary);">🏨 Check-In</h2>
+                <h2 id="modalTitleCheckIn" style="color:var(--primary);">🏨 Check-In</h2>
                 <button onclick="closeCheckIn()"
                     style="border:none; background:transparent; font-size:1.5rem; cursor:pointer;">&times;</button>
             </div>
@@ -437,7 +437,7 @@
                 <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px;">
                     <button type="button" onclick="closeCheckIn()"
                         style="padding:10px 20px; border:1px solid #cbd5e1; background:white; border-radius:8px; cursor:pointer;">Cancelar</button>
-                    <button type="submit" class="btn-login"
+                    <button type="submit" id="btnSubmitCheckIn" class="btn-login"
                         style="width:auto; margin-top:0; background:var(--accent);">Confirmar Ingreso</button>
                 </div>
             </form>
