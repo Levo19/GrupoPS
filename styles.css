@@ -307,6 +307,20 @@ body {
     transition: transform 0.3s, box-shadow 0.3s;
     position: relative;
     border: 1px solid rgba(0, 0, 0, 0.05);
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+.room-body {
+    padding: 20px;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+.room-actions {
+    margin-top: auto;
 }
 
 .room-card:hover {
@@ -685,7 +699,9 @@ body {
     border: 1px solid #fca5a5 !important;
     transform: scale(1.05);
     transition: all 0.3s ease;
-}/* =========================================
+}
+
+/* =========================================
    ROOM DETAIL CARD MODAL
    ========================================= */
 .room-detail-card-modal {
