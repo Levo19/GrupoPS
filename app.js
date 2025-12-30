@@ -409,7 +409,7 @@ function renderRooms(rooms) {
                  ${statusNorm === 'sucio' ? `<div class="room-actions-grid">${btnClean} ${btnReservar}</div>` : btnReservar}
             </div>`;
 
-        } else if (statusNorm === 'ocupado') {
+        } else if (normStatus === 'ocupado') {
             const clientName = r.cliente_actual || '';
 
             const btnFinish = `<button onclick="openCheckOut('${r.id}', '${r.numero}', '${clientName}')" class="btn-action btn-action-danger"><i class="fas fa-sign-out-alt"></i> Finalizar</button>`;
@@ -417,27 +417,28 @@ function renderRooms(rooms) {
             // Extender (Secondary)
             const btnExtend = `<button onclick="openReservation('${r.id}', '${r.numero}', null, '${clientName}', true)" class="btn-action btn-action-success"><i class="fas fa-clock"></i> Extender</button>`;
 
-            // New Res (Warning)
-            const btnNewRes = `<button onclick="openReservation('${r.id}', '${r.numero}', null, '', false)" class="btn-action btn-action-warning"><i class="fas fa-calendar-alt"></i> Reservar</button>`;
+            // [PHASE 9] Quick Charge Button
+            // Using r.reservaActivaId passed from backend
+            const btnCharge = `<button onclick="openQuickCharge('${r.id}', '${r.reservaActivaId}')" class="btn-action btn-action-primary" title="Cargar Consumo"><i class="fas fa-cart-plus"></i></button>`;
 
-            // Layout: Finish (Full) on top, then Extend/Reserve side by side
+            // Layout: Finish (Full) on top, then Extend + Charge
             actionsHtml = `
             <div style="display:flex; flex-direction:column; gap:8px; width:100%;">
                 ${btnFinish}
-                <div class="room-actions-grid">
+                <div class="room-actions-grid" style="grid-template-columns: 2fr 1fr;">
                     ${btnExtend}
-                    ${btnNewRes}
+                    ${btnCharge}
                 </div>
             </div>`;
 
-        } else if (statusNorm === 'mantenimiento') {
+        } else if (normStatus === 'mantenimiento') {
             actionsHtml = `
             <div class="room-actions-grid full-width">
                  <div style="text-align:center; color:#64748B; font-style:italic; font-size:0.85rem; margin-bottom:5px;">Mantenimiento</div>
                  ${btnReservar}
             </div>`;
 
-        } else if (statusNorm === 'reservado') {
+        } else if (normStatus === 'reservado') {
             // Check-In (Arrival) + Reservar
             const btnArrival = `<button onclick="openCheckIn('${r.id}', '${r.numero}')" class="btn-action btn-action-success"><i class="fas fa-check"></i> Llegada</button>`;
 
@@ -450,6 +451,12 @@ function renderRooms(rooms) {
             actionsHtml = `<span style="color:#64748B; font-size:0.9rem; font-style:italic;">No disponible</span>`;
         }
 
+        // [PHASE 9] DEBT BADGE
+        let debtBadge = '';
+        if (r.deuda && r.deuda > 0) {
+            debtBadge = `<span class="room-status-badge badge-debt" style="top:40px; background:#ef4444; color:white;">Deuda: S/ ${r.deuda.toFixed(2)}</span>`;
+        }
+
         html += `
         <div class="room-card fade-in" id="card-${r.id}">
             <div class="card-inner">
@@ -460,6 +467,7 @@ function renderRooms(rooms) {
                     <div class="room-img-box">
                         <img src="${mainImg}" class="room-img" alt="Foto">
                         <span class="room-status-badge ${statusClass}">${statusLabel}</span>
+                        ${debtBadge}
                     </div>
                     <div class="room-body">
                         <div style="display:flex; justify-content:space-between; align-items:flex-start;">
@@ -1623,6 +1631,8 @@ async function saveUser(e) {
 
 // ===== PRODUCTS MODULE =====
 let currentProductsList = [];
+let currentServicesList = []; // [PHASE 9]
+let qcSelectedPrice = 0; // [PHASE 9]
 let currentProductFilter = 'Todos';
 
 async function loadProductsView() {
@@ -2384,4 +2394,186 @@ async function submitExpense() {
             alert('Error: ' + d.error);
         }
     } catch (e) { alert('Error de conexión'); }
+}
+
+// ===== PHASE 9: QUICK CHARGE LOGIC =====
+
+let qcActiveTab = 'product';
+
+async function openQuickCharge(roomId, resId) {
+    if (!roomId || !resId || resId === 'null') {
+        alert('❌ Error: No se identificó la reserva activa. Verifica el estado de la habitación.');
+        return;
+    }
+
+    document.getElementById('qcRoomId').value = roomId;
+    document.getElementById('qcResId').value = resId;
+    document.getElementById('modalQuickCharge').style.display = 'flex';
+
+    currentProductFilter = 'Todos'; // Reset filter to show all
+    // Ensure Products Loaded
+    if (currentProductsList.length === 0) await loadProductsView();
+    populateQCProducts();
+
+    // Ensure Services Loaded
+    if (currentServicesList.length === 0) loadServicesData();
+
+    switchQCTab('product');
+}
+
+function switchQCTab(tab) {
+    qcActiveTab = tab;
+    // UI Updates
+    document.getElementById('tabQCProduct').style.background = tab === 'product' ? 'var(--primary)' : 'transparent';
+    document.getElementById('tabQCProduct').style.color = tab === 'product' ? 'white' : '#64748B';
+
+    document.getElementById('tabQCService').style.background = tab === 'service' ? 'var(--primary)' : 'transparent';
+    document.getElementById('tabQCService').style.color = tab === 'service' ? 'white' : '#64748B';
+
+    document.getElementById('qcFormProduct').style.display = tab === 'product' ? 'block' : 'none';
+    document.getElementById('qcFormService').style.display = tab === 'service' ? 'block' : 'none';
+}
+
+function populateQCProducts() {
+    const sel = document.getElementById('qcProdSelect');
+    sel.innerHTML = '<option value="">-- Seleccionar Producto --</option>';
+
+    // Filter active products
+    currentProductsList.forEach(p => {
+        if (String(p.activo).toLowerCase() === 'activo' || p.activo === true || String(p.activo) === 'si') {
+            const opt = document.createElement('option');
+            opt.value = p.id;
+            opt.text = `${p.nombre} (S/ ${p.precio})`;
+            opt.dataset.price = p.precio;
+            opt.dataset.stock = p.stock_actual;
+            sel.appendChild(opt);
+        }
+    });
+}
+
+function updateQCStockDisplay() {
+    const sel = document.getElementById('qcProdSelect');
+    if (sel.selectedIndex <= 0) {
+        document.getElementById('qcStockDisplay').innerText = 'Stock: -';
+        qcSelectedPrice = 0;
+        return;
+    }
+    const opt = sel.options[sel.selectedIndex];
+    const stock = opt.dataset.stock;
+    qcSelectedPrice = Number(opt.dataset.price);
+
+    document.getElementById('qcStockDisplay').innerText = `Stock Disponible: ${stock}`;
+    if (Number(stock) <= 0) {
+        document.getElementById('qcStockDisplay').style.color = '#ef4444';
+    } else {
+        document.getElementById('qcStockDisplay').style.color = '#64748B';
+    }
+}
+
+async function loadServicesData() {
+    try {
+        const res = await fetch(CONFIG.API_URL, {
+            method: 'POST',
+            body: JSON.stringify({ action: 'getServicios' })
+        });
+        const result = await res.json();
+        if (result.success) {
+            currentServicesList = result.servicios;
+            populateQCServices();
+        }
+    } catch (e) { console.error('Error fetching services', e); }
+}
+
+function populateQCServices() {
+    const sel = document.getElementById('qcServSelect');
+    sel.innerHTML = '<option value="">-- Seleccionar Servicio --</option>';
+
+    currentServicesList.forEach(s => {
+        const opt = document.createElement('option');
+        opt.value = s.id;
+        opt.text = `${s.nombre} (S/ ${s.precio})`;
+        opt.dataset.price = s.precio;
+        sel.appendChild(opt);
+    });
+}
+
+async function submitQuickCharge() {
+    const resId = document.getElementById('qcResId').value;
+
+    if (qcActiveTab === 'product') {
+        const prodId = document.getElementById('qcProdSelect').value;
+        const qty = document.getElementById('qcProdQty').value;
+
+        if (!prodId) return alert('Selecciona un producto');
+        if (qty <= 0) return alert('Cantidad inválida');
+
+        const sel = document.getElementById('qcProdSelect');
+        const stock = Number(sel.options[sel.selectedIndex].dataset.stock);
+        if (stock < qty) {
+            if (!confirm(`⚠️ Stock insuficiente logicamente (${stock}). ¿Enviar pedido igual?`)) return;
+        }
+
+        const total = qcSelectedPrice * Number(qty);
+        const prodName = sel.options[sel.selectedIndex].text.split(' (')[0];
+
+        const payload = {
+            action: 'saveConsumo',
+            reservaId: resId,
+            tipo: 'Producto',
+            descripcion: `Consumo: ${prodName}`,
+            monto: total,
+            cantidad: qty,
+            productoId: prodId
+        };
+
+        if (!confirm(`¿Cargar S/ ${total} por ${qty} ${prodName}?`)) return;
+
+        try {
+            const res = await fetch(CONFIG.API_URL, { method: 'POST', body: JSON.stringify(payload) });
+            const result = await res.json();
+            if (result.success) {
+                alert('✅ Consumo Agregado');
+                document.getElementById('modalQuickCharge').style.display = 'none';
+                loadRoomsView(); // Refresh Logic
+            } else {
+                alert('Error: ' + result.error);
+            }
+        } catch (e) { alert('Error red: ' + e.message); }
+
+    } else {
+        const servId = document.getElementById('qcServSelect').value;
+        const date = document.getElementById('qcServDate').value;
+        const notes = document.getElementById('qcServNotes').value;
+
+        if (!servId) return alert('Selecciona un servicio');
+
+        const sel = document.getElementById('qcServSelect');
+        const price = Number(sel.options[sel.selectedIndex].dataset.price);
+        const servName = sel.options[sel.selectedIndex].text.split(' (')[0];
+
+        const payload = {
+            action: 'saveConsumo',
+            reservaId: resId,
+            tipo: 'Servicio',
+            descripcion: `Servicio: ${servName} ${notes ? '(' + notes + ')' : ''}`,
+            monto: price,
+            cantidad: 1,
+            productoId: '',
+            fechaProgramada: date
+        };
+
+        if (!confirm(`¿Reservar ${servName} por S/ ${price}?`)) return;
+
+        try {
+            const res = await fetch(CONFIG.API_URL, { method: 'POST', body: JSON.stringify(payload) });
+            const result = await res.json();
+            if (result.success) {
+                alert('✅ Servicio Reservado');
+                document.getElementById('modalQuickCharge').style.display = 'none';
+                loadRoomsView();
+            } else {
+                alert('Error: ' + result.error);
+            }
+        } catch (e) { alert('Error red: ' + e.message); }
+    }
 }
