@@ -1121,6 +1121,24 @@ async function processCheckIn(e) {
 
 // ===== LIQUIDATION & FINANCE LOGIC (PHASE 7) =====
 
+// Helper to check session
+function checkSession() {
+    if (!currentUser) {
+        // Try to restore from storage
+        const token = sessionStorage.getItem('gps_token');
+        const user = sessionStorage.getItem('gps_user');
+        if (token && user) {
+            currentUser = JSON.parse(user);
+            return true;
+        } else {
+            alert('Sesión expirada. Inicie sesión nuevamente.');
+            showLogin();
+            return false;
+        }
+    }
+    return true;
+}
+
 // Alias for existing buttons
 window.openCheckOut = function (roomId) {
     if (!checkSession()) return;
