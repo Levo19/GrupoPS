@@ -382,57 +382,60 @@ function renderRooms(rooms) {
         // Actions Logic
         let actionsHtml = '';
 
-        // Common Reserve Button (Available for all except maybe Maintenance?)
-        const btnReservar = `<button onclick="openReservation('${r.id}', '${r.numero}')" style="background:#eab308; color:white; border:none; padding:6px 10px; border-radius:6px; cursor:pointer; font-size:0.85rem; display:flex; align-items:center; gap:5px;"><i class="fas fa-calendar-plus"></i> Reservar</button>`;
+        // Common Reserve Button
+        const btnReservar = `<button onclick="openReservation('${r.id}', '${r.numero}')" class="btn-action btn-action-warning"><i class="fas fa-calendar-plus"></i> Reservar</button>`;
 
         // ACTIONS
-        // Normalize status for comparison
         const statusNorm = r.estado.toLowerCase();
 
         if (statusNorm === 'disponible' || statusNorm === 'sucio') {
             const btnCheckIn = statusNorm === 'sucio'
-                ? `<div style="text-align:center; padding:8px; color:#f97316; font-weight:bold; font-size:0.8rem; border:1px dashed #f97316; border-radius:8px;">⚠️ Limpieza Pendiente</div>`
-                : `<button onclick="openCheckIn('${r.id}', '${r.numero}')" style="width:100%; padding:10px; border:none; border-radius:8px; background:#22c55e; color:white; font-weight:bold; cursor:pointer;" class="btn-hover-effect">
-                        <i class="fas fa-key"></i> Check-In (Ingreso)
-                   </button>`;
+                ? `<div class="btn-action btn-action-alert">⚠️ Limpieza Pendiente</div>`
+                : `<button onclick="openCheckIn('${r.id}', '${r.numero}')" class="btn-action btn-action-success"><i class="fas fa-key"></i> Check-In</button>`;
 
-            actionsHtml = `${btnCheckIn}
-                             <div style="height:10px;"></div>
-                             <button onclick="openReservation('${r.id}', '${r.numero}', null, '')" style="width:100%; padding:10px; border:none; border-radius:8px; background:#eab308; color:white; font-weight:bold; cursor:pointer;" class="btn-hover-effect">
-                                <i class="fas fa-calendar-alt"></i> Reservar
-                             </button>`;
-        } else if (statusNorm === 'ocupado') {
-            // Placeholder for clientName, assuming it would be fetched or passed
-            const clientName = r.cliente_actual || '';
-
-            const btnFinish = `<button onclick="openCheckOut('${r.id}', '${r.numero}', '${clientName}')" style="width:100%; padding:10px; border:none; border-radius:8px; background:#ef4444; color:white; font-weight:bold; cursor:pointer; margin-bottom:8px;">
-                                <i class="fas fa-sign-out-alt"></i> Finalizar
-                           </button>`;
-
-            // Pass isExtension = true
-            const btnExtend = `<button onclick="openReservation('${r.id}', '${r.numero}', null, '${clientName}', true)" style="width:100%; padding:10px; border:none; border-radius:8px; background:#22c55e; color:white; font-weight:bold; cursor:pointer; margin-bottom:8px;">
-                                <i class="fas fa-calendar-plus"></i> Extender
-                           </button>`;
-
-            // Pass isExtension = false
-            const btnNewRes = `<button onclick="openReservation('${r.id}', '${r.numero}', null, '', false)" style="width:100%; padding:10px; border:none; border-radius:8px; background:#eab308; color:white; font-weight:bold; cursor:pointer;">
-                                <i class="fas fa-calendar-alt"></i> Reservar
-                           </button>`;
-
-            actionsHtml = btnFinish + btnExtend + btnNewRes;
-        } else if (statusNorm === 'mantenimiento') {
             actionsHtml = `
-            <div style="display:flex; flex-direction:column; gap:5px;">
-                 <span style="color:#64748B; font-size:0.9rem; font-style:italic; text-align:center;">Mantenimiento</span>
+            <div class="room-actions-grid full-width" style="gap:8px;">
+                 ${btnCheckIn}
                  ${btnReservar}
             </div>`;
-        } else if (statusNorm === 'reservado') {
+
+        } else if (statusNorm === 'ocupado') {
+            const clientName = r.cliente_actual || '';
+
+            const btnFinish = `<button onclick="openCheckOut('${r.id}', '${r.numero}', '${clientName}')" class="btn-action btn-action-danger"><i class="fas fa-sign-out-alt"></i> Finalizar</button>`;
+
+            // Extender (Secondary)
+            const btnExtend = `<button onclick="openReservation('${r.id}', '${r.numero}', null, '${clientName}', true)" class="btn-action btn-action-success"><i class="fas fa-clock"></i> Extender</button>`;
+
+            // New Res (Warning)
+            const btnNewRes = `<button onclick="openReservation('${r.id}', '${r.numero}', null, '', false)" class="btn-action btn-action-warning"><i class="fas fa-calendar-alt"></i> Reservar</button>`;
+
+            // Layout: Finish (Full) on top, then Extend/Reserve side by side
             actionsHtml = `
-               <div style="display:flex; gap:5px;">
-                    <button onclick="openCheckIn('${r.id}', '${r.numero}')" style="background:#22c55e; color:white; border:none; padding:6px 10px; border-radius:6px; cursor:pointer; font-size:0.85rem; display:flex; align-items:center; gap:5px;"><i class="fas fa-check"></i> Llegada</button>
-                    ${btnReservar}
-               </div>
-            `;
+            <div style="display:flex; flex-direction:column; gap:8px; width:100%;">
+                ${btnFinish}
+                <div class="room-actions-grid">
+                    ${btnExtend}
+                    ${btnNewRes}
+                </div>
+            </div>`;
+
+        } else if (statusNorm === 'mantenimiento') {
+            actionsHtml = `
+            <div class="room-actions-grid full-width">
+                 <div style="text-align:center; color:#64748B; font-style:italic; font-size:0.85rem; margin-bottom:5px;">Mantenimiento</div>
+                 ${btnReservar}
+            </div>`;
+
+        } else if (statusNorm === 'reservado') {
+            // Check-In (Arrival) + Reservar
+            const btnArrival = `<button onclick="openCheckIn('${r.id}', '${r.numero}')" class="btn-action btn-action-success"><i class="fas fa-check"></i> Llegada</button>`;
+
+            actionsHtml = `
+             <div class="room-actions-grid">
+                  ${btnArrival}
+                  ${btnReservar}
+             </div>`;
         } else {
             actionsHtml = `<span style="color:#64748B; font-size:0.9rem; font-style:italic;">No disponible</span>`;
         }
