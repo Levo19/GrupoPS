@@ -869,3 +869,67 @@ body {
     background: #3b82f6;
     color: white;
 }
+/* =========================================
+   ROOM ACTION BUTTONS (Refined)
+   ========================================= */
+.room-actions-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    width: 100%;
+}
+
+.room-actions-grid.full-width {
+    grid-template-columns: 1fr;
+}
+
+.btn-action {
+    padding: 10px;
+    border: none;
+    border-radius: 8px;
+    font-weight: 700;
+    cursor: pointer;
+    font-size: 0.85rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    transition: all 0.2s;
+    text-align: center;
+    width: 100%;
+}
+
+.btn-action:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+}
+
+/* Red / Danger - e.g. Finalizar */
+.btn-action-danger {
+    background: #ef4444;
+    color: white;
+}
+
+/* Green / Success - e.g. Check-In, Extender */
+.btn-action-success {
+    background: #22c55e;
+    color: white;
+}
+
+/* Yellow / Warning - e.g. Reservar */
+.btn-action-warning {
+    background: #eab308;
+    color: white;
+}
+
+/* Orange / Alert - e.g. Limpieza */
+.btn-action-alert {
+    background: transparent;
+    border: 1px dashed #f97316;
+    color: #f97316;
+    cursor: default;
+}
+.btn-action-alert:hover {
+    transform: none;
+    box-shadow: none;
+}
