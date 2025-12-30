@@ -1115,88 +1115,89 @@ async function processCheckIn(e) {
         submitBtn.innerText = 'Confirmar'; // Reset text just in case re-opened
         submitBtn.disabled = false;
     }
+}
 
 
 
-    // ===== LIQUIDATION & FINANCE LOGIC (PHASE 7) =====
+// ===== LIQUIDATION & FINANCE LOGIC (PHASE 7) =====
 
-    // Alias for existing buttons
-    window.openCheckOut = function (roomId) {
-        if (!checkSession()) return;
-        openLiquidation(roomId);
-    }
+// Alias for existing buttons
+window.openCheckOut = function (roomId) {
+    if (!checkSession()) return;
+    openLiquidation(roomId);
+}
 
-    // Global state for current liquidation
-    let currentLiqData = null;
+// Global state for current liquidation
+let currentLiqData = null;
 
-    function openLiquidation(roomId) {
-        const room = currentRoomsList.find(r => r.id == roomId);
-        if (!room) return;
+function openLiquidation(roomId) {
+    const room = currentRoomsList.find(r => r.id == roomId);
+    if (!room) return;
 
-        document.getElementById('liqRoomId').value = roomId;
-        document.getElementById('liqRoomTitle').innerText = `Habitación ${room.numero} - ${room.tipo}`;
+    document.getElementById('liqRoomId').value = roomId;
+    document.getElementById('liqRoomTitle').innerText = `Habitación ${room.numero} - ${room.tipo}`;
 
-        // Show Modal
-        document.getElementById('modalLiquidation').style.display = 'flex';
-        document.getElementById('modalLiquidation').classList.add('active');
+    // Show Modal
+    document.getElementById('modalLiquidation').style.display = 'flex';
+    document.getElementById('modalLiquidation').classList.add('active');
 
-        // Load Data
-        loadLiquidationData(roomId);
-    }
+    // Load Data
+    loadLiquidationData(roomId);
+}
 
-    function closeLiquidation() {
-        document.getElementById('modalLiquidation').style.display = 'none';
-        document.getElementById('modalLiquidation').classList.remove('active');
-        currentLiqData = null;
-    }
+function closeLiquidation() {
+    document.getElementById('modalLiquidation').style.display = 'none';
+    document.getElementById('modalLiquidation').classList.remove('active');
+    currentLiqData = null;
+}
 
-    async function loadLiquidationData(roomId) {
-        // Show loading indicators
-        document.getElementById('tableChargesBody').innerHTML = '<tr><td colspan="2" style="text-align:center; padding:20px;">Cargando estado de cuenta...</td></tr>';
-        document.getElementById('tablePaymentsBody').innerHTML = '<tr><td colspan="2" style="text-align:center; padding:20px;">Cargando pagos...</td></tr>';
+async function loadLiquidationData(roomId) {
+    // Show loading indicators
+    document.getElementById('tableChargesBody').innerHTML = '<tr><td colspan="2" style="text-align:center; padding:20px;">Cargando estado de cuenta...</td></tr>';
+    document.getElementById('tablePaymentsBody').innerHTML = '<tr><td colspan="2" style="text-align:center; padding:20px;">Cargando pagos...</td></tr>';
 
-        try {
-            const res = await fetch(CONFIG.API_URL, {
-                method: 'POST',
-                body: JSON.stringify({ action: 'getAccountStatement', habitacionId: roomId })
-            });
-            const data = await res.json();
+    try {
+        const res = await fetch(CONFIG.API_URL, {
+            method: 'POST',
+            body: JSON.stringify({ action: 'getAccountStatement', habitacionId: roomId })
+        });
+        const data = await res.json();
 
-            if (data.success) {
-                currentLiqData = data.statement;
-                renderLiquidation(data.statement);
-            } else {
-                document.getElementById('tableChargesBody').innerHTML = `<tr><td colspan="2" style="color:red; text-align:center;">${data.error}</td></tr>`;
-                // Disable finalize if no active reservation found
-                if (data.error.includes('No se encontró')) {
-                    document.getElementById('btnFinalizeCheckout').disabled = true;
-                    document.getElementById('btnFinalizeCheckout').style.background = '#94a3b8';
-                }
+        if (data.success) {
+            currentLiqData = data.statement;
+            renderLiquidation(data.statement);
+        } else {
+            document.getElementById('tableChargesBody').innerHTML = `<tr><td colspan="2" style="color:red; text-align:center;">${data.error}</td></tr>`;
+            // Disable finalize if no active reservation found
+            if (data.error.includes('No se encontró')) {
+                document.getElementById('btnFinalizeCheckout').disabled = true;
+                document.getElementById('btnFinalizeCheckout').style.background = '#94a3b8';
             }
-        } catch (e) {
-            console.error(e);
-            alert('Error conectando con servidor financiero');
         }
+    } catch (e) {
+        console.error(e);
+        alert('Error conectando con servidor financiero');
     }
+}
 
-    function renderLiquidation(statement) {
-        document.getElementById('liqResId').value = statement.reservation ? statement.reservation.id : '';
-        document.getElementById('btnFinalizeCheckout').disabled = false;
-        document.getElementById('btnFinalizeCheckout').style.background = 'var(--accent)';
+function renderLiquidation(statement) {
+    document.getElementById('liqResId').value = statement.reservation ? statement.reservation.id : '';
+    document.getElementById('btnFinalizeCheckout').disabled = false;
+    document.getElementById('btnFinalizeCheckout').style.background = 'var(--accent)';
 
-        // 1. CHARGES
-        let htmlCharges = '';
+    // 1. CHARGES
+    let htmlCharges = '';
 
-        // Stay
-        htmlCharges += `
+    // Stay
+    htmlCharges += `
     <tr style="background:#e0f2fe;">
         <td style="padding:10px; font-weight:600; color:#0369a1;">${statement.stay.descripcion}</td>
         <td style="text-align:right; padding:10px; font-weight:bold; color:#0369a1;">S/ ${statement.stay.monto.toFixed(2)}</td>
     </tr>`;
 
-        // Internals
-        statement.internals.forEach(c => {
-            htmlCharges += `
+    // Internals
+    statement.internals.forEach(c => {
+        htmlCharges += `
         <tr>
             <td style="padding:10px; border-bottom:1px solid #f1f5f9;">
                 <div style="font-weight:500;">${c.descripcion}</div>
@@ -1204,11 +1205,11 @@ async function processCheckIn(e) {
             </td>
             <td style="text-align:right; padding:10px; border-bottom:1px solid #f1f5f9;">S/ ${c.monto.toFixed(2)}</td>
         </tr>`;
-        });
+    });
 
-        // Externals
-        statement.externals.forEach(c => {
-            htmlCharges += `
+    // Externals
+    statement.externals.forEach(c => {
+        htmlCharges += `
         <tr>
             <td style="padding:10px; border-bottom:1px solid #f1f5f9; color:#4b5563;">
                  <div style="font-weight:500;">${c.descripcion}</div>
@@ -1216,19 +1217,19 @@ async function processCheckIn(e) {
             </td>
             <td style="text-align:right; padding:10px; border-bottom:1px solid #f1f5f9;">S/ ${c.monto.toFixed(2)}</td>
         </tr>`;
-        });
+    });
 
-        document.getElementById('tableChargesBody').innerHTML = htmlCharges;
-        document.getElementById('valTotalConsumos').innerText = `S/ ${statement.totals.consumption.toFixed(2)}`;
+    document.getElementById('tableChargesBody').innerHTML = htmlCharges;
+    document.getElementById('valTotalConsumos').innerText = `S/ ${statement.totals.consumption.toFixed(2)}`;
 
 
-        // 2. PAYMENTS
-        let htmlPay = '';
-        if (statement.payments.length === 0) {
-            htmlPay = '<tr><td colspan="2" style="text-align:center; padding:15px; color:#94a3b8; font-style:italic;">No hay pagos registrados</td></tr>';
-        } else {
-            statement.payments.forEach(p => {
-                htmlPay += `
+    // 2. PAYMENTS
+    let htmlPay = '';
+    if (statement.payments.length === 0) {
+        htmlPay = '<tr><td colspan="2" style="text-align:center; padding:15px; color:#94a3b8; font-style:italic;">No hay pagos registrados</td></tr>';
+    } else {
+        statement.payments.forEach(p => {
+            htmlPay += `
             <tr>
                 <td style="padding:8px; border-bottom:1px solid #dcfce7;">
                     <div>${new Date(p.fecha).toLocaleDateString()}</div>
@@ -1236,92 +1237,92 @@ async function processCheckIn(e) {
                 </td>
                 <td style="text-align:right; padding:8px; border-bottom:1px solid #dcfce7;">S/ ${p.monto.toFixed(2)}</td>
             </tr>`;
-            });
-        }
-        document.getElementById('tablePaymentsBody').innerHTML = htmlPay;
-
-        // 3. BALANCE
-        const bal = statement.totals.balance;
-        const balanceEl = document.getElementById('valBalance');
-        balanceEl.innerText = `S/ ${bal.toFixed(2)}`;
-
-        if (Math.abs(bal) < 0.1) {
-            balanceEl.style.color = '#22c55e'; // Green (Paid)
-            balanceEl.innerText = 'S/ 0.00 (Pagado)';
-        } else if (bal > 0) {
-            balanceEl.style.color = '#ef4444'; // Red (Debt)
-        } else {
-            balanceEl.style.color = '#3b82f6'; // Blue (Refund?)
-        }
+        });
     }
+    document.getElementById('tablePaymentsBody').innerHTML = htmlPay;
 
-    // === ACTIONS ===
+    // 3. BALANCE
+    const bal = statement.totals.balance;
+    const balanceEl = document.getElementById('valBalance');
+    balanceEl.innerText = `S/ ${bal.toFixed(2)}`;
 
-    function showAddConsumptionForm() {
-        const form = document.getElementById('formAddConsumo');
-        form.style.display = form.style.display === 'none' ? 'block' : 'none';
+    if (Math.abs(bal) < 0.1) {
+        balanceEl.style.color = '#22c55e'; // Green (Paid)
+        balanceEl.innerText = 'S/ 0.00 (Pagado)';
+    } else if (bal > 0) {
+        balanceEl.style.color = '#ef4444'; // Red (Debt)
+    } else {
+        balanceEl.style.color = '#3b82f6'; // Blue (Refund?)
     }
+}
 
-    async function submitConsumo() {
-        const desc = document.getElementById('newConsDesc').value;
-        const monto = document.getElementById('newConsMonto').value;
-        const resId = document.getElementById('liqResId').value;
+// === ACTIONS ===
 
-        if (!desc || !monto || !resId) return alert('Complete los datos');
+function showAddConsumptionForm() {
+    const form = document.getElementById('formAddConsumo');
+    form.style.display = form.style.display === 'none' ? 'block' : 'none';
+}
 
-        // Optimistic Add (to list) could be done, but reload is safer for totals
-        try {
-            await fetch(CONFIG.API_URL, {
-                method: 'POST',
-                body: JSON.stringify({
-                    action: 'saveConsumo',
-                    reservaId: resId,
-                    tipo: 'Producto Interno',
-                    descripcion: desc,
-                    monto: monto,
-                    cantidad: 1
-                })
-            });
-            document.getElementById('newConsDesc').value = '';
-            document.getElementById('newConsMonto').value = '';
-            document.getElementById('formAddConsumo').style.display = 'none';
-            loadLiquidationData(document.getElementById('liqRoomId').value); // Reload
-        } catch (e) { alert('Error guardando'); }
-    }
+async function submitConsumo() {
+    const desc = document.getElementById('newConsDesc').value;
+    const monto = document.getElementById('newConsMonto').value;
+    const resId = document.getElementById('liqResId').value;
 
-    async function submitPago() {
-        const monto = document.getElementById('payMonto').value;
-        const metodo = document.getElementById('payMetodo').value;
-        const resId = document.getElementById('liqResId').value;
+    if (!desc || !monto || !resId) return alert('Complete los datos');
 
-        if (!monto || !resId) return alert('Ingrese monto');
+    // Optimistic Add (to list) could be done, but reload is safer for totals
+    try {
+        await fetch(CONFIG.API_URL, {
+            method: 'POST',
+            body: JSON.stringify({
+                action: 'saveConsumo',
+                reservaId: resId,
+                tipo: 'Producto Interno',
+                descripcion: desc,
+                monto: monto,
+                cantidad: 1
+            })
+        });
+        document.getElementById('newConsDesc').value = '';
+        document.getElementById('newConsMonto').value = '';
+        document.getElementById('formAddConsumo').style.display = 'none';
+        loadLiquidationData(document.getElementById('liqRoomId').value); // Reload
+    } catch (e) { alert('Error guardando'); }
+}
 
-        try {
-            await fetch(CONFIG.API_URL, {
-                method: 'POST',
-                body: JSON.stringify({
-                    action: 'savePago',
-                    reservaId: resId,
-                    monto: monto,
-                    metodo: metodo
-                })
-            });
-            document.getElementById('payMonto').value = '';
-            loadLiquidationData(document.getElementById('liqRoomId').value); // Reload
-        } catch (e) { alert('Error guardando pago'); }
-    }
+async function submitPago() {
+    const monto = document.getElementById('payMonto').value;
+    const metodo = document.getElementById('payMetodo').value;
+    const resId = document.getElementById('liqResId').value;
 
-    function printVoucher() {
-        if (!currentLiqData) return;
+    if (!monto || !resId) return alert('Ingrese monto');
 
-        // Generate simple thermal-like HTML in new window
-        const w = window.open('', '_blank', 'width=400,height=600');
+    try {
+        await fetch(CONFIG.API_URL, {
+            method: 'POST',
+            body: JSON.stringify({
+                action: 'savePago',
+                reservaId: resId,
+                monto: monto,
+                metodo: metodo
+            })
+        });
+        document.getElementById('payMonto').value = '';
+        loadLiquidationData(document.getElementById('liqRoomId').value); // Reload
+    } catch (e) { alert('Error guardando pago'); }
+}
 
-        const d = currentLiqData;
-        const itemsHtml = d.internals.map(i => `<tr><td>${i.descripcion}</td><td align="right">${i.monto.toFixed(2)}</td></tr>`).join('') +
-            d.externals.map(e => `<tr><td>${e.descripcion}</td><td align="right">${e.monto.toFixed(2)}</td></tr>`).join('');
+function printVoucher() {
+    if (!currentLiqData) return;
 
-        const html = `
+    // Generate simple thermal-like HTML in new window
+    const w = window.open('', '_blank', 'width=400,height=600');
+
+    const d = currentLiqData;
+    const itemsHtml = d.internals.map(i => `<tr><td>${i.descripcion}</td><td align="right">${i.monto.toFixed(2)}</td></tr>`).join('') +
+        d.externals.map(e => `<tr><td>${e.descripcion}</td><td align="right">${e.monto.toFixed(2)}</td></tr>`).join('');
+
+    const html = `
     <html>
     <head>
         <title>Voucher Grupo PS</title>
@@ -1363,117 +1364,117 @@ async function processCheckIn(e) {
     </html>
     `;
 
-        w.document.write(html);
-        w.document.close();
-    }
+    w.document.write(html);
+    w.document.close();
+}
 
-    async function finalizeCheckOut() {
-        if (!confirm('¿CONFIRMAR SALIDA DEFINITIVA?\nEsto marcará la habitación como SUCIA y cerrará la cuenta.')) return;
+async function finalizeCheckOut() {
+    if (!confirm('¿CONFIRMAR SALIDA DEFINITIVA?\nEsto marcará la habitación como SUCIA y cerrará la cuenta.')) return;
 
-        const roomId = document.getElementById('liqRoomId').value;
-        const btn = document.getElementById('btnFinalizeCheckout');
-        btn.innerText = 'Procesando...';
-        btn.disabled = true;
+    const roomId = document.getElementById('liqRoomId').value;
+    const btn = document.getElementById('btnFinalizeCheckout');
+    btn.innerText = 'Procesando...';
+    btn.disabled = true;
 
-        try {
-            // Reuse legacy action but simplified
-            const res = await fetch(CONFIG.API_URL, {
-                method: 'POST',
-                body: JSON.stringify({
-                    action: 'checkOut',
-                    habitacionId: roomId,
-                    fechaSalidaReal: new Date().toISOString(), // Use current time
-                    notas: 'Checkout Finalizado via Liquidador'
-                })
-            });
-            const r = await res.json();
-            if (r.success) {
-                alert('✅ Checkout Completado.');
-                closeLiquidation();
-                loadRooms(); // Refresh main view to show 'Sucio'
-            } else {
-                alert('Error: ' + r.error);
-            }
-        } catch (e) {
-            alert('Error de conexión');
-        } finally {
-            btn.innerText = 'Finalizar Estadía (Check-Out)';
-            btn.disabled = false;
-        }
-    }
-
-    // ===== USERS MODULE =====
-    let currentUsersList = [];
-
-    async function markRoomClean(roomId) {
-        if (!confirm('¿Marcar habitación como LIMPIA y DISPONIBLE?')) return;
-
-        // Optimistic Update
-        const rIdx = currentRoomsList.findIndex(r => r.id == roomId);
-        if (rIdx !== -1) {
-            currentRoomsList[rIdx].estado = 'Disponible';
-            renderRooms(currentRoomsList); // Refresh UI immediately (Fixed: passed arg)
-        }
-
-        try {
-            const res = await fetch(CONFIG.API_URL, {
-                method: 'POST',
-                body: JSON.stringify({
-                    action: 'saveHabitacion',
-                    habitacion: { id: roomId, estado: 'Disponible' }
-                })
-            });
-            const data = await res.json();
-            if (!data.success) {
-                alert('Error al guardar: ' + data.error);
-                loadRooms(); // Revert
-            } else {
-                // Success silent
-                loadRooms();
-            }
-        } catch (e) {
-            alert('Error de conexión');
-        }
-    }
-
-    async function loadUsersView() {
-        const container = document.getElementById('view-users');
-
-        if (currentUsersList.length > 0) {
-            renderUsers(currentUsersList);
+    try {
+        // Reuse legacy action but simplified
+        const res = await fetch(CONFIG.API_URL, {
+            method: 'POST',
+            body: JSON.stringify({
+                action: 'checkOut',
+                habitacionId: roomId,
+                fechaSalidaReal: new Date().toISOString(), // Use current time
+                notas: 'Checkout Finalizado via Liquidador'
+            })
+        });
+        const r = await res.json();
+        if (r.success) {
+            alert('✅ Checkout Completado.');
+            closeLiquidation();
+            loadRooms(); // Refresh main view to show 'Sucio'
         } else {
-            container.innerHTML = `
+            alert('Error: ' + r.error);
+        }
+    } catch (e) {
+        alert('Error de conexión');
+    } finally {
+        btn.innerText = 'Finalizar Estadía (Check-Out)';
+        btn.disabled = false;
+    }
+}
+
+// ===== USERS MODULE =====
+let currentUsersList = [];
+
+async function markRoomClean(roomId) {
+    if (!confirm('¿Marcar habitación como LIMPIA y DISPONIBLE?')) return;
+
+    // Optimistic Update
+    const rIdx = currentRoomsList.findIndex(r => r.id == roomId);
+    if (rIdx !== -1) {
+        currentRoomsList[rIdx].estado = 'Disponible';
+        renderRooms(currentRoomsList); // Refresh UI immediately (Fixed: passed arg)
+    }
+
+    try {
+        const res = await fetch(CONFIG.API_URL, {
+            method: 'POST',
+            body: JSON.stringify({
+                action: 'saveHabitacion',
+                habitacion: { id: roomId, estado: 'Disponible' }
+            })
+        });
+        const data = await res.json();
+        if (!data.success) {
+            alert('Error al guardar: ' + data.error);
+            loadRooms(); // Revert
+        } else {
+            // Success silent
+            loadRooms();
+        }
+    } catch (e) {
+        alert('Error de conexión');
+    }
+}
+
+async function loadUsersView() {
+    const container = document.getElementById('view-users');
+
+    if (currentUsersList.length > 0) {
+        renderUsers(currentUsersList);
+    } else {
+        container.innerHTML = `
             <div style="text-align:center; padding: 50px;">
                 <i class="fas fa-spinner fa-spin" style="font-size: 2rem; color: var(--primary);"></i>
                 <p style="margin-top:15px; color:#64748B;">Cargando usuarios...</p>
             </div>
         `;
-        }
-
-        try {
-            const res = await fetch(CONFIG.API_URL, {
-                method: 'POST',
-                body: JSON.stringify({ action: 'getUsuarios' })
-            });
-            const data = await res.json();
-
-            if (data.success) {
-                currentUsersList = data.usuarios;
-                renderUsers(data.usuarios);
-            } else if (currentUsersList.length === 0) {
-                container.innerHTML = `<div style="color:red; text-align:center;">Error: ${data.error}</div>`;
-            }
-        } catch (e) {
-            if (currentUsersList.length === 0) {
-                container.innerHTML = `<div style="color:red; text-align:center;">Error de conexión: ${e.message}</div>`;
-            }
-        }
     }
 
-    function renderUsers(users) {
-        const container = document.getElementById('view-users');
+    try {
+        const res = await fetch(CONFIG.API_URL, {
+            method: 'POST',
+            body: JSON.stringify({ action: 'getUsuarios' })
+        });
+        const data = await res.json();
 
-        let html = `
+        if (data.success) {
+            currentUsersList = data.usuarios;
+            renderUsers(data.usuarios);
+        } else if (currentUsersList.length === 0) {
+            container.innerHTML = `<div style="color:red; text-align:center;">Error: ${data.error}</div>`;
+        }
+    } catch (e) {
+        if (currentUsersList.length === 0) {
+            container.innerHTML = `<div style="color:red; text-align:center;">Error de conexión: ${e.message}</div>`;
+        }
+    }
+}
+
+function renderUsers(users) {
+    const container = document.getElementById('view-users');
+
+    let html = `
     <div style="display:flex; justify-content:flex-end; margin-bottom:20px;">
         <button class="btn-login" style="width:auto;" onclick="openNewUser()">+ Nuevo Usuario</button>
     </div>
@@ -1491,16 +1492,16 @@ async function processCheckIn(e) {
             <tbody>
     `;
 
-        users.forEach(u => {
-            let roleColor = '#64748B';
-            if (u.rol === 'Admin') roleColor = 'var(--primary)';
-            if (u.rol === 'Tours') roleColor = 'var(--accent)';
+    users.forEach(u => {
+        let roleColor = '#64748B';
+        if (u.rol === 'Admin') roleColor = 'var(--primary)';
+        if (u.rol === 'Tours') roleColor = 'var(--accent)';
 
-            let statusBadge = u.estado === 'Activo'
-                ? `<span style="background:#dcfce7; color:#166534; padding:4px 8px; border-radius:6px; font-size:0.8rem; font-weight:600;">Activo</span>`
-                : `<span style="background:#f1f5f9; color:#64748B; padding:4px 8px; border-radius:6px; font-size:0.8rem; font-weight:600;">Inactivo</span>`;
+        let statusBadge = u.estado === 'Activo'
+            ? `<span style="background:#dcfce7; color:#166534; padding:4px 8px; border-radius:6px; font-size:0.8rem; font-weight:600;">Activo</span>`
+            : `<span style="background:#f1f5f9; color:#64748B; padding:4px 8px; border-radius:6px; font-size:0.8rem; font-weight:600;">Inactivo</span>`;
 
-            html += `
+        html += `
         <tr style="border-bottom:1px solid #f1f5f9;">
             <td style="padding:15px; font-weight:600;">${u.nombre}</td>
             <td style="padding:15px;">${u.email}</td>
@@ -1511,139 +1512,139 @@ async function processCheckIn(e) {
             </td>
         </tr>
         `;
+    });
+
+    html += '</tbody></table></div>';
+    container.innerHTML = html;
+}
+
+function openNewUser() {
+    document.getElementById('editUserId').value = '';
+    document.getElementById('editUserNombre').value = '';
+    document.getElementById('editUserEmail').value = '';
+    document.getElementById('editUserPass').value = '';
+    document.getElementById('editUserRol').value = 'Recepcion';
+    document.getElementById('editUserEstado').value = 'Activo';
+    document.getElementById('modalUserEditor').style.display = 'flex';
+}
+
+function editUser(id) {
+    const user = currentUsersList.find(u => u.id == id);
+    if (!user) return;
+
+    document.getElementById('editUserId').value = user.id;
+    document.getElementById('editUserNombre').value = user.nombre;
+    document.getElementById('editUserEmail').value = user.email;
+    document.getElementById('editUserPass').value = ''; // Blank to keep existing
+    document.getElementById('editUserRol').value = user.rol;
+    document.getElementById('editUserEstado').value = user.estado;
+
+    document.getElementById('modalUserEditor').style.display = 'flex';
+}
+
+function closeUserEditor() {
+    document.getElementById('modalUserEditor').style.display = 'none';
+}
+
+async function saveUser(e) {
+    e.preventDefault();
+    const btn = e.target.querySelector('button[type="submit"]');
+    const originalText = btn.innerText;
+
+    // 1. Get Data
+    const id = document.getElementById('editUserId').value;
+    const userData = {
+        id: id,
+        nombre: document.getElementById('editUserNombre').value,
+        email: document.getElementById('editUserEmail').value,
+        password: document.getElementById('editUserPass').value,
+        rol: document.getElementById('editUserRol').value,
+        estado: document.getElementById('editUserEstado').value,
+    };
+
+    // 2. Optimistic Update
+    if (id) {
+        // Edit
+        const index = currentUsersList.findIndex(u => u.id == id);
+        if (index !== -1) {
+            currentUsersList[index] = { ...currentUsersList[index], ...userData };
+        }
+    } else {
+        // New
+        currentUsersList.push({ ...userData, id: 'temp-' + Date.now() });
+    }
+
+    // Render & Close
+    renderUsers(currentUsersList);
+    closeUserEditor();
+
+    // 3. Background Sync
+    try {
+        const res = await fetch(CONFIG.API_URL, {
+            method: 'POST',
+            body: JSON.stringify({ action: 'saveUsuario', usuario: userData })
         });
+        const data = await res.json();
 
-        html += '</tbody></table></div>';
-        container.innerHTML = html;
-    }
-
-    function openNewUser() {
-        document.getElementById('editUserId').value = '';
-        document.getElementById('editUserNombre').value = '';
-        document.getElementById('editUserEmail').value = '';
-        document.getElementById('editUserPass').value = '';
-        document.getElementById('editUserRol').value = 'Recepcion';
-        document.getElementById('editUserEstado').value = 'Activo';
-        document.getElementById('modalUserEditor').style.display = 'flex';
-    }
-
-    function editUser(id) {
-        const user = currentUsersList.find(u => u.id == id);
-        if (!user) return;
-
-        document.getElementById('editUserId').value = user.id;
-        document.getElementById('editUserNombre').value = user.nombre;
-        document.getElementById('editUserEmail').value = user.email;
-        document.getElementById('editUserPass').value = ''; // Blank to keep existing
-        document.getElementById('editUserRol').value = user.rol;
-        document.getElementById('editUserEstado').value = user.estado;
-
-        document.getElementById('modalUserEditor').style.display = 'flex';
-    }
-
-    function closeUserEditor() {
-        document.getElementById('modalUserEditor').style.display = 'none';
-    }
-
-    async function saveUser(e) {
-        e.preventDefault();
-        const btn = e.target.querySelector('button[type="submit"]');
-        const originalText = btn.innerText;
-
-        // 1. Get Data
-        const id = document.getElementById('editUserId').value;
-        const userData = {
-            id: id,
-            nombre: document.getElementById('editUserNombre').value,
-            email: document.getElementById('editUserEmail').value,
-            password: document.getElementById('editUserPass').value,
-            rol: document.getElementById('editUserRol').value,
-            estado: document.getElementById('editUserEstado').value,
-        };
-
-        // 2. Optimistic Update
-        if (id) {
-            // Edit
-            const index = currentUsersList.findIndex(u => u.id == id);
-            if (index !== -1) {
-                currentUsersList[index] = { ...currentUsersList[index], ...userData };
-            }
-        } else {
-            // New
-            currentUsersList.push({ ...userData, id: 'temp-' + Date.now() });
-        }
-
-        // Render & Close
-        renderUsers(currentUsersList);
-        closeUserEditor();
-
-        // 3. Background Sync
-        try {
-            const res = await fetch(CONFIG.API_URL, {
-                method: 'POST',
-                body: JSON.stringify({ action: 'saveUsuario', usuario: userData })
-            });
-            const data = await res.json();
-
-            if (!data.success) {
-                alert('❌ Error guardando en servidor: ' + data.error);
-                loadUsersView();
-            } else {
-                loadUsersView(); // Silent refresh
-            }
-        } catch (err) {
-            alert('❌ Error de conexión: ' + err.message);
+        if (!data.success) {
+            alert('❌ Error guardando en servidor: ' + data.error);
             loadUsersView();
-        }
-    }
-
-
-    // ===== PRODUCTS MODULE =====
-    let currentProductsList = [];
-    let currentProductFilter = 'Todos';
-
-    async function loadProductsView() {
-        const container = document.getElementById('view-products');
-
-        // Optimistic
-        if (currentProductsList.length > 0) {
-            renderProducts(currentProductsList);
         } else {
-            container.innerHTML = `
+            loadUsersView(); // Silent refresh
+        }
+    } catch (err) {
+        alert('❌ Error de conexión: ' + err.message);
+        loadUsersView();
+    }
+}
+
+
+// ===== PRODUCTS MODULE =====
+let currentProductsList = [];
+let currentProductFilter = 'Todos';
+
+async function loadProductsView() {
+    const container = document.getElementById('view-products');
+
+    // Optimistic
+    if (currentProductsList.length > 0) {
+        renderProducts(currentProductsList);
+    } else {
+        container.innerHTML = `
             <div style="text-align:center; padding: 50px;">
                 <i class="fas fa-spinner fa-spin" style="font-size: 2rem; color: var(--primary);"></i>
                 <p style="margin-top:15px; color:#64748B;">Cargando inventario...</p>
             </div>
         `;
-        }
-
-        try {
-            const res = await fetch(CONFIG.API_URL, {
-                method: 'POST',
-                body: JSON.stringify({ action: 'getProductos' })
-            });
-            const data = await res.json();
-
-            if (data.success) {
-                currentProductsList = data.productos;
-                renderProducts(data.productos);
-            } else if (currentProductsList.length === 0) {
-                container.innerHTML = `<div style="color:red; text-align:center;">Error: ${data.error}</div>`;
-            }
-        } catch (e) {
-            if (currentProductsList.length === 0) {
-                container.innerHTML = `<div style="color:red; text-align:center;">Error de conexión: ${e.message}</div>`;
-            }
-        }
     }
 
-    function renderProducts(products) {
-        const container = document.getElementById('view-products');
+    try {
+        const res = await fetch(CONFIG.API_URL, {
+            method: 'POST',
+            body: JSON.stringify({ action: 'getProductos' })
+        });
+        const data = await res.json();
 
-        // Group by category for cleaner view if needed, but table is fine for now
-        const btnClass = (cat) => currentProductFilter === cat ? 'btn-login filter-btn-active' : 'btn-login';
+        if (data.success) {
+            currentProductsList = data.productos;
+            renderProducts(data.productos);
+        } else if (currentProductsList.length === 0) {
+            container.innerHTML = `<div style="color:red; text-align:center;">Error: ${data.error}</div>`;
+        }
+    } catch (e) {
+        if (currentProductsList.length === 0) {
+            container.innerHTML = `<div style="color:red; text-align:center;">Error de conexión: ${e.message}</div>`;
+        }
+    }
+}
 
-        let html = `
+function renderProducts(products) {
+    const container = document.getElementById('view-products');
+
+    // Group by category for cleaner view if needed, but table is fine for now
+    const btnClass = (cat) => currentProductFilter === cat ? 'btn-login filter-btn-active' : 'btn-login';
+
+    let html = `
     <div style="display:flex; justify-content:space-between; margin-bottom:20px;">
         <div style="display:flex; gap:10px;">
              <button class="${btnClass('Todos')}" style="width:auto; background:#64748B;" onclick="filterProducts('Todos')">Todos</button>
@@ -1671,15 +1672,15 @@ async function processCheckIn(e) {
             <tbody>
     `;
 
-        products.forEach(p => {
-            let catColor = '#64748B';
-            if (p.categoria === 'Otros') catColor = '#8b5cf6'; // Purple
-            if (p.categoria === 'Bebidas') catColor = '#3b82f6';
-            if (p.categoria === 'Snacks') catColor = '#eab308';
+    products.forEach(p => {
+        let catColor = '#64748B';
+        if (p.categoria === 'Otros') catColor = '#8b5cf6'; // Purple
+        if (p.categoria === 'Bebidas') catColor = '#3b82f6';
+        if (p.categoria === 'Snacks') catColor = '#eab308';
 
-            let imgTag = p.imagen_url ? `<img src="${p.imagen_url}" style="width:40px; height:40px; border-radius:4px; object-fit:cover;">` : '<div style="width:40px; height:40px; background:#f1f5f9; border-radius:4px;"></div>';
+        let imgTag = p.imagen_url ? `<img src="${p.imagen_url}" style="width:40px; height:40px; border-radius:4px; object-fit:cover;">` : '<div style="width:40px; height:40px; background:#f1f5f9; border-radius:4px;"></div>';
 
-            html += `
+        html += `
         <tr style="border-bottom:1px solid #f1f5f9;">
             <td style="padding:15px;">${imgTag}</td>
             <td style="padding:15px;">
@@ -1696,175 +1697,175 @@ async function processCheckIn(e) {
             </td>
         </tr>
         `;
-        });
-        html += '</tbody></table></div>';
-        container.innerHTML = html;
-    }
+    });
+    html += '</tbody></table></div>';
+    container.innerHTML = html;
+}
 
-    function filterProducts(cat) {
-        currentProductFilter = cat;
-        if (cat === 'Todos') {
-            renderProducts(currentProductsList);
-        } else {
-            const filtered = currentProductsList.filter(p => p.categoria === cat);
-            renderProducts(filtered);
-        }
-    }
-
-    function openNewProduct() {
-        document.getElementById('editProdId').value = '';
-        document.getElementById('editProdCat').value = 'Bebidas';
-        document.getElementById('editProdNombre').value = '';
-        document.getElementById('editProdDesc').value = '';
-        document.getElementById('editProdPrecio').value = '';
-        document.getElementById('editProdStock').value = '';
-        document.getElementById('editProdImg').value = '';
-        document.getElementById('editProdActivo').value = 'Activo';
-
-        document.getElementById('modalProductEditor').style.display = 'flex';
-    }
-
-    function editProduct(id) {
-        const p = currentProductsList.find(x => x.id == id);
-        if (!p) return;
-
-        document.getElementById('editProdId').value = p.id;
-        document.getElementById('editProdCat').value = p.categoria;
-        document.getElementById('editProdNombre').value = p.nombre;
-        document.getElementById('editProdDesc').value = p.descripcion;
-        document.getElementById('editProdPrecio').value = p.precio;
-        document.getElementById('editProdStock').value = p.stock;
-        document.getElementById('editProdImg').value = p.imagen_url;
-        document.getElementById('editProdActivo').value = p.activo;
-
-
-        document.getElementById('modalProductEditor').style.display = 'flex';
-    }
-
-    function closeProductEditor() {
-        document.getElementById('modalProductEditor').style.display = 'none';
-    }
-
-    async function saveProduct(e) {
-        e.preventDefault();
-        const btn = e.target.querySelector('button[type="submit"]');
-        const originalText = btn.innerText;
-
-        // 1. Get Data
-        const id = document.getElementById('editProdId').value;
-        const prodData = {
-            id: id,
-            categoria: document.getElementById('editProdCat').value,
-            nombre: document.getElementById('editProdNombre').value,
-            descripcion: document.getElementById('editProdDesc').value,
-            precio: document.getElementById('editProdPrecio').value,
-            stock: document.getElementById('editProdStock').value,
-            imagen_url: document.getElementById('editProdImg').value,
-            activo: document.getElementById('editProdActivo').value,
-
-        };
-
-        // 2. Optimistic Update
-        if (id) {
-            // Edit
-            const index = currentProductsList.findIndex(p => p.id == id);
-            if (index !== -1) {
-                currentProductsList[index] = { ...currentProductsList[index], ...prodData };
-            }
-        } else {
-            // New
-            currentProductsList.push({ ...prodData, id: 'temp-' + Date.now() });
-        }
-
-        // Render & Close
+function filterProducts(cat) {
+    currentProductFilter = cat;
+    if (cat === 'Todos') {
         renderProducts(currentProductsList);
-        closeProductEditor();
+    } else {
+        const filtered = currentProductsList.filter(p => p.categoria === cat);
+        renderProducts(filtered);
+    }
+}
 
-        // 3. Background Sync
-        try {
-            const res = await fetch(CONFIG.API_URL, {
-                method: 'POST',
-                body: JSON.stringify({ action: 'saveProducto', producto: prodData })
-            });
-            const data = await res.json();
+function openNewProduct() {
+    document.getElementById('editProdId').value = '';
+    document.getElementById('editProdCat').value = 'Bebidas';
+    document.getElementById('editProdNombre').value = '';
+    document.getElementById('editProdDesc').value = '';
+    document.getElementById('editProdPrecio').value = '';
+    document.getElementById('editProdStock').value = '';
+    document.getElementById('editProdImg').value = '';
+    document.getElementById('editProdActivo').value = 'Activo';
 
-            if (!data.success) {
-                alert('❌ Error guardando en servidor: ' + data.error);
-                loadProductsView();
-            } else {
-                loadProductsView(); // Silent refresh
-            }
-        } catch (err) {
-            alert('❌ Error de conexión: ' + err.message);
-            loadProductsView();
+    document.getElementById('modalProductEditor').style.display = 'flex';
+}
+
+function editProduct(id) {
+    const p = currentProductsList.find(x => x.id == id);
+    if (!p) return;
+
+    document.getElementById('editProdId').value = p.id;
+    document.getElementById('editProdCat').value = p.categoria;
+    document.getElementById('editProdNombre').value = p.nombre;
+    document.getElementById('editProdDesc').value = p.descripcion;
+    document.getElementById('editProdPrecio').value = p.precio;
+    document.getElementById('editProdStock').value = p.stock;
+    document.getElementById('editProdImg').value = p.imagen_url;
+    document.getElementById('editProdActivo').value = p.activo;
+
+
+    document.getElementById('modalProductEditor').style.display = 'flex';
+}
+
+function closeProductEditor() {
+    document.getElementById('modalProductEditor').style.display = 'none';
+}
+
+async function saveProduct(e) {
+    e.preventDefault();
+    const btn = e.target.querySelector('button[type="submit"]');
+    const originalText = btn.innerText;
+
+    // 1. Get Data
+    const id = document.getElementById('editProdId').value;
+    const prodData = {
+        id: id,
+        categoria: document.getElementById('editProdCat').value,
+        nombre: document.getElementById('editProdNombre').value,
+        descripcion: document.getElementById('editProdDesc').value,
+        precio: document.getElementById('editProdPrecio').value,
+        stock: document.getElementById('editProdStock').value,
+        imagen_url: document.getElementById('editProdImg').value,
+        activo: document.getElementById('editProdActivo').value,
+
+    };
+
+    // 2. Optimistic Update
+    if (id) {
+        // Edit
+        const index = currentProductsList.findIndex(p => p.id == id);
+        if (index !== -1) {
+            currentProductsList[index] = { ...currentProductsList[index], ...prodData };
         }
+    } else {
+        // New
+        currentProductsList.push({ ...prodData, id: 'temp-' + Date.now() });
     }
 
-    // ===== CALENDAR MODULE (PHASE 6) =====
-    let calendarStartDate = new Date();
+    // Render & Close
+    renderProducts(currentProductsList);
+    closeProductEditor();
 
-    async function loadCalendarView() {
-        const container = document.getElementById('view-calendar');
+    // 3. Background Sync
+    try {
+        const res = await fetch(CONFIG.API_URL, {
+            method: 'POST',
+            body: JSON.stringify({ action: 'saveProducto', producto: prodData })
+        });
+        const data = await res.json();
 
-        // 1. Optimistic Render
-        if (currentRoomsList.length > 0 && currentReservationsList.length > 0) {
-            renderCalendarTimeline(currentRoomsList, currentReservationsList);
+        if (!data.success) {
+            alert('❌ Error guardando en servidor: ' + data.error);
+            loadProductsView();
         } else {
-            container.innerHTML = `
+            loadProductsView(); // Silent refresh
+        }
+    } catch (err) {
+        alert('❌ Error de conexión: ' + err.message);
+        loadProductsView();
+    }
+}
+
+// ===== CALENDAR MODULE (PHASE 6) =====
+let calendarStartDate = new Date();
+
+async function loadCalendarView() {
+    const container = document.getElementById('view-calendar');
+
+    // 1. Optimistic Render
+    if (currentRoomsList.length > 0 && currentReservationsList.length > 0) {
+        renderCalendarTimeline(currentRoomsList, currentReservationsList);
+    } else {
+        container.innerHTML = `
             <div style="text-align:center; padding: 50px;">
                 <i class="fas fa-spinner fa-spin" style="font-size: 2rem; color: var(--primary);"></i>
                 <p style="margin-top:15px;" class="text-slate-500">Cargando calendario...</p>
             </div>
         `;
-        }
-
-        try {
-            // 2. Silent Parallel Fetch
-            const [resRooms, resRes] = await Promise.all([
-                fetch(CONFIG.API_URL, { method: 'POST', body: JSON.stringify({ action: 'getHabitaciones' }) }).then(r => r.json()),
-                fetch(CONFIG.API_URL, { method: 'POST', body: JSON.stringify({ action: 'getReservas' }) }).then(r => r.json())
-            ]);
-
-            if (resRooms.success && resRes.success) {
-                currentRoomsList = resRooms.habitaciones;
-                currentReservationsList = resRes.reservas; // Ensure sync
-                renderCalendarTimeline(currentRoomsList, currentReservationsList);
-            } else if (currentRoomsList.length === 0) {
-                throw new Error('Error cargando datos');
-            }
-
-        } catch (e) {
-            if (currentRoomsList.length === 0) {
-                container.innerHTML = `<div style="color:red; text-align:center;">Error: ${e.message}</div>`;
-            }
-        }
     }
 
-    function changeCalendarDate(days) {
-        calendarStartDate.setDate(calendarStartDate.getDate() + days);
-        loadCalendarView();
-    }
+    try {
+        // 2. Silent Parallel Fetch
+        const [resRooms, resRes] = await Promise.all([
+            fetch(CONFIG.API_URL, { method: 'POST', body: JSON.stringify({ action: 'getHabitaciones' }) }).then(r => r.json()),
+            fetch(CONFIG.API_URL, { method: 'POST', body: JSON.stringify({ action: 'getReservas' }) }).then(r => r.json())
+        ]);
 
-    function renderCalendarTimeline(rooms, reservations) {
-        const container = document.getElementById('view-calendar');
-
-        // Config: Show next 15 days from calendarStartDate
-        const daysToShow = 15;
-        const dates = [];
-        const start = new Date(calendarStartDate);
-
-        for (let i = 0; i < daysToShow; i++) {
-            const d = new Date(start);
-            d.setDate(start.getDate() + i);
-            dates.push(d);
+        if (resRooms.success && resRes.success) {
+            currentRoomsList = resRooms.habitaciones;
+            currentReservationsList = resRes.reservas; // Ensure sync
+            renderCalendarTimeline(currentRoomsList, currentReservationsList);
+        } else if (currentRoomsList.length === 0) {
+            throw new Error('Error cargando datos');
         }
 
-        // Colors
-        const colorActive = '#22c55e'; // Green
-        const colorFuture = '#eab308'; // Yellow
-        const colorPast = '#94a3b8'; // Gray
+    } catch (e) {
+        if (currentRoomsList.length === 0) {
+            container.innerHTML = `<div style="color:red; text-align:center;">Error: ${e.message}</div>`;
+        }
+    }
+}
 
-        let html = `
+function changeCalendarDate(days) {
+    calendarStartDate.setDate(calendarStartDate.getDate() + days);
+    loadCalendarView();
+}
+
+function renderCalendarTimeline(rooms, reservations) {
+    const container = document.getElementById('view-calendar');
+
+    // Config: Show next 15 days from calendarStartDate
+    const daysToShow = 15;
+    const dates = [];
+    const start = new Date(calendarStartDate);
+
+    for (let i = 0; i < daysToShow; i++) {
+        const d = new Date(start);
+        d.setDate(start.getDate() + i);
+        dates.push(d);
+    }
+
+    // Colors
+    const colorActive = '#22c55e'; // Green
+    const colorFuture = '#eab308'; // Yellow
+    const colorPast = '#94a3b8'; // Gray
+
+    let html = `
     <div style="background:white; border-radius:12px; padding:20px; box-shadow:0 4px 6px -1px rgba(0,0,0,0.05); overflow-x:auto;">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
             <div style="display:flex; gap:10px; align-items:center;">
@@ -1891,239 +1892,239 @@ async function processCheckIn(e) {
                 <tr>
                     <th style="padding:10px; text-align:left; border-bottom:2px solid #e2e8f0; width:100px;">Hab.</th>
                     ${dates.map(d => {
-            const dayName = d.toLocaleDateString('es-ES', { weekday: 'short' });
-            const dayNum = d.getDate();
-            return `<th style="padding:10px; text-align:center; border-bottom:2px solid #e2e8f0; font-size:0.85rem; color:#64748B;">
+        const dayName = d.toLocaleDateString('es-ES', { weekday: 'short' });
+        const dayNum = d.getDate();
+        return `<th style="padding:10px; text-align:center; border-bottom:2px solid #e2e8f0; font-size:0.85rem; color:#64748B;">
                                     <div>${dayName}</div>
                                     <div style="font-weight:bold; font-size:1.1rem; color:var(--text-main);">${dayNum}</div>
                                 </th>`;
-        }).join('')}
+    }).join('')}
                 </tr>
             </thead>
             <tbody>
     `;
 
-        rooms.forEach(r => {
-            html += `<tr style="border-bottom:1px solid #f1f5f9;">
+    rooms.forEach(r => {
+        html += `<tr style="border-bottom:1px solid #f1f5f9;">
                     <td style="padding:15px 10px; font-weight:bold; color:var(--primary); cursor:pointer;" onclick="openRoomDetail('${r.id}')" title="Ver detalle de habitación">
                         ${r.numero} <br>
                         <span style="font-size:0.7rem; color:#94a3b8; font-weight:normal;">${r.tipo}</span>
                     </td>`;
 
-            dates.forEach(date => {
-                let cellColor = '';
-                let cellTitle = '';
-                let cellText = '';
+        dates.forEach(date => {
+            let cellColor = '';
+            let cellTitle = '';
+            let cellText = '';
 
-                // Standardize Date for comparison (YYYY-MM-DD)
-                const isoDate = date.toISOString().split('T')[0];
-                const todayIso = new Date().toISOString().split('T')[0];
+            // Standardize Date for comparison (YYYY-MM-DD)
+            const isoDate = date.toISOString().split('T')[0];
+            const todayIso = new Date().toISOString().split('T')[0];
 
-                // 1. Find ALL events touching this date (inclusive of end)
-                const matches = reservations.filter(res => {
-                    if (String(res.habitacionId) !== String(r.id) && String(res.habitacionId) !== String(r.numero)) return false;
-                    if (res.estado === 'Cancelada') return false;
+            // 1. Find ALL events touching this date (inclusive of end)
+            const matches = reservations.filter(res => {
+                if (String(res.habitacionId) !== String(r.id) && String(res.habitacionId) !== String(r.numero)) return false;
+                if (res.estado === 'Cancelada') return false;
 
-                    const start = res.fechaEntrada.substring(0, 10);
-                    const end = res.fechaSalida.substring(0, 10);
+                const start = res.fechaEntrada.substring(0, 10);
+                const end = res.fechaSalida.substring(0, 10);
 
-                    // Include End Date for Split View
-                    return isoDate >= start && isoDate <= end;
-                });
+                // Include End Date for Split View
+                return isoDate >= start && isoDate <= end;
+            });
 
-                let leftType = null;  // Color for Left Half (Morning)
-                let rightType = null; // Color for Right Half (Afternoon)
-                let leftTitle = '';
-                let rightTitle = '';
-                let labelProps = { text: '', color: '' }; // For text label
+            let leftType = null;  // Color for Left Half (Morning)
+            let rightType = null; // Color for Right Half (Afternoon)
+            let leftTitle = '';
+            let rightTitle = '';
+            let labelProps = { text: '', color: '' }; // For text label
 
-                // Priority colors
-                const getCol = (st) => {
-                    if (st === 'Activa' || st === 'Ocupada') return colorActive;
-                    if (st === 'Finalizada') return colorPast;
-                    return colorFuture;
-                };
+            // Priority colors
+            const getCol = (st) => {
+                if (st === 'Activa' || st === 'Ocupada') return colorActive;
+                if (st === 'Finalizada') return colorPast;
+                return colorFuture;
+            };
 
-                // Fallback for Today (Physical Occupancy)
-                if (matches.length === 0 && String(r.estado).toLowerCase() === 'ocupado' && isoDate === todayIso) {
-                    leftType = colorActive;
-                    rightType = colorActive;
-                    labelProps.text = 'Ocupado';
-                    leftTitle = 'Ocupado Manual';
+            // Fallback for Today (Physical Occupancy)
+            if (matches.length === 0 && String(r.estado).toLowerCase() === 'ocupado' && isoDate === todayIso) {
+                leftType = colorActive;
+                rightType = colorActive;
+                labelProps.text = 'Ocupado';
+                leftTitle = 'Ocupado Manual';
+            }
+
+            matches.forEach(res => {
+                const start = res.fechaEntrada.substring(0, 10);
+                const end = res.fechaSalida.substring(0, 10);
+                const col = getCol(res.estado);
+                const name = (res.cliente || 'Anónimo').split(' ')[0];
+
+                if (isoDate > start && isoDate < end) {
+                    // Full Day
+                    leftType = col;
+                    rightType = col;
+                    labelProps.text = name;
+                    leftTitle = res.estado + ': ' + res.cliente;
+                } else if (isoDate === end) {
+                    // Ends Today -> Left Half
+                    leftType = col;
+                    // Dont override rightType if already set
+                    if (!rightType) labelProps.text = 'Salida';
+                } else if (isoDate === start) {
+                    // Starts Today -> Right Half
+                    rightType = col;
+                    labelProps.text = name;
+                    rightTitle = 'Entrada: ' + res.cliente;
+                }
+            });
+
+            // 3. Render Cell
+            if (leftType || rightType) {
+                let bgStyle = '';
+                // TOP = Checkout/Leaving (leftType logic -> Top)
+                // BOTTOM = Checkin/Arriving (rightType logic -> Bottom)
+
+                // Matches earlier logic:
+                // leftType was "Ends Today" -> Checkout -> Top
+                // rightType was "Starts Today" -> Checkin -> Bottom
+
+                if (leftType && rightType) {
+                    if (leftType === rightType) {
+                        bgStyle = `background:${leftType};`; // Solid
+                    } else {
+                        bgStyle = `background: linear-gradient(to bottom, ${leftType} 50%, ${rightType} 50%);`; // Split Top/Bottom
+                    }
+                } else if (leftType) {
+                    // Only Top (Checkout) -> Top Color, Bottom White
+                    bgStyle = `background: linear-gradient(to bottom, ${leftType} 50%, white 50%);`;
+                } else if (rightType) {
+                    // Only Bottom (Checkin) -> Top White, Bottom Color
+                    bgStyle = `background: linear-gradient(to bottom, white 50%, ${rightType} 50%);`;
                 }
 
-                matches.forEach(res => {
-                    const start = res.fechaEntrada.substring(0, 10);
-                    const end = res.fechaSalida.substring(0, 10);
-                    const col = getCol(res.estado);
-                    const name = (res.cliente || 'Anónimo').split(' ')[0];
-
-                    if (isoDate > start && isoDate < end) {
-                        // Full Day
-                        leftType = col;
-                        rightType = col;
-                        labelProps.text = name;
-                        leftTitle = res.estado + ': ' + res.cliente;
-                    } else if (isoDate === end) {
-                        // Ends Today -> Left Half
-                        leftType = col;
-                        // Dont override rightType if already set
-                        if (!rightType) labelProps.text = 'Salida';
-                    } else if (isoDate === start) {
-                        // Starts Today -> Right Half
-                        rightType = col;
-                        labelProps.text = name;
-                        rightTitle = 'Entrada: ' + res.cliente;
-                    }
-                });
-
-                // 3. Render Cell
-                if (leftType || rightType) {
-                    let bgStyle = '';
-                    // TOP = Checkout/Leaving (leftType logic -> Top)
-                    // BOTTOM = Checkin/Arriving (rightType logic -> Bottom)
-
-                    // Matches earlier logic:
-                    // leftType was "Ends Today" -> Checkout -> Top
-                    // rightType was "Starts Today" -> Checkin -> Bottom
-
-                    if (leftType && rightType) {
-                        if (leftType === rightType) {
-                            bgStyle = `background:${leftType};`; // Solid
-                        } else {
-                            bgStyle = `background: linear-gradient(to bottom, ${leftType} 50%, ${rightType} 50%);`; // Split Top/Bottom
-                        }
-                    } else if (leftType) {
-                        // Only Top (Checkout) -> Top Color, Bottom White
-                        bgStyle = `background: linear-gradient(to bottom, ${leftType} 50%, white 50%);`;
-                    } else if (rightType) {
-                        // Only Bottom (Checkin) -> Top White, Bottom Color
-                        bgStyle = `background: linear-gradient(to bottom, white 50%, ${rightType} 50%);`;
-                    }
-
-                    html += `<td style="padding:5px;">
+                html += `<td style="padding:5px;">
                             <div style="${bgStyle} color:white; font-size:0.75rem; padding:5px; border-radius:6px; text-align:center; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; cursor:pointer; text-shadow:0 1px 2px rgba(0,0,0,0.3);" title="${leftTitle} ${rightTitle}">
                                 ${labelProps.text}
                             </div>
                         </td>`;
-                } else {
-                    html += `<td style="padding:5px; text-align:center;">
+            } else {
+                html += `<td style="padding:5px; text-align:center;">
                             <div onclick="openReservation('${r.id}', '${r.numero}', '${isoDate}', '')" style="height:30px; border-radius:6px; cursor:pointer; background:#f8fafc;" class="cell-hover" title="Reservar"></div>
                         </td>`;
-                }
-            });
-            html += `</tr>`;
+            }
         });
+        html += `</tr>`;
+    });
 
-        html += `</tbody></table></div>
+    html += `</tbody></table></div>
     <style>.cell-hover:hover{background:#bfdbfe !important;}</style>
     `;
 
-        container.innerHTML = html;
-    }
+    container.innerHTML = html;
+}
 
-    // ===== ROOM DETAIL CARD LOGIC =====
-    function openRoomDetail(roomId) {
-        const r = currentRoomsList.find(x => x.id == roomId);
-        if (!r) return;
+// ===== ROOM DETAIL CARD LOGIC =====
+function openRoomDetail(roomId) {
+    const r = currentRoomsList.find(x => x.id == roomId);
+    if (!r) return;
 
-        // Elements
-        const img = document.getElementById('rdImg');
-        const badge = document.getElementById('rdStatus');
-        const title = document.getElementById('rdTitle');
-        const type = document.getElementById('rdType');
-        const price = document.getElementById('rdPrice');
-        const cap = document.getElementById('rdCap');
-        const beds = document.getElementById('rdBeds');
-        const actions = document.getElementById('rdActions');
+    // Elements
+    const img = document.getElementById('rdImg');
+    const badge = document.getElementById('rdStatus');
+    const title = document.getElementById('rdTitle');
+    const type = document.getElementById('rdType');
+    const price = document.getElementById('rdPrice');
+    const cap = document.getElementById('rdCap');
+    const beds = document.getElementById('rdBeds');
+    const actions = document.getElementById('rdActions');
 
-        // Lookup Active Reservation for Client Name
-        // Relaxed match: ID or Number, Status Activa OR Ocupada
-        let clientName = '';
-        const activeRes = currentReservationsList.find(res =>
+    // Lookup Active Reservation for Client Name
+    // Relaxed match: ID or Number, Status Activa OR Ocupada
+    let clientName = '';
+    const activeRes = currentReservationsList.find(res =>
+        (String(res.habitacionId) === String(r.id) || String(res.habitacionId) === String(r.numero)) &&
+        (res.estado === 'Activa' || res.estado === 'Ocupada')
+    );
+    if (activeRes) clientName = activeRes.cliente;
+    // Fallback: Check if room has "reservado" status but 'Reserva' object?
+    if (!clientName && r.estado === 'ocupado') {
+        // Maybe manual check-in stored elsewhere or just use generic text?
+        // Let's check 'Reserva' status too just in case of mismatch
+        const pendingRes = currentReservationsList.find(res =>
             (String(res.habitacionId) === String(r.id) || String(res.habitacionId) === String(r.numero)) &&
-            (res.estado === 'Activa' || res.estado === 'Ocupada')
+            (res.estado === 'Reserva')
         );
-        if (activeRes) clientName = activeRes.cliente;
-        // Fallback: Check if room has "reservado" status but 'Reserva' object?
-        if (!clientName && r.estado === 'ocupado') {
-            // Maybe manual check-in stored elsewhere or just use generic text?
-            // Let's check 'Reserva' status too just in case of mismatch
-            const pendingRes = currentReservationsList.find(res =>
-                (String(res.habitacionId) === String(r.id) || String(res.habitacionId) === String(r.numero)) &&
-                (res.estado === 'Reserva')
-            );
-            if (pendingRes) clientName = pendingRes.cliente;
-        }
-
-        // 1. Image
-        let imgUrl = 'https://images.unsplash.com/photo-1611892440504-42a792e24d32?q=80&w=600';
-        try {
-            if (r.fotos && r.fotos.startsWith('[')) imgUrl = JSON.parse(r.fotos)[0] || imgUrl;
-            else if (r.fotos && r.fotos.startsWith('http')) imgUrl = r.fotos;
-        } catch (e) { }
-        img.src = imgUrl;
-
-        // 2. Info
-        title.innerText = 'Habitación ' + r.numero;
-        type.innerText = r.tipo;
-        price.innerText = 'S/ ' + r.precio;
-        cap.innerText = (r.capacidad || 2) + ' Personas';
-        beds.innerText = (r.camas || 1) + ' Cama';
-
-        // 3. Status & Colors
-        const status = (r.estado || 'Disponible').toLowerCase();
-        let statusText = 'DISPONIBLE';
-        let badgeColor = '#10b981'; // green
-
-        if (status === 'ocupado') {
-            statusText = 'OCUPADO';
-            badgeColor = '#ef4444';
-        } else if (status === 'mantenimiento') {
-            statusText = 'MANTENIMIENTO';
-            badgeColor = '#f59e0b';
-        } else if (status === 'reservado') {
-            statusText = 'RESERVADO';
-            badgeColor = '#eab308';
-        } else if (status === 'sucio') {
-            statusText = 'LIMPIEZA';
-            badgeColor = '#3b82f6';
-        }
-        badge.innerText = statusText;
-        badge.style.backgroundColor = badgeColor;
-
-        // 4. Dynamic Actions
-        let btns = '';
-
-        if (status === 'disponible' || status === 'sucio') {
-            // Check In & Reserve
-            btns += `<button class="rd-btn btn-checkin" style="background:#22c55e; color:white;" onclick="closeRoomDetail(); openCheckIn('${r.id}', '${r.numero}')"><i class="fas fa-check"></i> Check-In</button>`;
-            btns += `<button class="rd-btn btn-reserve" style="background:#eab308; color:white;" onclick="closeRoomDetail(); openReservation('${r.id}', '${r.numero}')"><i class="fas fa-calendar-alt"></i> Reservar</button>`;
-            if (status === 'sucio') {
-                btns += `<button class="rd-btn btn-clean" style="border:1px dashed #64748B; color:#64748B;" onclick="closeRoomDetail(); alert('Funcionalidad de limpieza rápida pendiente')"><i class="fas fa-broom"></i> Marcar Limpio</button>`;
-            }
-        } else if (status === 'ocupado') {
-            // Check Out & Extend
-            btns += `<button class="rd-btn btn-checkout" style="background:#ef4444; color:white;" onclick="closeRoomDetail(); openCheckOut('${r.id}')"><i class="fas fa-sign-out-alt"></i> Finalizar</button>`;
-
-            // Green Extend Button, passing isExtension=true
-            btns += `<button class="rd-btn btn-reserve" style="background:#22c55e; color:white;" onclick="closeRoomDetail(); openReservation('${r.id}', '${r.numero}', '', '${clientName}', true)"><i class="fas fa-calendar-plus"></i> Extender</button>`;
-        } else if (status === 'reservado') {
-            // Check In & Edit
-            btns += `<button class="rd-btn btn-checkin" style="background:#22c55e; color:white;" onclick="closeRoomDetail(); openCheckIn('${r.id}', '${r.numero}')"><i class="fas fa-check"></i> Llegada</button>`;
-            btns += `<button class="rd-btn btn-reserve" style="background:#eab308; color:white;" onclick="closeRoomDetail(); openReservation('${r.id}', '${r.numero}')"><i class="fas fa-edit"></i> Modificar</button>`;
-        } else {
-            btns += `<div style="text-align:center; color:#64748B;">No hay acciones disponibles.</div>`;
-        }
-
-        // Always Edit
-        btns += `<button class="rd-btn" style="background:#f1f5f9; color:#64748B;" onclick="closeRoomDetail(); editRoom('${r.id}')"><i class="fas fa-cog"></i> Editar Propiedades</button>`;
-
-        actions.innerHTML = btns;
-
-        document.getElementById('modalRoomDetail').style.display = 'flex';
+        if (pendingRes) clientName = pendingRes.cliente;
     }
 
-    function closeRoomDetail() {
-        document.getElementById('modalRoomDetail').style.display = 'none';
+    // 1. Image
+    let imgUrl = 'https://images.unsplash.com/photo-1611892440504-42a792e24d32?q=80&w=600';
+    try {
+        if (r.fotos && r.fotos.startsWith('[')) imgUrl = JSON.parse(r.fotos)[0] || imgUrl;
+        else if (r.fotos && r.fotos.startsWith('http')) imgUrl = r.fotos;
+    } catch (e) { }
+    img.src = imgUrl;
+
+    // 2. Info
+    title.innerText = 'Habitación ' + r.numero;
+    type.innerText = r.tipo;
+    price.innerText = 'S/ ' + r.precio;
+    cap.innerText = (r.capacidad || 2) + ' Personas';
+    beds.innerText = (r.camas || 1) + ' Cama';
+
+    // 3. Status & Colors
+    const status = (r.estado || 'Disponible').toLowerCase();
+    let statusText = 'DISPONIBLE';
+    let badgeColor = '#10b981'; // green
+
+    if (status === 'ocupado') {
+        statusText = 'OCUPADO';
+        badgeColor = '#ef4444';
+    } else if (status === 'mantenimiento') {
+        statusText = 'MANTENIMIENTO';
+        badgeColor = '#f59e0b';
+    } else if (status === 'reservado') {
+        statusText = 'RESERVADO';
+        badgeColor = '#eab308';
+    } else if (status === 'sucio') {
+        statusText = 'LIMPIEZA';
+        badgeColor = '#3b82f6';
     }
+    badge.innerText = statusText;
+    badge.style.backgroundColor = badgeColor;
+
+    // 4. Dynamic Actions
+    let btns = '';
+
+    if (status === 'disponible' || status === 'sucio') {
+        // Check In & Reserve
+        btns += `<button class="rd-btn btn-checkin" style="background:#22c55e; color:white;" onclick="closeRoomDetail(); openCheckIn('${r.id}', '${r.numero}')"><i class="fas fa-check"></i> Check-In</button>`;
+        btns += `<button class="rd-btn btn-reserve" style="background:#eab308; color:white;" onclick="closeRoomDetail(); openReservation('${r.id}', '${r.numero}')"><i class="fas fa-calendar-alt"></i> Reservar</button>`;
+        if (status === 'sucio') {
+            btns += `<button class="rd-btn btn-clean" style="border:1px dashed #64748B; color:#64748B;" onclick="closeRoomDetail(); alert('Funcionalidad de limpieza rápida pendiente')"><i class="fas fa-broom"></i> Marcar Limpio</button>`;
+        }
+    } else if (status === 'ocupado') {
+        // Check Out & Extend
+        btns += `<button class="rd-btn btn-checkout" style="background:#ef4444; color:white;" onclick="closeRoomDetail(); openCheckOut('${r.id}')"><i class="fas fa-sign-out-alt"></i> Finalizar</button>`;
+
+        // Green Extend Button, passing isExtension=true
+        btns += `<button class="rd-btn btn-reserve" style="background:#22c55e; color:white;" onclick="closeRoomDetail(); openReservation('${r.id}', '${r.numero}', '', '${clientName}', true)"><i class="fas fa-calendar-plus"></i> Extender</button>`;
+    } else if (status === 'reservado') {
+        // Check In & Edit
+        btns += `<button class="rd-btn btn-checkin" style="background:#22c55e; color:white;" onclick="closeRoomDetail(); openCheckIn('${r.id}', '${r.numero}')"><i class="fas fa-check"></i> Llegada</button>`;
+        btns += `<button class="rd-btn btn-reserve" style="background:#eab308; color:white;" onclick="closeRoomDetail(); openReservation('${r.id}', '${r.numero}')"><i class="fas fa-edit"></i> Modificar</button>`;
+    } else {
+        btns += `<div style="text-align:center; color:#64748B;">No hay acciones disponibles.</div>`;
+    }
+
+    // Always Edit
+    btns += `<button class="rd-btn" style="background:#f1f5f9; color:#64748B;" onclick="closeRoomDetail(); editRoom('${r.id}')"><i class="fas fa-cog"></i> Editar Propiedades</button>`;
+
+    actions.innerHTML = btns;
+
+    document.getElementById('modalRoomDetail').style.display = 'flex';
+}
+
+function closeRoomDetail() {
+    document.getElementById('modalRoomDetail').style.display = 'none';
+}
