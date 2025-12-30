@@ -447,29 +447,65 @@ function renderRooms(rooms) {
         }
 
         html += `
-        <div class="room-card fade-in">
-            <div class="room-img-box">
-                <img src="${mainImg}" class="room-img" alt="Foto">
-                <span class="room-status-badge ${statusClass}">${statusLabel}</span>
-            </div>
-            <div class="room-body">
-                <div style="display:flex; justify-content:space-between; align-items:flex-start;">
-                    <div>
-                        <div class="room-number">Hab. ${r.numero}</div>
-                        <div class="room-type">${r.tipo}</div>
+        <div class="room-card fade-in" id="card-${r.id}">
+            <div class="card-inner">
+                <!-- FRONT FACE -->
+                <div class="card-front">
+                    <button class="btn-flip" title="Administrar" onclick="toggleRoomFlip('${r.id}')"><i class="fas fa-cog"></i></button>
+                    
+                    <div class="room-img-box">
+                        <img src="${mainImg}" class="room-img" alt="Foto">
+                        <span class="room-status-badge ${statusClass}">${statusLabel}</span>
                     </div>
-                    <div class="price-tag">S/ ${r.precio}</div>
-                </div>
-                
-                <div class="room-meta">
-                    <span><i class="fas fa-user-friends"></i> ${r.capacidad}</span>
-                    <span><i class="fas fa-bed"></i> ${r.camas}</span>
+                    <div class="room-body">
+                        <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+                            <div>
+                                <div class="room-number">Hab. ${r.numero}</div>
+                                <div class="room-type">${r.tipo}</div>
+                            </div>
+                            <div class="price-tag">S/ ${r.precio}</div>
+                        </div>
+                        
+                        <div class="room-meta">
+                            <span><i class="fas fa-user-friends"></i> ${r.capacidad}</span>
+                            <span><i class="fas fa-bed"></i> ${r.camas}</span>
+                        </div>
+
+                        <div class="room-actions" style="width:100%;">
+                            ${actionsHtml}
+                        </div>
+                    </div>
                 </div>
 
-                <div class="room-actions" style="justify-content:space-between; width:100%;">
-                    ${actionsHtml}
-                    <div style="display:flex; gap:5px;">
-                        <button class="btn-icon" title="Editar" onclick="editRoom('${r.id}')"><i class="fas fa-pen"></i></button>
+                <!-- BACK FACE (ADMIN) -->
+                <div class="card-back">
+                    <div class="card-back-header">
+                        <span>Gestión Admin</span>
+                        <button class="btn-icon" onclick="toggleRoomFlip('${r.id}')"><i class="fas fa-times"></i></button>
+                    </div>
+                    <div class="card-back-body">
+                         <div class="admin-info-row">
+                            <span class="admin-label">ID Sistema</span>
+                            <span class="admin-value" style="font-size:0.7rem;">${r.id}</span>
+                         </div>
+                         <div class="admin-info-row">
+                            <span class="admin-label">Precio Base</span>
+                            <span class="admin-value">S/ ${r.precio}</span>
+                         </div>
+                         <div class="admin-info-row">
+                            <span class="admin-label">Capacidad</span>
+                            <span class="admin-value">${r.capacidad} Pers.</span>
+                         </div>
+                         <div class="admin-info-row">
+                            <span class="admin-label">Tipo</span>
+                            <span class="admin-value">${r.tipo}</span>
+                         </div>
+
+                         <div style="margin-top:auto;">
+                            <button class="btn-action btn-action-warning" onclick="editRoom('${r.id}')">
+                                <i class="fas fa-pen"></i> Editar Propiedades
+                            </button>
+                         </div>
                     </div>
                 </div>
             </div>
@@ -479,6 +515,11 @@ function renderRooms(rooms) {
     html += '</div>';
 
     container.innerHTML = html;
+}
+
+function toggleRoomFlip(id) {
+    const card = document.getElementById('card-' + id);
+    if (card) card.classList.toggle('flipped');
 }
 
 // ===== CHECK-IN LOGIC (PHASE 5) =====
