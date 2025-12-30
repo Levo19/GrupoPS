@@ -1148,6 +1148,7 @@ body {
     .liq-grid {
         grid-template-columns: 1fr;
     }
+
     .liquidation-modal {
         width: 100% !important;
         height: 100% !important;
@@ -1167,6 +1168,27 @@ body {
 
 .balance-box:hover {
     transform: scale(1.02);
-    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
 }
 
+/* Phase 9: Quick Charge Styles */
+.badge-debt {
+    font-size: 0.75rem;
+    padding: 4px 8px;
+    border-radius: 12px;
+    position: absolute;
+    right: 10px;
+    z-index: 10;
+    font-weight: 700;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.btn-action-primary {
+    background: var(--primary);
+    color: white;
+}
+
+.btn-action-primary:hover {
+    background: #4f46e5;
+    transform: translateY(-2px);
+}
