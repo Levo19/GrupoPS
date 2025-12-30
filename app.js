@@ -470,7 +470,6 @@ function renderRooms(rooms) {
                     ${actionsHtml}
                     <div style="display:flex; gap:5px;">
                         <button class="btn-icon" title="Editar" onclick="editRoom('${r.id}')"><i class="fas fa-pen"></i></button>
-                        ${normStatus === 'sucio' ? `<button class="btn-icon" title="Marcar Limpio" style="color:var(--primary);"><i class="fas fa-broom"></i></button>` : ''}
                     </div>
                 </div>
             </div>
@@ -1161,7 +1160,7 @@ async function markRoomClean(roomId) {
     const rIdx = currentRoomsList.findIndex(r => r.id == roomId);
     if (rIdx !== -1) {
         currentRoomsList[rIdx].estado = 'Disponible';
-        renderRooms(); // Refresh UI immediately
+        renderRooms(currentRoomsList); // Refresh UI immediately (Fixed: passed arg)
     }
 
     try {
