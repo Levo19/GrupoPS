@@ -421,7 +421,11 @@ function renderRooms(rooms) {
 
             actionsHtml = btnFinish + btnExtend + btnNewRes;
         } else if (statusNorm === 'mantenimiento') {
-            actionsHtml = `<span style="color:#64748B; font-size:0.9rem; font-style:italic;">No disponible (Mantenimiento)</span>`;
+            actionsHtml = `
+            <div style="display:flex; flex-direction:column; gap:5px;">
+                 <span style="color:#64748B; font-size:0.9rem; font-style:italic; text-align:center;">Mantenimiento</span>
+                 ${btnReservar}
+            </div>`;
         } else if (statusNorm === 'reservado') {
             actionsHtml = `
                <div style="display:flex; gap:5px;">
@@ -475,23 +479,9 @@ function renderRooms(rooms) {
 // ===== CHECK-IN / RESERVATION LOGIC =====
 // Variables moved to top of file
 
-function openCheckIn(roomId, roomNum) {
-    checkInMode = 'checkin';
-    document.getElementById('modalTitleCheckIn').innerText = '🏨 Check-In';
-    document.getElementById('btnSubmitCheckIn').innerText = 'Confirmar Ingreso';
-    document.getElementById('btnSubmitCheckIn').style.background = 'var(--accent)';
+// Functions openCheckIn and openReservation are defined as window methods later in the file
+// to ensure global scope access for HTML onclick attributes.
 
-    setupCheckInModal(roomId, roomNum);
-}
-
-function openReservation(roomId, roomNum, startInfo) {
-    checkInMode = 'reservation';
-    document.getElementById('modalTitleCheckIn').innerText = '📅 Nueva Reserva';
-    document.getElementById('btnSubmitCheckIn').innerText = 'Confirmar Reserva';
-    document.getElementById('btnSubmitCheckIn').style.background = '#22c55e'; // Green for reservation
-
-    setupCheckInModal(roomId, roomNum);
-}
 
 // Helper to ensure reservations are loaded for blocking logic
 async function ensureReservationsLoaded() {
@@ -941,6 +931,9 @@ function setupCheckInModal(roomId, roomNum, preSelectedDate) {
         let ops = '<option value="" disabled selected>-- Elija Habitación --</option>';
         if (typeof currentRoomsList !== 'undefined') {
             currentRoomsList.forEach(r => {
+                // Strict Filter for Check-In Mode
+                if (checkInMode === 'checkin' && r.estado === 'Ocupado') return; // Skip occupied
+
                 ops += `<option value="${r.id}">Hab. ${r.numero} - ${r.tipo} (S/ ${r.precio})</option>`;
             });
         }
@@ -1597,7 +1590,7 @@ function renderCalendarTimeline(rooms, reservations) {
                 <!-- Action Buttons in Header -->
                 <div style="display:flex; gap:10px;">
                      <button onclick="openCheckIn('', '')" style="background:#22c55e; color:white; border:none; padding:8px 16px; border-radius:6px; font-weight:bold; cursor:pointer; display:flex; align-items:center; gap:5px;"><i class="fas fa-check-circle"></i> Check-In</button>
-                     <button onclick="openReservation('', '')" style="background:var(--primary); color:white; border:none; padding:8px 16px; border-radius:6px; font-weight:bold; cursor:pointer; display:flex; align-items:center; gap:5px;"><i class="fas fa-calendar-plus"></i> Nueva Reserva</button>
+                     <button onclick="openReservation('', '')" style="background:#eab308; color:white; border:none; padding:8px 16px; border-radius:6px; font-weight:bold; cursor:pointer; display:flex; align-items:center; gap:5px;"><i class="fas fa-calendar-plus"></i> Nueva Reserva</button>
                 </div>
             </div>
         </div>
