@@ -1134,3 +1134,39 @@ body {
     transform: scale(1.1);
     color: var(--primary);
 }
+
+/* =========================================
+   LIQUIDATION / CHECKOUT STYLES
+   ========================================= */
+.liq-grid {
+    display: grid;
+    grid-template-columns: 1.2fr 0.8fr;
+    gap: 25px;
+}
+
+@media (max-width: 800px) {
+    .liq-grid {
+        grid-template-columns: 1fr;
+    }
+    .liquidation-modal {
+        width: 100% !important;
+        height: 100% !important;
+        max-height: 100vh !important;
+        border-radius: 0 !important;
+    }
+}
+
+.balance-box {
+    background: #f8fafc;
+    border: 2px solid #cbd5e1;
+    border-radius: 12px;
+    padding: 20px;
+    text-align: center;
+    transition: transform 0.3s;
+}
+
+.balance-box:hover {
+    transform: scale(1.02);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+}
+
