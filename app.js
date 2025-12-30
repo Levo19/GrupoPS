@@ -2558,7 +2558,7 @@ async function submitQuickCharge() {
             descripcion: `Servicio: ${servName} ${notes ? '(' + notes + ')' : ''}`,
             monto: price,
             cantidad: 1,
-            productoId: '',
+            productoId: servId, // Now saving the Service ID for reference
             fechaProgramada: date
         };
 
