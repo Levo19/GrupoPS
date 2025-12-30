@@ -389,14 +389,20 @@ function renderRooms(rooms) {
         const statusNorm = r.estado.toLowerCase();
 
         if (statusNorm === 'disponible' || statusNorm === 'sucio') {
-            const btnCheckIn = statusNorm === 'sucio'
-                ? `<div class="btn-action btn-action-alert">⚠️ Limpieza Pendiente</div>`
-                : `<button onclick="openCheckIn('${r.id}', '${r.numero}')" class="btn-action btn-action-success"><i class="fas fa-key"></i> Check-In</button>`;
+            const btnCheckIn = `<button onclick="openCheckIn('${r.id}', '${r.numero}')" class="btn-action btn-action-success"><i class="fas fa-key"></i> Check-In</button>`;
+
+            // Optional: If dirty, show a "Quick Clean" button or just a visual warning inside the grid?
+            // User wants dynamic. Let's just give them the Check-In button.
+            // If they check-in, it implies it's ready.
+
+            const btnClean = statusNorm === 'sucio'
+                ? `<button onclick="markRoomClean('${r.id}')" class="btn-action btn-action-alert" title="Marcar como Limpio"><i class="fas fa-broom"></i> Limpiar</button>`
+                : '';
 
             actionsHtml = `
             <div class="room-actions-grid full-width" style="gap:8px;">
                  ${btnCheckIn}
-                 ${btnReservar}
+                 ${statusNorm === 'sucio' ? `<div class="room-actions-grid">${btnClean} ${btnReservar}</div>` : btnReservar}
             </div>`;
 
         } else if (statusNorm === 'ocupado') {
@@ -1147,6 +1153,37 @@ async function processCheckOut(e) {
 
 // ===== USERS MODULE =====
 let currentUsersList = [];
+
+async function markRoomClean(roomId) {
+    if (!confirm('¿Marcar habitación como LIMPIA y DISPONIBLE?')) return;
+
+    // Optimistic Update
+    const rIdx = currentRoomsList.findIndex(r => r.id == roomId);
+    if (rIdx !== -1) {
+        currentRoomsList[rIdx].estado = 'Disponible';
+        renderRooms(); // Refresh UI immediately
+    }
+
+    try {
+        const res = await fetch(CONFIG.API_URL, {
+            method: 'POST',
+            body: JSON.stringify({
+                action: 'saveHabitacion',
+                habitacion: { id: roomId, estado: 'Disponible' }
+            })
+        });
+        const data = await res.json();
+        if (!data.success) {
+            alert('Error al guardar: ' + data.error);
+            loadRooms(); // Revert
+        } else {
+            // Success silent
+            loadRooms();
+        }
+    } catch (e) {
+        alert('Error de conexión');
+    }
+}
 
 async function loadUsersView() {
     const container = document.getElementById('view-users');
