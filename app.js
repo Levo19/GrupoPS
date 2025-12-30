@@ -184,7 +184,7 @@ async function loadRoomsView() {
     const container = document.getElementById('view-rooms');
 
     // 1. Optimistic Render (Instant)
-    if (currentRoomsList.length > 0) {
+    if (currentRoomsList && currentRoomsList.length > 0) {
         renderRooms(currentRoomsList);
     } else {
         container.innerHTML = `
@@ -1160,9 +1160,17 @@ window.openCheckOut = function (roomId) {
 // Global state for current liquidation
 let currentLiqData = null;
 
-function openLiquidation(roomId) {
-    const room = currentRoomsList.find(r => r.id == roomId);
-    if (!room) return;
+async function openLiquidation(roomId) {
+    if (!currentRoomsList || currentRoomsList.length === 0) {
+        // Try fetch if missing
+        try {
+            const res = await fetch(CONFIG.API_URL, { method: 'POST', body: JSON.stringify({ action: 'getHabitaciones' }) });
+            const data = await res.json();
+            if (data.success) currentRoomsList = data.habitaciones;
+        } catch (e) { console.error(e); }
+    }
+    const room = currentRoomsList ? currentRoomsList.find(r => r.id == roomId) : null;
+    if (!room) return alert('Error: No se encontró la habitación localmente. Recarga la página.');
 
     document.getElementById('liqRoomId').value = roomId;
     document.getElementById('liqRoomTitle').innerText = `Habitación ${room.numero} - ${room.tipo}`;
@@ -1840,7 +1848,7 @@ async function loadCalendarView() {
     const container = document.getElementById('view-calendar');
 
     // 1. Optimistic Render
-    if (currentRoomsList.length > 0 && currentReservationsList.length > 0) {
+    if ((currentRoomsList && currentRoomsList.length > 0) && (currentReservationsList && currentReservationsList.length > 0)) {
         renderCalendarTimeline(currentRoomsList, currentReservationsList);
     } else {
         container.innerHTML = `
