@@ -144,7 +144,7 @@ function navigate(viewId) {
 
     // Hide all views
     // Hide all views safely
-    const views = ['view-dashboard', 'view-rooms', 'view-calendar', 'view-users', 'view-products'];
+    const views = ['view-dashboard', 'view-rooms', 'view-calendar', 'view-users', 'view-products', 'view-finances'];
     views.forEach(id => {
         const el = document.getElementById(id);
         if (el) el.style.display = 'none';
@@ -172,6 +172,10 @@ function navigate(viewId) {
         document.getElementById('view-products').style.display = 'block';
         title.innerText = 'Inventario Productos & Servicios';
         loadProductsView();
+    } else if (viewId === 'finances') {
+        document.getElementById('view-finances').style.display = 'block';
+        title.innerText = 'Finanzas & Compras';
+        renderFinanceView();
     }
 }
 
@@ -2145,4 +2149,239 @@ function openRoomDetail(roomId) {
 
 function closeRoomDetail() {
     document.getElementById('modalRoomDetail').style.display = 'none';
+}
+
+// ===== FINANCE MODULE (PHASE 8) =====
+
+let currentFinanceReport = null; // Stores data
+
+function renderFinanceView() {
+    // Default to current month
+    // loadFinanceData handles fetch
+    loadFinanceData();
+}
+
+async function loadFinanceData() {
+    document.getElementById('financeTbody').innerHTML = '<tr><td colspan="4" style="text-align:center; padding:20px;">Cargando datos financieros...</td></tr>';
+
+    // Month Filter
+    const filter = document.getElementById('financeMonthSelector').value;
+    const now = new Date();
+    let start, end;
+
+    if (filter === '0') {
+        // Current Month
+        start = new Date(now.getFullYear(), now.getMonth(), 1);
+        end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    } else {
+        // Previous Month
+        start = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+        end = new Date(now.getFullYear(), now.getMonth(), 0);
+    }
+
+    try {
+        const res = await fetch(CONFIG.API_URL, {
+            method: 'POST',
+            body: JSON.stringify({
+                action: 'getFinanceReport',
+                start: start.toISOString(),
+                end: end.toISOString()
+            })
+        });
+        const data = await res.json();
+
+        if (data.success) {
+            currentFinanceReport = data.report;
+            updateFinanceUI();
+        } else {
+            alert('Error cargando finanzas: ' + data.error);
+        }
+    } catch (e) { console.error(e); alert('Error de conexión'); }
+}
+
+function updateFinanceUI() {
+    if (!currentFinanceReport) return;
+    const r = currentFinanceReport;
+
+    // 1. KPIs
+    document.getElementById('kpiIngresos').innerText = `S/ ${r.resumen.totalIngresos.toFixed(2)}`;
+    document.getElementById('kpiGastos').innerText = `S/ ${r.resumen.totalGastos.toFixed(2)}`;
+    const util = r.resumen.utilidad;
+    const utilEl = document.getElementById('kpiUtilidad');
+    utilEl.innerText = `S/ ${util.toFixed(2)}`;
+    utilEl.style.color = util >= 0 ? '#1e293b' : '#ef4444'; // Red if loss
+
+    // 2. Refresh Table based on active tab
+    const activeBtn = document.getElementById('tabIngresos');
+    // If Ingresos has border-bottom primary, it's active.
+    if (activeBtn.style.borderBottom.includes('var(--primary)') || activeBtn.style.borderBottom.includes('rgb(')) {
+        renderFinanceTable('ingresos');
+    } else {
+        renderFinanceTable('gastos');
+    }
+}
+
+function switchFinanceTab(tab) {
+    const btnIn = document.getElementById('tabIngresos');
+    const btnEx = document.getElementById('tabGastos');
+
+    if (tab === 'ingresos') {
+        btnIn.style.color = 'var(--primary)';
+        btnIn.style.borderBottom = '3px solid var(--primary)';
+        btnEx.style.color = '#94a3b8';
+        btnEx.style.borderBottom = 'none';
+        renderFinanceTable('ingresos');
+    } else {
+        btnEx.style.color = 'var(--primary)';
+        btnEx.style.borderBottom = '3px solid var(--primary)';
+        btnIn.style.color = '#94a3b8';
+        btnIn.style.borderBottom = 'none';
+        renderFinanceTable('gastos');
+    }
+}
+
+function renderFinanceTable(type) {
+    const thead = document.getElementById('financeThead');
+    const tbody = document.getElementById('financeTbody');
+    const r = currentFinanceReport;
+
+    if (type === 'ingresos') {
+        thead.innerHTML = `
+            <tr>
+                <th style="padding:12px; text-align:left; color:#64748B;">Fecha</th>
+                <th style="padding:12px; text-align:left; color:#64748B;">Descripción</th>
+                <th style="padding:12px; text-align:left; color:#64748B;">Método</th>
+                <th style="padding:12px; text-align:right; color:#64748B;">Monto</th>
+            </tr>`;
+
+        if (r.ingresos.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; padding:20px; color:#94a3b8;">No hay ingresos registrados</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = r.ingresos.map(i => `
+            <tr style="border-bottom:1px solid #f1f5f9;">
+                <td style="padding:12px;">${new Date(i.fecha).toLocaleDateString()}</td>
+                <td style="padding:12px; font-weight:500;">${i.descripcion}</td>
+                <td style="padding:12px;">
+                    <span style="background:#dcfce7; color:#166534; padding:2px 8px; border-radius:10px; font-size:0.8rem;">${i.metodo}</span>
+                </td>
+                <td style="padding:12px; text-align:right; font-weight:bold; color:#166534;">+ S/ ${i.monto.toFixed(2)}</td>
+            </tr>
+        `).join('');
+
+    } else {
+        // GASTOS
+        thead.innerHTML = `
+            <tr>
+                <th style="padding:12px; text-align:left; color:#64748B;">Fecha</th>
+                <th style="padding:12px; text-align:left; color:#64748B;">Descripción</th>
+                <th style="padding:12px; text-align:left; color:#64748B;">Categoría</th>
+                <th style="padding:12px; text-align:right; color:#64748B;">Monto</th>
+            </tr>`;
+
+        if (r.gastos.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; padding:20px; color:#94a3b8;">No hay gastos registrados</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = r.gastos.map(g => `
+            <tr style="border-bottom:1px solid #f1f5f9;">
+                <td style="padding:12px;">${new Date(g.fecha).toLocaleDateString()}</td>
+                <td style="padding:12px; font-weight:500;">${g.descripcion}</td>
+                <td style="padding:12px;">${g.categoria}</td>
+                <td style="padding:12px; text-align:right; font-weight:bold; color:#ef4444;">- S/ ${g.monto.toFixed(2)}</td>
+            </tr>
+        `).join('');
+    }
+}
+
+// === MODALS & ACTIONS ===
+
+function openPurchaseModal() {
+    // Populate dropdown
+    const sel = document.getElementById('purchProdId');
+    sel.innerHTML = '<option value="">Cargando productos...</option>';
+
+    // Use cached list
+    if (currentProductsList.length > 0) {
+        sel.innerHTML = currentProductsList.map(p => `
+            <option value="${p.id}">${p.nombre} (Stock: ${p.stock})</option>
+        `).join('');
+    } else {
+        sel.innerHTML = '<option value="">No hay productos</option>';
+    }
+
+    document.getElementById('modalPurchase').style.display = 'flex';
+}
+
+async function submitPurchase() {
+    const pId = document.getElementById('purchProdId').value;
+    const qty = document.getElementById('purchQty').value;
+    const cost = document.getElementById('purchCost').value;
+    const notes = document.getElementById('purchNotes').value;
+
+    if (!pId || !qty || !cost) return alert('Datos incompletos');
+
+    try {
+        const res = await fetch(CONFIG.API_URL, {
+            method: 'POST',
+            body: JSON.stringify({
+                action: 'registerPurchase',
+                productoId: pId,
+                cantidad: qty,
+                costoTotal: cost,
+                notas: notes
+            })
+        });
+        const d = await res.json();
+        if (d.success) {
+            alert('Compra registrada ✅\nStock actualizado.');
+            document.getElementById('modalPurchase').style.display = 'none';
+            // Reset form
+            document.getElementById('purchQty').value = '';
+            document.getElementById('purchCost').value = '';
+            loadFinanceData(); // Refresh list
+            loadProducts(); // Refresh stock in background
+        } else {
+            alert('Error: ' + d.error);
+        }
+    } catch (e) { alert('Error de conexión'); }
+}
+
+function openExpenseModal() {
+    document.getElementById('modalExpense').style.display = 'flex';
+    document.getElementById('expDate').valueAsDate = new Date();
+}
+
+async function submitExpense() {
+    const desc = document.getElementById('expDesc').value;
+    const cat = document.getElementById('expCat').value;
+    const amt = document.getElementById('expAmount').value;
+    const date = document.getElementById('expDate').value;
+
+    if (!desc || !amt || !date) return alert('Datos incompletos');
+
+    try {
+        const res = await fetch(CONFIG.API_URL, {
+            method: 'POST',
+            body: JSON.stringify({
+                action: 'saveGasto',
+                descripcion: desc,
+                categoria: cat,
+                monto: amt,
+                fecha: date
+            })
+        });
+        const d = await res.json();
+        if (d.success) {
+            alert('Gasto registrado ✅');
+            document.getElementById('modalExpense').style.display = 'none';
+            document.getElementById('expDesc').value = '';
+            document.getElementById('expAmount').value = '';
+            loadFinanceData();
+        } else {
+            alert('Error: ' + d.error);
+        }
+    } catch (e) { alert('Error de conexión'); }
 }
