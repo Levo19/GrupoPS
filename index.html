@@ -844,6 +844,87 @@
         </div>
     </div>
 
+    <!-- MODAL: PRODUCT ANALYSIS (Logistics Phase 15) -->
+    <div id="modalProductAnalysis" class="modal-overlay"
+        onclick="if(event.target === this) document.getElementById('modalProductAnalysis').style.display='none'">
+        <div class="modal-card" style="width: 800px; max-width: 95%;">
+            <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:20px;">
+                <div>
+                    <h2 id="anaProdName" style="color:var(--primary-dark); margin:0;">Producto</h2>
+                    <span id="anaProdCat"
+                        style="background:#e0f2fe; color:#0369a1; padding:2px 8px; border-radius:4px; font-size:0.8rem; font-weight:600;">Categoria</span>
+                </div>
+                <button onclick="document.getElementById('modalProductAnalysis').style.display='none'"
+                    style="background:none; border:none; font-size:1.5rem; cursor:pointer;">&times;</button>
+            </div>
+
+            <!-- Analysis Grid -->
+            <div
+                style="display:grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap:15px; margin-bottom:25px;">
+                <!-- Cost -->
+                <div style="background:#f1f5f9; padding:15px; border-radius:12px; border:1px solid #cbd5e1;">
+                    <div style="font-size:0.8rem; color:#64748B; font-weight:700; text-transform:uppercase;">Último
+                        Costo</div>
+                    <div id="anaLastCost" style="font-size:1.5rem; font-weight:800; color:#475569;">S/ 0.00</div>
+                    <div style="font-size:0.75rem; color:#94a3b8;">Unitario (calculado)</div>
+                </div>
+                <!-- Price -->
+                <div style="background:#fff; padding:15px; border-radius:12px; border:2px solid var(--primary);">
+                    <div style="font-size:0.8rem; color:var(--primary); font-weight:700; text-transform:uppercase;">
+                        Precio Venta</div>
+                    <input type="number" id="anaPriceInput" step="0.10"
+                        style="width:100%; font-size:1.5rem; font-weight:800; color:var(--primary-dark); border:none; background:transparent; border-bottom:1px dashed var(--primary);"
+                        oninput="calculateAnalysisMargin()">
+                    <div style="font-size:0.75rem; color:var(--primary);">Editable</div>
+                </div>
+                <!-- Margin % -->
+                <div id="anaMarginCard"
+                    style="background:#f0fdf4; padding:15px; border-radius:12px; border:1px solid #bbf7d0;">
+                    <div style="font-size:0.8rem; color:#166534; font-weight:700; text-transform:uppercase;">Margen %
+                    </div>
+                    <div id="anaMarginPercent" style="font-size:1.5rem; font-weight:800; color:#15803d;">0%</div>
+                    <div style="font-size:0.75rem; color:#166534;">Objetivo: >30%</div>
+                </div>
+                <!-- Profit -->
+                <div id="anaProfitCard"
+                    style="background:#fff7ed; padding:15px; border-radius:12px; border:1px solid #fed7aa;">
+                    <div style="font-size:0.8rem; color:#9a3412; font-weight:700; text-transform:uppercase;">Ganancia /
+                        Ud</div>
+                    <div id="anaProfit" style="font-size:1.5rem; font-weight:800; color:#c2410c;">S/ 0.00</div>
+                </div>
+            </div>
+
+            <!-- Actions -->
+            <div style="display:flex; justify-content:flex-end; gap:10px; margin-bottom:25px;">
+                <button class="btn-submit" onclick="saveAnalyzedPrice()" style="width:auto; padding:10px 25px;">
+                    <i class="fas fa-save"></i> Guardar Nuevo Precio
+                </button>
+            </div>
+
+            <!-- Purchase History -->
+            <h3
+                style="font-size:1.1rem; color:#334155; margin-bottom:15px; border-bottom:1px solid #e2e8f0; padding-bottom:10px;">
+                <i class="fas fa-history"></i> Historial de Compras (Stock)
+            </h3>
+            <div style="max-height:250px; overflow-y:auto; border:1px solid #e2e8f0; border-radius:8px;">
+                <table class="data-table" style="width:100%;">
+                    <thead style="position:sticky; top:0; background:#f8fafc; z-index:1;">
+                        <tr>
+                            <th style="padding:10px;">Fecha</th>
+                            <th>Cantidad</th>
+                            <th>Costo Total</th>
+                            <th>Costo Unit.</th>
+                        </tr>
+                    </thead>
+                    <tbody id="anaHistoryBody">
+                        <!-- JS Injected -->
+                    </tbody>
+                </table>
+            </div>
+
+        </div>
+    </div>
+
     <script src="app.js"></script>
 </body>
 
