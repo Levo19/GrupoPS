@@ -1134,9 +1134,9 @@ async function processCheckIn(e) {
 
     // Update UI
     if (document.getElementById('view-calendar').style.display === 'block') {
-        renderCalendar();
+        renderCalendarTimeline(currentRoomsList, currentReservationsList);
     } else {
-        renderRooms();
+        renderRooms(); // Assumes this function exists and works
     }
 
     try {
