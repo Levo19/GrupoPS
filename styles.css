@@ -1473,3 +1473,89 @@ thead tr th.sticky-col {
     background: #4f46e5;
     transform: translateY(-2px);
 }
+
+/* ===== FINANCE DASHBOARD (PHASE 14) ===== */
+.finance-kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 20px;
+    margin-bottom: 30px;
+}
+
+.finance-kpi-card {
+    background: white;
+    padding: 25px;
+    border-radius: 16px;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+    border: 1px solid rgba(226, 232, 240, 0.8);
+    transition: transform 0.2s, box-shadow 0.2s;
+    position: relative;
+    overflow: hidden;
+}
+
+.finance-kpi-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05);
+}
+
+.finance-kpi-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 6px;
+    height: 100%;
+}
+
+.kpi-card-income::before {
+    background: linear-gradient(to bottom, #22c55e, #16a34a);
+}
+
+.kpi-card-expense::before {
+    background: linear-gradient(to bottom, #ef4444, #dc2626);
+}
+
+.kpi-card-net::before {
+    background: linear-gradient(to bottom, #3b82f6, #2563eb);
+}
+
+.kpi-label {
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #64748B;
+    font-weight: 600;
+    margin-bottom: 10px;
+}
+
+.kpi-value {
+    font-size: 2rem;
+    font-weight: 800;
+    color: #1e293b;
+    font-family: 'Inter', sans-serif;
+}
+
+/* Table Styles */
+.finance-table-header {
+    display: flex;
+    gap: 20px;
+    margin-bottom: 20px;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.finance-tab-btn {
+    background: none;
+    border: none;
+    padding: 10px 20px;
+    font-size: 1rem;
+    font-weight: 600;
+    color: #64748B;
+    cursor: pointer;
+    transition: color 0.2s;
+    border-bottom: 3px solid transparent;
+}
+
+.finance-tab-btn.active {
+    color: var(--primary);
+    border-bottom-color: var(--primary);
+}
