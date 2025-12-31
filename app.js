@@ -2657,3 +2657,5 @@ async function submitExpense() {
             } catch (e) { alert('Error red: ' + e.message); }
         }
     }
+}
+}
