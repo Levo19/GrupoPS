@@ -33,8 +33,8 @@
                 <p style="font-size: 0.9rem; color: #64748b; margin-bottom: 20px;">Nexus Empresarial - Gestión
                     Corporativa</p>
 
-                <!-- Dynamic Greeting -->
-                <h2 id="welcomeTitle" class="fade-in" style="font-size: 1.4rem; color: var(--primary);">Cargando...</h2>
+                <!-- Dynamic Greeting (Hidden Initially) -->
+                <h2 id="welcomeTitle" class="reveal-hidden" style="font-size: 1.4rem; color: var(--primary);"></h2>
             </div>
             <form onsubmit="handleLogin(event)" class="login-form">
                 <!-- User Field Removed (Implied) -->
@@ -55,9 +55,35 @@
     <div id="appContainer" class="app-container" style="display: none;">
 
         <!-- SIDEBAR -->
+        <!-- SIDEBAR -->
         <aside class="sidebar">
-            <i class="fas fa-sign-out-alt"></i> Salir
-            </a>
+            <div class="sidebar-header">
+                <div class="logo-box">PS</div>
+                <span class="brand-name">Grupo PS</span>
+            </div>
+
+            <nav class="sidebar-nav">
+                <div class="nav-section-label">PRINCIPAL</div>
+                <button onclick="navigate('dashboard')" class="nav-item active">
+                    <i class="fas fa-th-large"></i> <span>Dashboard</span>
+                </button>
+                <button onclick="navigate('rooms')" class="nav-item">
+                    <i class="fas fa-bed"></i> <span>Habitaciones</span>
+                </button>
+                <button onclick="navigate('calendar')" class="nav-item">
+                    <i class="fas fa-calendar-alt"></i> <span>Calendario</span>
+                </button>
+                <button onclick="navigate('products')" class="nav-item">
+                    <i class="fas fa-boxes"></i> <span>Productos</span>
+                </button>
+                <button onclick="navigate('finances')" class="nav-item">
+                    <i class="fas fa-chart-line"></i> <span>Finanzas</span>
+                </button>
+
+                <div class="nav-section-label">ADMIN</div>
+                <button onclick="logout()" class="nav-item fail-color">
+                    <i class="fas fa-sign-out-alt"></i> <span>Salir</span>
+                </button>
             </nav>
         </aside>
 
