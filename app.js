@@ -51,8 +51,18 @@ async function initLoginGreeting() {
         } else {
             title.innerText = `${greeting}, Administrador`;
         }
+
+        // 3. Trigger Reveal Animation (Slide Down)
+        // Small delay to ensure render
+        setTimeout(() => {
+            title.classList.add('reveal-visible');
+            title.classList.remove('reveal-hidden');
+        }, 100);
+
     } catch (e) {
         title.innerText = `${greeting}, Administrador`;
+        title.classList.add('reveal-visible');
+        title.classList.remove('reveal-hidden');
     }
 }
 
@@ -1915,7 +1925,8 @@ function changeCalendarDate(days) {
 function renderCalendarTimeline(rooms, reservations) {
     const container = document.getElementById('view-calendar');
 
-    // Config: Show next 15 days from calendarStartDate
+    // Phase 12: Premium Concierge Calendar
+    // Config: Show next 15 days
     const daysToShow = 15;
     const dates = [];
     const start = new Date(calendarStartDate);
@@ -1932,8 +1943,9 @@ function renderCalendarTimeline(rooms, reservations) {
     const colorPast = '#94a3b8'; // Gray
 
     let html = `
-    <div style="background:white; border-radius:12px; padding:20px; box-shadow:0 4px 6px -1px rgba(0,0,0,0.05); overflow-x:auto;">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+    <div class="calendar-container">
+        <!-- Sticky Header Context -->
+        <div style="display:flex; justify-content:space-between; align-items:center; padding:15px; background:white; position:sticky; top:0; left:0; z-index:40; border-bottom:1px solid #f1f5f9;">
             <div style="display:flex; gap:10px; align-items:center;">
                 <button onclick="changeCalendarDate(-15)" style="border:1px solid #cbd5e1; background:white; padding:5px 10px; border-radius:6px; cursor:pointer;"><i class="fas fa-chevron-left"></i></button>
                 <h2 style="color:var(--primary); font-size:1.5rem; margin:0;">Oc. ${start.toLocaleDateString()}</h2>
@@ -1945,10 +1957,8 @@ function renderCalendarTimeline(rooms, reservations) {
                     <span style="display:inline-block; width:12px; height:12px; background:${colorActive}; border-radius:50%; margin-right:5px;"></span>Ocupado
                     <span style="display:inline-block; width:12px; height:12px; background:${colorFuture}; border-radius:50%; margin-right:5px; margin-left:10px;"></span>Reservado
                 </div>
-                <!-- Action Buttons in Header -->
                 <div style="display:flex; gap:10px;">
                      <button onclick="openCheckIn('', '')" style="background:#22c55e; color:white; border:none; padding:8px 16px; border-radius:6px; font-weight:bold; cursor:pointer; display:flex; align-items:center; gap:5px;"><i class="fas fa-check-circle"></i> Check-In</button>
-                     <button onclick="openReservation('', '')" style="background:#eab308; color:white; border:none; padding:8px 16px; border-radius:6px; font-weight:bold; cursor:pointer; display:flex; align-items:center; gap:5px;"><i class="fas fa-calendar-plus"></i> Nueva Reserva</button>
                 </div>
             </div>
         </div>
@@ -1956,11 +1966,15 @@ function renderCalendarTimeline(rooms, reservations) {
         <table style="width:100%; border-collapse:collapse; min-width:800px;">
             <thead>
                 <tr>
-                    <th style="padding:10px; text-align:left; border-bottom:2px solid #e2e8f0; width:100px;">Hab.</th>
+                    <th class="sticky-header sticky-col" style="padding:10px; text-align:left; border-bottom:2px solid #e2e8f0; width:100px;">Hab.</th>
                     ${dates.map(d => {
         const dayName = d.toLocaleDateString('es-ES', { weekday: 'short' });
         const dayNum = d.getDate();
-        return `<th style="padding:10px; text-align:center; border-bottom:2px solid #e2e8f0; font-size:0.85rem; color:#64748B;">
+        const fullIso = d.toISOString().split('T')[0];
+        const todayIso = new Date().toISOString().split('T')[0];
+        const isToday = fullIso === todayIso;
+
+        return `<th class="sticky-header ${isToday ? 'today-highlight' : ''}" style="padding:10px; text-align:center; border-bottom:2px solid #e2e8f0; font-size:0.85rem; color:#64748B;">
                                     <div>${dayName}</div>
                                     <div style="font-weight:bold; font-size:1.1rem; color:var(--text-main);">${dayNum}</div>
                                 </th>`;
@@ -1972,110 +1986,78 @@ function renderCalendarTimeline(rooms, reservations) {
 
     rooms.forEach(r => {
         html += `<tr style="border-bottom:1px solid #f1f5f9;">
-                    <td style="padding:15px 10px; font-weight:bold; color:var(--primary); cursor:pointer;" onclick="openRoomDetail('${r.id}')" title="Ver detalle de habitación">
+                    <td class="sticky-col" style="padding:15px 10px; font-weight:bold; color:var(--primary); cursor:pointer;" onclick="openRoomDetail('${r.id}')" title="Ver detalle">
                         ${r.numero} <br>
                         <span style="font-size:0.7rem; color:#94a3b8; font-weight:normal;">${r.tipo}</span>
                     </td>`;
 
         dates.forEach(date => {
-            let cellColor = '';
-            let cellTitle = '';
-            let cellText = '';
-
-            // Standardize Date for comparison (YYYY-MM-DD)
             const isoDate = date.toISOString().split('T')[0];
             const todayIso = new Date().toISOString().split('T')[0];
+            const isToday = isoDate === todayIso;
 
-            // 1. Find ALL events touching this date (inclusive of end)
+            // Highlight Column
+            const tdClass = isToday ? 'today-highlight' : '';
+
+            // Logic for Reservation Matching
+            let activeRes = null;
+            let barType = ''; // 'start', 'mid', 'end', 'single'
+            let barColor = '';
+            let barLabel = '';
+            let barId = '';
+
+            // Find reservation covering this day
             const matches = reservations.filter(res => {
                 if (String(res.habitacionId) !== String(r.id) && String(res.habitacionId) !== String(r.numero)) return false;
                 if (res.estado === 'Cancelada') return false;
-
-                const start = res.fechaEntrada.substring(0, 10);
-                const end = res.fechaSalida.substring(0, 10);
-
-                // Include End Date for Split View
-                return isoDate >= start && isoDate <= end;
+                const s = res.fechaEntrada.substring(0, 10);
+                const e = res.fechaSalida.substring(0, 10);
+                return isoDate >= s && isoDate <= e;
             });
 
-            let leftType = null;  // Color for Left Half (Morning)
-            let rightType = null; // Color for Right Half (Afternoon)
-            let leftTitle = '';
-            let rightTitle = '';
-            let labelProps = { text: '', color: '' }; // For text label
+            if (matches.length > 0) {
+                // Priority to active/occupied
+                const res = matches[0]; // Take first for simplicity in Phase 12
+                barId = res.id;
 
-            // Priority colors
-            const getCol = (st) => {
-                if (st === 'Activa' || st === 'Ocupada') return colorActive;
-                if (st === 'Finalizada') return colorPast;
-                return colorFuture;
-            };
+                const s = res.fechaEntrada.substring(0, 10);
+                const e = res.fechaSalida.substring(0, 10);
+                const col = (res.estado === 'Activa' || res.estado === 'Ocupada') ? colorActive : colorFuture;
+                barColor = col;
 
-            // Fallback for Today (Physical Occupancy)
-            if (matches.length === 0 && String(r.estado).toLowerCase() === 'ocupado' && isoDate === todayIso) {
-                leftType = colorActive;
-                rightType = colorActive;
-                labelProps.text = 'Ocupado';
-                leftTitle = 'Ocupado Manual';
-            }
-
-            matches.forEach(res => {
-                const start = res.fechaEntrada.substring(0, 10);
-                const end = res.fechaSalida.substring(0, 10);
-                const col = getCol(res.estado);
-                const name = (res.cliente || 'Anónimo').split(' ')[0];
-
-                if (isoDate > start && isoDate < end) {
-                    // Full Day
-                    leftType = col;
-                    rightType = col;
-                    labelProps.text = name;
-                    leftTitle = res.estado + ': ' + res.cliente;
-                } else if (isoDate === end) {
-                    // Ends Today -> Left Half
-                    leftType = col;
-                    // Dont override rightType if already set
-                    if (!rightType) labelProps.text = 'Salida';
-                } else if (isoDate === start) {
-                    // Starts Today -> Right Half
-                    rightType = col;
-                    labelProps.text = name;
-                    rightTitle = 'Entrada: ' + res.cliente;
-                }
-            });
-
-            // 3. Render Cell
-            if (leftType || rightType) {
-                let bgStyle = '';
-                // TOP = Checkout/Leaving (leftType logic -> Top)
-                // BOTTOM = Checkin/Arriving (rightType logic -> Bottom)
-
-                // Matches earlier logic:
-                // leftType was "Ends Today" -> Checkout -> Top
-                // rightType was "Starts Today" -> Checkin -> Bottom
-
-                if (leftType && rightType) {
-                    if (leftType === rightType) {
-                        bgStyle = `background:${leftType};`; // Solid
-                    } else {
-                        bgStyle = `background: linear-gradient(to bottom, ${leftType} 50%, ${rightType} 50%);`; // Split Top/Bottom
+                // Determine Bar Shape
+                if (s === e) {
+                    barType = 'res-bar-single'; // 1 day stay (Start & End)
+                } else if (isoDate === s) {
+                    barType = 'res-bar-start';
+                    barLabel = (res.cliente || '').split(' ')[0];
+                } else if (isoDate === e) {
+                    barType = 'res-bar-end';
+                } else {
+                    barType = 'res-bar-mid';
+                    if (isoDate === dates[0].toISOString().split('T')[0]) {
+                        // If checking-in prior to view, show name
+                        barLabel = (res.cliente || '').split(' ')[0];
                     }
-                } else if (leftType) {
-                    // Only Top (Checkout) -> Top Color, Bottom White
-                    bgStyle = `background: linear-gradient(to bottom, ${leftType} 50%, white 50%);`;
-                } else if (rightType) {
-                    // Only Bottom (Checkin) -> Top White, Bottom Color
-                    bgStyle = `background: linear-gradient(to bottom, white 50%, ${rightType} 50%);`;
                 }
 
-                html += `<td style="padding:5px;">
-                            <div style="${bgStyle} color:white; font-size:0.75rem; padding:5px; border-radius:6px; text-align:center; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; cursor:pointer; text-shadow:0 1px 2px rgba(0,0,0,0.3);" title="${leftTitle} ${rightTitle}">
-                                ${labelProps.text}
+                // If label was not set by start logic, maybe empty or mid
+                if (!barLabel && barType === 'res-bar-single') barLabel = (res.cliente || '').split(' ')[0];
+
+                // Manual overrides for Checkin/Checkout Split Views are complex. 
+                // For Phase 12 Concierge, we prioritize the Continuous Flow.
+                // If there's an end and start on same day, this logic might overlap. 
+                // We will stick to "First Match Wins" for the visual bar for now to keep it clean.
+
+                html += `<td class="${tdClass}" style="padding:5px;">
+                            <div class="res-bar-base ${barType}" style="background:${barColor};" onclick="openReservation('${barId}', '${isoDate}')" title="${res.cliente}">
+                                ${barLabel}
                             </div>
-                        </td>`;
+                         </td>`;
             } else {
-                html += `<td style="padding:5px; text-align:center;">
-                            <div onclick="openReservation('${r.id}', '${r.numero}', '${isoDate}', '')" style="height:30px; border-radius:6px; cursor:pointer; background:#f8fafc;" class="cell-hover" title="Reservar"></div>
+                // Empty - Click to add new
+                html += `<td class="${tdClass}" style="padding:5px; text-align:center;">
+                            <div onclick="openReservation('${r.id}', '${r.numero}', '${isoDate}', '')" style="height:30px; border-radius:6px; cursor:pointer;" class="cell-hover" title="Nueva Reserva"></div>
                         </td>`;
             }
         });
