@@ -2037,7 +2037,7 @@ function renderCalendarTimeline(rooms, reservations) {
             let barLabel = '';
             let barId = '';
 
-            // Find reservation covering this day (Nightly Logic: Exclude Checkout Date)
+            // Find reservation covering this day (Proportional Logic)
             const matches = reservations.filter(res => {
                 if (String(res.habitacionId) !== String(r.id) && String(res.habitacionId) !== String(r.numero)) return false;
                 if (res.estado === 'Cancelada') return false;
@@ -2045,12 +2045,10 @@ function renderCalendarTimeline(rooms, reservations) {
                 const s = res.fechaEntrada.substring(0, 10);
                 const e = res.fechaSalida.substring(0, 10);
 
-                if (s === e) return isoDate === s; // Day Use
-                return isoDate >= s && isoDate < e; // Nightly (Checkout day is free)
+                return isoDate >= s && isoDate <= e;
             });
 
             if (matches.length > 0) {
-                // Priority to active/occupied
                 const res = matches[0];
                 barId = res.id;
 
@@ -2059,20 +2057,15 @@ function renderCalendarTimeline(rooms, reservations) {
                 const col = (res.estado === 'Activa' || res.estado === 'Ocupada') ? colorActive : colorFuture;
                 barColor = col;
 
-                // Helper for next day string to check if this is the last night
-                const nextD = new Date(date);
-                nextD.setDate(date.getDate() + 1);
-                const nextIso = nextD.toISOString().split('T')[0];
-
-                // Determine Bar Shape
+                // Determine Bar Shape (Proportional)
                 if (s === e) {
                     barType = 'res-bar-single';
-                    barLabel = (res.cliente || '').split(' ')[0]; // Show name for single day
+                    barLabel = (res.cliente || '').split(' ')[0];
                 } else if (isoDate === s) {
-                    barType = 'res-bar-start';
-                    barLabel = (res.cliente || '').split(' ')[0]; // Show name at start
-                } else if (nextIso === e) {
-                    barType = 'res-bar-end'; // This is the last night before checkout
+                    barType = 'res-bar-start'; // Starts at 50%
+                    barLabel = (res.cliente || '').split(' ')[0];
+                } else if (isoDate === e) {
+                    barType = 'res-bar-end'; // Ends at 50%
                 } else {
                     barType = 'res-bar-mid';
                     // Repeat name if it's the first visible day of a long booking
