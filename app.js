@@ -61,7 +61,7 @@ function showLogin() {
     document.getElementById('appContainer').style.display = 'none';
 }
 
-// ===== AUTHENTICATION =====
+// ===== AUTHENTICATION (SIMPLIFIED PHASE 10) =====
 async function handleLogin(e) {
     e.preventDefault();
     const btn = document.getElementById('btnLogin');
@@ -69,38 +69,33 @@ async function handleLogin(e) {
 
     // UI Loading
     btn.disabled = true;
-    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Validando...';
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Ingresando...';
     err.style.display = 'none';
 
-    const email = document.getElementById('txtEmail').value;
     const password = document.getElementById('txtPassword').value;
-
-    // DEMO BYPASS: Si el usuario no ha desplegado el backend aun
-    // Permito entrar con admin/admin para que vea la UI
-    if (email === 'admin@demo.com' && password === '123') {
-        const demoUser = { nombre: 'Demo User', email: 'admin@demo.com', rol: 'Admin' };
-        loginSuccess({ user: demoUser, token: 'demo' });
-        return;
-    }
 
     try {
         const res = await fetch(CONFIG.API_URL, {
             method: 'POST',
-            body: JSON.stringify({ action: 'login', email, password })
+            body: JSON.stringify({
+                action: 'login',
+                email: 'admin', // Hardcoded for Single User Mode
+                password: password
+            })
         });
         const data = await res.json();
 
         if (data.success) {
             loginSuccess(data);
         } else {
-            throw new Error(data.error || 'Error al iniciar sesión');
+            throw new Error(data.error || 'Contraseña incorrecta');
         }
     } catch (e) {
         console.error(e);
         err.style.display = 'block';
         err.innerText = '⚠️ ' + (e.message || 'Error de conexión');
         btn.disabled = false;
-        btn.innerHTML = 'Iniciar Sesión <i class="fas fa-arrow-right" style="margin-left:8px"></i>';
+        btn.innerHTML = 'Ingresar <i class="fas fa-arrow-right" style="margin-left:8px"></i>';
     }
 }
 
