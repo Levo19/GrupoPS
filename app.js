@@ -2037,18 +2037,21 @@ function renderCalendarTimeline(rooms, reservations) {
             let barLabel = '';
             let barId = '';
 
-            // Find reservation covering this day
+            // Find reservation covering this day (Nightly Logic: Exclude Checkout Date)
             const matches = reservations.filter(res => {
                 if (String(res.habitacionId) !== String(r.id) && String(res.habitacionId) !== String(r.numero)) return false;
                 if (res.estado === 'Cancelada') return false;
+
                 const s = res.fechaEntrada.substring(0, 10);
                 const e = res.fechaSalida.substring(0, 10);
-                return isoDate >= s && isoDate <= e;
+
+                if (s === e) return isoDate === s; // Day Use
+                return isoDate >= s && isoDate < e; // Nightly (Checkout day is free)
             });
 
             if (matches.length > 0) {
                 // Priority to active/occupied
-                const res = matches[0]; // Take first for simplicity in Phase 12
+                const res = matches[0];
                 barId = res.id;
 
                 const s = res.fechaEntrada.substring(0, 10);
@@ -2056,29 +2059,29 @@ function renderCalendarTimeline(rooms, reservations) {
                 const col = (res.estado === 'Activa' || res.estado === 'Ocupada') ? colorActive : colorFuture;
                 barColor = col;
 
+                // Helper for next day string to check if this is the last night
+                const nextD = new Date(date);
+                nextD.setDate(date.getDate() + 1);
+                const nextIso = nextD.toISOString().split('T')[0];
+
                 // Determine Bar Shape
                 if (s === e) {
-                    barType = 'res-bar-single'; // 1 day stay (Start & End)
+                    barType = 'res-bar-single';
+                    barLabel = (res.cliente || '').split(' ')[0]; // Show name for single day
                 } else if (isoDate === s) {
                     barType = 'res-bar-start';
-                    barLabel = (res.cliente || '').split(' ')[0];
-                } else if (isoDate === e) {
-                    barType = 'res-bar-end';
+                    barLabel = (res.cliente || '').split(' ')[0]; // Show name at start
+                } else if (nextIso === e) {
+                    barType = 'res-bar-end'; // This is the last night before checkout
                 } else {
                     barType = 'res-bar-mid';
+                    // Repeat name if it's the first visible day of a long booking
                     if (isoDate === dates[0].toISOString().split('T')[0]) {
-                        // If checking-in prior to view, show name
                         barLabel = (res.cliente || '').split(' ')[0];
                     }
                 }
 
-                // If label was not set by start logic, maybe empty or mid
                 if (!barLabel && barType === 'res-bar-single') barLabel = (res.cliente || '').split(' ')[0];
-
-                // Manual overrides for Checkin/Checkout Split Views are complex. 
-                // For Phase 12 Concierge, we prioritize the Continuous Flow.
-                // If there's an end and start on same day, this logic might overlap. 
-                // We will stick to "First Match Wins" for the visual bar for now to keep it clean.
 
                 html += `<td class="${tdClass}" style="padding:5px;">
                             <div class="res-bar-base ${barType}" style="background:${barColor};" onclick="openReservation('${barId}', '${isoDate}')" title="${res.cliente}">
