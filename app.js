@@ -1799,8 +1799,9 @@ function renderProducts(products) {
             <td style="padding:15px;">S/ ${p.precio}</td>
             <td style="padding:15px; font-weight:bold;">${p.stock}</td>
             <td style="padding:15px;">${p.activo}</td>
-            <td style="padding:15px;">
-                <button class="btn-icon" onclick="editProduct('${p.id}')"><i class="fas fa-edit"></i></button>
+            <td style="padding:15px; display:flex; gap:10px;">
+                <button class="btn-icon" onclick="openProductAnalysis('${p.id}')" title="Análisis Logístico" style="color:#0ea5e9; background:#f0f9ff;"><i class="fas fa-chart-line"></i></button>
+                <button class="btn-icon" onclick="editProduct('${p.id}')" title="Editar Producto"><i class="fas fa-edit"></i></button>
             </td>
         </tr>
         `;
@@ -2657,5 +2658,123 @@ async function submitExpense() {
             } catch (e) { alert('Error red: ' + e.message); }
         }
     }
+
+}
+
+// ===== PHASE 15: PRODUCT INTELLIGENCE (LOGISTICS) =====
+
+let currentAnalysisProdId = null;
+let currentAnalysisLastCost = 0;
+
+async function openProductAnalysis(prodId) {
+    currentAnalysisProdId = prodId;
+    document.getElementById('modalProductAnalysis').style.display = 'flex';
+    document.getElementById('anaProdName').innerText = 'Cargando...';
+
+    try {
+        const res = await fetch(CONFIG.API_URL, {
+            method: 'POST',
+            body: JSON.stringify({ action: 'getProductAnalysis', productoId: prodId })
+        });
+        const result = await res.json();
+
+        if (result.success) {
+            const d = result.data;
+            const p = d.product;
+
+            // Header
+            document.getElementById('anaProdName').innerText = p.nombre;
+            document.getElementById('anaProdCat').innerText = 'Stock Actual: ' + p.stock;
+
+            // Cards
+            currentAnalysisLastCost = d.lastCost;
+            document.getElementById('anaLastCost').innerText = 'S/ ' + d.lastCost.toFixed(2);
+            document.getElementById('anaPriceInput').value = p.precio.toFixed(2);
+
+            calculateAnalysisMargin(); // value update
+
+            // History Table
+            const tbody = document.getElementById('anaHistoryBody');
+            tbody.innerHTML = '';
+
+            if (d.history.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; padding:20px; color:#64748B;">Sin historial de compras registrado</td></tr>';
+            } else {
+                d.history.forEach(h => {
+                    const row = document.createElement('tr');
+                    const dateStr = new Date(h.fecha).toLocaleDateString();
+                    row.innerHTML = `
+                        <td style="padding:10px;">${dateStr}</td>
+                        <td style="font-weight:bold;">${h.cantidad}</td>
+                        <td>S/ ${h.total.toFixed(2)}</td>
+                        <td style="color:var(--primary-dark); font-weight:bold;">S/ ${h.unitario.toFixed(2)}</td>
+                    `;
+                    tbody.appendChild(row);
+                });
+            }
+
+        } else {
+            alert('Error cargando análisis: ' + result.error);
+        }
+    } catch (e) { console.error(e); alert('Error de conexión'); }
+}
+
+function calculateAnalysisMargin() {
+    const price = Number(document.getElementById('anaPriceInput').value);
+    const cost = currentAnalysisLastCost;
+
+    if (price > 0) {
+        const profit = price - cost;
+        const margin = (profit / price) * 100;
+
+        document.getElementById('anaMarginPercent').innerText = margin.toFixed(1) + '%';
+        document.getElementById('anaProfit').innerText = 'S/ ' + profit.toFixed(2);
+
+        // Color Feedback
+        const mCard = document.getElementById('anaMarginCard');
+        if (margin < 15) { mCard.style.background = '#fef2f2'; mCard.style.borderColor = '#fca5a5'; } // Red
+        else if (margin < 30) { mCard.style.background = '#fffbeb'; mCard.style.borderColor = '#fcd34d'; } // Yellow
+        else { mCard.style.background = '#f0fdf4'; mCard.style.borderColor = '#bbf7d0'; } // Green
+
+    } else {
+        document.getElementById('anaMarginPercent').innerText = '0%';
+        document.getElementById('anaProfit').innerText = 'S/ 0.00';
+    }
+}
+
+async function saveAnalyzedPrice() {
+    if (!currentAnalysisProdId) return;
+    const newPrice = document.getElementById('anaPriceInput').value;
+
+    if (!confirm(`¿Actualizar precio de venta a S/ ${newPrice}?`)) return;
+
+    // We can reuse the generic 'saveProduct' or create a specific one. 
+    // Ideally we should have a 'updateProductPrice' lighter action, but 'saveProduct' works if we send full data.
+    // However, frontend doesn't have full data here easily. 
+    // Let's assume we can add a 'updatePrice' action or just use the Product Editor.
+    // SHORTCUT: For now, I'll alert the user to use the editor OR implement a micro-update.
+    // Better: Implement 'updateProductPrice' in backend? No, let's use the existing editor logic via a direct edit if possible.
+    // WAIT, I can just call 'saveProduct' if I had all data. I don't.
+    // Let's implement a 'quickUpdatePrice' in backend or just hack it?
+    // Let's Add 'quickUpdatePrice' to backend. It is safer.
+
+    try {
+        const res = await fetch(CONFIG.API_URL, {
+            method: 'POST',
+            body: JSON.stringify({
+                action: 'quickUpdatePrice',
+                id: currentAnalysisProdId,
+                newPrice: newPrice
+            })
+        });
+        const d = await res.json();
+        if (d.success) {
+            alert('Precio Actualizado ✅');
+            document.getElementById('modalProductAnalysis').style.display = 'none';
+            loadProductsView();
+        } else {
+            alert('Error: ' + d.error);
+        }
+    } catch (e) { alert('Error de conexión'); }
 }
 
