@@ -198,32 +198,22 @@
                         <button class="btn-primary" onclick="openPurchaseModal()">+ Nueva Compra Insumos</button>
                     </div>
 
-                    <!-- KPI Cards -->
-                    <div
-                        style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 30px;">
-                        <!-- Income Card -->
-                        <div
-                            style="background: white; padding: 20px; border-radius: 12px; border-left: 5px solid #22c55e; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);">
-                            <div style="font-size: 0.8rem; text-transform:uppercase; color: #64748B; font-weight: 700;">
-                                Ingresos Totales</div>
-                            <div id="kpiIngresos" style="font-size: 1.8rem; font-weight: 800; color: #1e293b;">S/ 0.00
-                            </div>
+                    <!-- KPI Cards (Executive Design) -->
+                    <div class="finance-kpi-grid">
+                        <!-- Income -->
+                        <div class="finance-kpi-card kpi-card-income">
+                            <div class="kpi-label">Ingresos Totales</div>
+                            <div id="kpiIngresos" class="kpi-value">S/ 0.00</div>
                         </div>
-                        <!-- Expenses Card -->
-                        <div
-                            style="background: white; padding: 20px; border-radius: 12px; border-left: 5px solid #ef4444; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);">
-                            <div style="font-size: 0.8rem; text-transform:uppercase; color: #64748B; font-weight: 700;">
-                                Gastos Totales</div>
-                            <div id="kpiGastos" style="font-size: 1.8rem; font-weight: 800; color: #1e293b;">S/ 0.00
-                            </div>
+                        <!-- Expenses -->
+                        <div class="finance-kpi-card kpi-card-expense">
+                            <div class="kpi-label">Gastos Totales</div>
+                            <div id="kpiGastos" class="kpi-value">S/ 0.00</div>
                         </div>
-                        <!-- Profit Card -->
-                        <div
-                            style="background: white; padding: 20px; border-radius: 12px; border-left: 5px solid #3b82f6; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);">
-                            <div style="font-size: 0.8rem; text-transform:uppercase; color: #64748B; font-weight: 700;">
-                                Utilidad Neta</div>
-                            <div id="kpiUtilidad" style="font-size: 1.8rem; font-weight: 800; color: #1e293b;">S/ 0.00
-                            </div>
+                        <!-- Net -->
+                        <div class="finance-kpi-card kpi-card-net">
+                            <div class="kpi-label">Utilidad Neta</div>
+                            <div id="kpiUtilidad" class="kpi-value">S/ 0.00</div>
                         </div>
                     </div>
 
@@ -586,6 +576,7 @@
                 <label>Categoría</label>
                 <select id="expCat" class="form-input">
                     <option value="Servicios Básicos">Servicios Básicos (Luz/Agua)</option>
+                    <option value="Insumos">Insumos y Materiales (Limpieza/Otros)</option>
                     <option value="Mantenimiento">Mantenimiento y Reparaciones</option>
                     <option value="Planilla">Planilla / Personal</option>
                     <option value="Otros">Otros</option>
