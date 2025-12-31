@@ -180,22 +180,31 @@
                 <!-- FINANCES VIEW (PHASE 8) -->
                 <div id="view-finances" style="display: none;">
                     <!-- Header Actions -->
-                    <div
-                        style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                        <div style="display:flex; gap:10px;">
-                            <button class="btn-primary" style="background:#64748B;" onclick="openExpenseModal()">+
-                                Registrar Gasto General</button>
+                    <!-- Header Actions (New Toolbar) -->
+                    <div class="finance-actions-bar">
+                        <!-- Left Group: Expenses -->
+                        <div class="finance-btn-group">
+                            <button class="btn-finance btn-finance-expense" onclick="openExpenseModal()">
+                                <i class="fas fa-file-invoice-dollar"></i> Registrar Gasto
+                            </button>
                         </div>
-                        <!-- Date Filter -->
+
+                        <!-- Center: Date Filter -->
                         <div style="display:flex; align-items:center; gap:10px;">
                             <span style="font-weight:600; color:#64748B;">Periodo:</span>
-                            <select id="financeMonthSelector" class="form-input" style="width:150px;"
+                            <select id="financeMonthSelector" class="form-input" style="width:150px; padding: 8px;"
                                 onchange="loadFinanceData()">
                                 <option value="0">Mes Actual</option>
                                 <option value="-1">Mes Anterior</option>
                             </select>
                         </div>
-                        <button class="btn-primary" onclick="openPurchaseModal()">+ Nueva Compra Insumos</button>
+
+                        <!-- Right Group: Purchases -->
+                        <div class="finance-btn-group">
+                            <button class="btn-finance btn-finance-purchase" onclick="openPurchaseModal()">
+                                <i class="fas fa-cart-plus"></i> Compra Stock
+                            </button>
+                        </div>
                     </div>
 
                     <!-- KPI Cards (Executive Design) -->
