@@ -96,6 +96,37 @@ async function preloadAppSession() {
     }
 }
 
+// ===== DATA REFRESH HELPERS =====
+async function loadReservations() {
+    try {
+        const res = await fetch(CONFIG.API_URL, { method: 'POST', body: JSON.stringify({ action: 'getReservas' }) });
+        const data = await res.json();
+        if (data.success) {
+            currentReservationsList = data.reservas;
+            if (document.getElementById('view-calendar').style.display === 'block') {
+                renderCalendarTimeline(currentRoomsList, currentReservationsList);
+            }
+        }
+    } catch (e) { console.error(e); }
+}
+
+async function loadRooms() {
+    try {
+        const res = await fetch(CONFIG.API_URL, { method: 'POST', body: JSON.stringify({ action: 'getHabitaciones' }) });
+        const data = await res.json();
+        if (data.success) {
+            currentRoomsList = data.habitaciones;
+            if (document.getElementById('view-rooms').style.display === 'block') {
+                renderRooms(currentRoomsList);
+            }
+            // Calendar also depends on Rooms
+            if (document.getElementById('view-calendar').style.display === 'block') {
+                renderCalendarTimeline(currentRoomsList, currentReservationsList);
+            }
+        }
+    } catch (e) { console.error(e); }
+}
+
 function showLogin() {
     document.getElementById('loginScreen').style.display = 'flex';
     document.getElementById('loginScreen').style.opacity = '1';
