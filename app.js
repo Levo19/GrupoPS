@@ -22,8 +22,39 @@ document.addEventListener('DOMContentLoaded', () => {
         initDashboard();
     } else {
         showLogin();
+        // Phase 11: Dynamic Greeting
+        initLoginGreeting();
     }
 });
+
+// Phase 11: Dynamic Greeting Logic
+async function initLoginGreeting() {
+    const title = document.getElementById('welcomeTitle');
+
+    // 1. Time based logic
+    const hour = new Date().getHours();
+    let greeting = 'Hola';
+    if (hour < 12) greeting = 'Buenos días';
+    else if (hour < 18) greeting = 'Buenas tardes';
+    else greeting = 'Buenas noches';
+
+    try {
+        // 2. Fetch Name
+        const res = await fetch(CONFIG.API_URL, {
+            method: 'POST',
+            body: JSON.stringify({ action: 'getAdminName' })
+        });
+        const data = await res.json();
+
+        if (data.success && data.name) {
+            title.innerText = `${greeting}, ${data.name.split(' ')[0]}`; // Use first name
+        } else {
+            title.innerText = `${greeting}, Administrador`;
+        }
+    } catch (e) {
+        title.innerText = `${greeting}, Administrador`;
+    }
+}
 
 // ===== PRELOADING =====
 async function preloadAppSession() {
