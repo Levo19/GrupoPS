@@ -290,22 +290,38 @@ thead tr th.sticky-col {
 .res-bar-start {
     border-top-left-radius: 6px;
     border-bottom-left-radius: 6px;
-    margin-right: -1px;
-    /* Overlap right */
+    margin-left: 50%;
+    /* Check-in at 2PM (Afternoon) */
+    width: 60%;
+    /* Fill the rest + overlap */
+    z-index: 10;
     padding-left: 5px;
 }
 
 .res-bar-mid {
     border-radius: 0;
-    margin-left: -1px;
-    margin-right: -1px;
+    width: 100%;
+    margin-left: -5px;
+    /* Overlap to ensure continuity */
+    padding-right: 5px;
+    z-index: 5;
 }
 
 .res-bar-end {
     border-top-right-radius: 6px;
     border-bottom-right-radius: 6px;
-    margin-left: -1px;
+    width: 50%;
+    /* Check-out at 11AM (Morning) */
+    margin-left: -5px;
+    /* Overlap */
+    z-index: 10;
     padding-right: 5px;
+}
+
+.res-bar-single {
+    border-radius: 6px;
+    margin: 0 10%;
+    width: 80%;
 }
 
 /* Today Highlight */
