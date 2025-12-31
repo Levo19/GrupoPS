@@ -209,6 +209,113 @@ body {
     display: none;
 }
 
+/* REVEAL ANIMATION (Phase 11) */
+.reveal-hidden {
+    opacity: 0;
+    max-height: 0;
+    transform: translateY(-20px);
+    overflow: hidden;
+    transition: all 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+    margin: 0;
+}
+
+.reveal-visible {
+    opacity: 1;
+    max-height: 100px;
+    /* Adjust based on content */
+    transform: translateY(0);
+    margin: 15px 0;
+    /* Add margin when visible */
+}
+
+/* =========================================
+   PHASE 12: CALENDAR PREMIUM (CONCIERGE)
+   ========================================= */
+
+/* Sticky Headers & Columns */
+.calendar-container {
+    overflow: auto;
+    position: relative;
+    max-height: 80vh;
+    /* Allow vertical scroll */
+    border-radius: 12px;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+    background: white;
+}
+
+.sticky-header {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    background: white;
+    /* Opaque background to hide scrolling content */
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.sticky-col {
+    position: sticky;
+    left: 0;
+    z-index: 15;
+    background: white;
+    border-right: 2px solid #e2e8f0;
+}
+
+/* Fix z-index for the top-left corner intersection */
+thead tr th.sticky-col {
+    z-index: 30;
+}
+
+/* Continuous Bars flow */
+.res-bar-base {
+    color: white;
+    font-size: 0.75rem;
+    padding: 6px 0;
+    text-align: center;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    cursor: pointer;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: filter 0.2s;
+}
+
+.res-bar-base:hover {
+    filter: brightness(1.1);
+}
+
+.res-bar-start {
+    border-top-left-radius: 6px;
+    border-bottom-left-radius: 6px;
+    margin-right: -1px;
+    /* Overlap right */
+    padding-left: 5px;
+}
+
+.res-bar-mid {
+    border-radius: 0;
+    margin-left: -1px;
+    margin-right: -1px;
+}
+
+.res-bar-end {
+    border-top-right-radius: 6px;
+    border-bottom-right-radius: 6px;
+    margin-left: -1px;
+    padding-right: 5px;
+}
+
+/* Today Highlight */
+.today-highlight {
+    background-color: #fffbeb;
+    /* Very light amber */
+    border-left: 2px solid #fbbf24;
+    border-right: 2px solid #fbbf24;
+}
+
 /* =========================================
    DASHBOARD LAYOUT
    ========================================= */
