@@ -360,6 +360,14 @@ thead tr th.sticky-col {
     transition: all 0.2s;
     margin-bottom: 5px;
     text-decoration: none;
+
+    /* Button Reset (Phase 12 Fix) */
+    border: none;
+    background: transparent;
+    width: 100%;
+    text-align: left;
+    font-size: 1rem;
+    font-family: inherit;
 }
 
 .nav-item:hover,
