@@ -3108,10 +3108,21 @@ function openReservationDetail(resId) {
     let actionsHtml = '';
     const closeFn = "document.getElementById('modalReservationDetail').style.display='none';";
 
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    // Parse start date safely
+    let startDate = new Date();
+    if (res.fechaEntrada) {
+        startDate = new Date(res.fechaEntrada);
+    }
+    startDate.setHours(0, 0, 0, 0);
+
+    // Check-In Active Condition: Today >= StartDate
+    const canCheckIn = today >= startDate;
+
     if (res.estado === 'Activa' || res.estado === 'Ocupada') { // Green
         badge.style.background = '#dcfce7'; badge.style.color = '#166534';
 
-        // Actions: Extend, Edit, Check-Out
         actionsHtml += `<button onclick="${closeFn} openReservation('${res.habitacionId}', '${room ? room.numero : ''}', '', '${res.cliente}', 'extend', '${res.id}', '${res.fechaSalida}')" class="btn-submit" style="background:#eab308; width:auto;"><i class="fas fa-calendar-plus"></i> Extender</button>`;
         actionsHtml += `<button onclick="${closeFn} openReservation('${res.habitacionId}', '${room ? room.numero : ''}', '${res.fechaEntrada}', '${res.cliente}', 'edit', '${res.id}', '${res.fechaSalida}')" class="btn-submit" style="background:#3b82f6; width:auto;"><i class="fas fa-edit"></i> Editar</button>`;
         actionsHtml += `<button onclick="${closeFn} openCheckOut('${res.habitacionId}')" class="btn-submit" style="background:#ef4444; width:auto;"><i class="fas fa-sign-out-alt"></i> Salida</button>`;
@@ -3119,48 +3130,119 @@ function openReservationDetail(resId) {
     } else if (res.estado === 'Reserva') { // Yellow
         badge.style.background = '#fef9c3'; badge.style.color = '#854d0e';
 
-        // Actions: Check-In, Edit
-        actionsHtml += `<button onclick="${closeFn} openCheckIn('${res.habitacionId}', '${room ? room.numero : ''}')" class="btn-submit" style="background:#22c55e; width:auto;"><i class="fas fa-check"></i> Check-In</button>`;
+        if (canCheckIn) {
+            // Confirm Arrival
+            actionsHtml += `<button onclick="${closeFn} confirmReservation('${res.id}')" class="btn-submit" style="background:#22c55e; width:auto;"><i class="fas fa-check"></i> Check-In (Ingreso)</button>`;
+        } else {
+            // Future Reservation
+            actionsHtml += `<button disabled class="btn-submit" style="background:#cbd5e1; width:auto; cursor:not-allowed;" title="Disponible desde la fecha de llegada"><i class="fas fa-clock"></i> Esperando Llegada</button>`;
+        }
+
         actionsHtml += `<button onclick="${closeFn} openReservation('${res.habitacionId}', '${room ? room.numero : ''}', '${res.fechaEntrada}', '${res.cliente}', 'edit', '${res.id}', '${res.fechaSalida}')" class="btn-submit" style="background:#3b82f6; width:auto;"><i class="fas fa-edit"></i> Editar</button>`;
+        actionsHtml += `<button onclick="${closeFn} cancelReservation('${res.id}', '${res.habitacionId}')" class="btn-submit" style="background:#ef4444; width:auto;"><i class="fas fa-trash-alt"></i> Cancelar / No Show</button>`;
+
     } else {
         badge.style.background = '#e2e8f0'; badge.style.color = '#475569';
     }
 
-} else if (mode === 'edit') {
-    title.innerHTML = '<i class="fas fa-edit"></i> Modificar Reserva';
-    btn.innerText = 'Actualizar Datos';
+    document.getElementById('rdActionsContainer').innerHTML = actionsHtml;
+}
 
-    clientInput.value = existingClient || '';
-    clientInput.disabled = false;
-    inDate.disabled = false;
+async function confirmReservation(resId) {
+    if (!confirm('¿Confirmar ingreso del huésped? Estado pasará a Activa.')) return;
+    try {
+        const res = await fetch(CONFIG.API_URL, {
+            method: 'POST', body: JSON.stringify({ action: 'confirmReservation', id: resId })
+        });
+        const d = await res.json();
+        if (d.success) { showToast('✅ Ingreso Confirmado'); loadCalendarView(); }
+        else alert('Error: ' + d.error);
+    } catch (e) { alert('Error red'); }
+}
 
-    // Pre-fill Dates from arguments (passed as string iso) or objects
-    if (date) inDate.value = date; // Start
-    if (currentEnd) outDate.value = currentEnd; // End passed as 'currentEnd' arg for convenience
+async function cancelReservation(resId, habId) {
+    if (!confirm('¿Cancelar esta reserva? Se liberará la habitación.')) return;
+    try {
+        const res = await fetch(CONFIG.API_URL, {
+            method: 'POST', body: JSON.stringify({ action: 'cancelReservation', id: resId, habitacionId: habId })
+        });
+        const d = await res.json();
+        if (d.success) { showToast('🗑️ Reserva Cancelada'); loadCalendarView(); }
+        else alert('Error: ' + d.error);
+    } catch (e) { alert('Error red'); }
+}
 
-    document.getElementById('resNotes').value = ''; // TODO: Pass notes if we want full edit
 
-} else { // 'new'
-    title.innerHTML = '<i class="fas fa-calendar-alt"></i> Nueva Reserva';
-    btn.innerText = 'Guardar Reserva';
 
-    clientInput.value = '';
-    clientInput.disabled = false;
-    inDate.disabled = false;
+// 2. EXTENSION & EDIT FLOW (Reusing Reservation Modal)
+function openReservation(roomId, roomNum, date, existingClient, mode = 'new', existingResId = null, currentEnd = null) {
+    // Mode: 'new' | 'extend' | 'edit'
 
-    // Date Logic
-    if (date) {
-        inDate.value = date;
-        const d = new Date(date);
-        d.setDate(d.getDate() + 1);
-        outDate.valueAsDate = d;
-    } else {
-        inDate.valueAsDate = new Date();
-        const tmr = new Date();
+    document.getElementById('modalReservation').style.display = 'flex';
+    document.getElementById('resRoomId').value = roomId;
+    document.getElementById('resRoomNum').value = roomNum ? 'Hab. ' + roomNum : 'Habitación';
+    document.getElementById('resIsExtension').value = mode;
+    document.getElementById('resResId').value = existingResId || '';
+
+    const title = document.getElementById('resModalTitle');
+    const btn = document.querySelector('#modalReservation .btn-submit');
+    const clientInput = document.getElementById('resClient');
+    const inDate = document.getElementById('resInDate');
+    const outDate = document.getElementById('resOutDate');
+
+    if (mode === 'extend') {
+        title.innerHTML = '<i class="fas fa-calendar-plus"></i> Extender Estadía';
+        btn.innerText = 'Confirmar Extensión';
+
+        clientInput.value = existingClient || '';
+        clientInput.disabled = true;
+        inDate.disabled = true;
+
+        let startDateObj = new Date();
+        if (currentEnd) {
+            startDateObj = new Date(currentEnd);
+        }
+        inDate.valueAsDate = startDateObj;
+
+        // Default End = Start + 1
+        const tmr = new Date(startDateObj);
         tmr.setDate(tmr.getDate() + 1);
         outDate.valueAsDate = tmr;
+
+    } else if (mode === 'edit') {
+        title.innerHTML = '<i class="fas fa-edit"></i> Modificar Reserva';
+        btn.innerText = 'Actualizar Datos';
+
+        clientInput.value = existingClient || '';
+        clientInput.disabled = false;
+        inDate.disabled = false;
+
+        if (date) inDate.value = date;
+        if (currentEnd) outDate.value = currentEnd;
+
+        document.getElementById('resNotes').value = '';
+
+    } else { // 'new'
+        title.innerHTML = '<i class="fas fa-calendar-alt"></i> Nueva Reserva';
+        btn.innerText = 'Guardar Reserva';
+
+        clientInput.value = '';
+        clientInput.disabled = false;
+        inDate.disabled = false;
+
+        // Date Logic
+        if (date) {
+            inDate.value = date;
+            const d = new Date(date);
+            d.setDate(d.getDate() + 1);
+            outDate.valueAsDate = d;
+        } else {
+            inDate.valueAsDate = new Date();
+            const tmr = new Date();
+            tmr.setDate(tmr.getDate() + 1);
+            outDate.valueAsDate = tmr;
+        }
     }
-}
 }
 
 async function submitReservation() {
