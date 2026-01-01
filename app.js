@@ -1343,8 +1343,16 @@ async function submitPago() {
     const monto = document.getElementById('payMonto').value;
     const metodo = document.getElementById('payMetodo').value;
     const resId = document.getElementById('liqResId').value;
+    const btn = document.querySelector('#modalLiquidation .btn-submit-pay') || document.querySelector('#modalLiquidation button[onclick="submitPago()"]');
 
     if (!monto || !resId) return alert('Ingrese monto');
+
+    // UI Loading
+    const originalText = btn ? btn.innerText : 'Ingresar Pago';
+    if (btn) {
+        btn.innerText = 'Procesando...';
+        btn.disabled = true;
+    }
 
     try {
         await fetch(CONFIG.API_URL, {
@@ -1358,42 +1366,57 @@ async function submitPago() {
         });
         document.getElementById('payMonto').value = '';
         loadLiquidationData(document.getElementById('liqRoomId').value); // Reload
-    } catch (e) { alert('Error guardando pago'); }
+    } catch (e) {
+        alert('Error guardando pago');
+    } finally {
+        if (btn) {
+            btn.innerText = originalText;
+            btn.disabled = false;
+        }
+    }
 }
 
 function printVoucher() {
     if (!currentLiqData) return;
 
-    // Generate simple thermal-like HTML in new window
     const w = window.open('', '_blank', 'width=400,height=600');
-
     const d = currentLiqData;
     const itemsHtml = d.internals.map(i => `<tr><td>${i.descripcion}</td><td align="right">${i.monto.toFixed(2)}</td></tr>`).join('') +
         d.externals.map(e => `<tr><td>${e.descripcion}</td><td align="right">${e.monto.toFixed(2)}</td></tr>`).join('');
 
+    // Dates
+    const checkIn = new Date(d.reservation.fechaEntrada).toLocaleDateString();
+    const checkOut = new Date(d.reservation.fechaSalida).toLocaleDateString();
+
     const html = `
     <html>
     <head>
-        <title>Voucher Grupo PS</title>
+        <title>Voucher Casa Munay</title>
         <style>
-            body { font-family: 'Courier New', monospace; font-size: 12px; max-width: 300px; margin: 0 auto; padding: 10px; }
-            .header { text-align: center; border-bottom: 1px dashed black; padding-bottom: 10px; margin-bottom: 10px; }
-            .totals { border-top: 1px dashed black; margin-top: 10px; padding-top: 10px; }
-            table { width: 100%; }
+            body { font-family: 'Courier New', monospace; font-size: 11px; max-width: 280px; margin: 0 auto; padding: 5px; color: black; }
+            .header { text-align: center; border-bottom: 1px dashed black; padding-bottom: 5px; margin-bottom: 5px; }
+            .totals { border-top: 1px dashed black; margin-top: 5px; padding-top: 5px; }
+            table { width: 100%; border-collapse: collapse; }
+            td { padding: 2px 0; }
+            .brand { font-size: 14px; font-weight: bold; text-transform: uppercase; margin-bottom: 2px; }
+            .sub-brand { font-size: 10px; margin-bottom: 5px; }
+            .qr-container { text-align: center; margin-top: 10px; }
+            .qr-img { width: 80px; height: 80px; }
         </style>
     </head>
     <body onload="window.print()">
         <div class="header">
-            <strong>GRUPO PS HOTEL</strong><br>
-            RUC: 20123456789<br>
+            <div class="brand">HOSPEDAJE CASA MUNAY</div>
+            <div class="sub-brand">RUC: 20610099999</div>
             ----------------<br>
-            Cliente: ${d.reservation.cliente}<br>
-            Habitación: ${d.reservation.habitacionId}<br>
-            Fecha: ${new Date().toLocaleDateString()}
+            Cliente: <b>${d.reservation.cliente}</b><br>
+            Hab: <b>${d.reservation.habitacionId}</b> | Recibo: ${new Date().getTime().toString().substr(-6)}<br>
+            Estadía: ${checkIn} - ${checkOut}<br>
+            Fecha Emisión: ${new Date().toLocaleString()}
         </div>
         
         <table>
-            <tr><td><strong>Concepto</strong></td><td align="right"><strong>Total</strong></td></tr>
+            <tr><td style="border-bottom:1px solid #000;">Concepto</td><td align="right" style="border-bottom:1px solid #000;">Total</td></tr>
             <tr><td>${d.stay.descripcion}</td><td align="right">${d.stay.monto.toFixed(2)}</td></tr>
             ${itemsHtml}
         </table>
@@ -1406,8 +1429,14 @@ function printVoucher() {
             </table>
         </div>
         
-        <div style="text-align:center; margin-top:20px;">
-            ¡Gracias por su visita!
+        <div class="qr-container">
+            <img src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=CASAMUNAY-RES-${d.reservation.id}" class="qr-img"><br>
+            <span style="font-size:9px;">Reserva #${d.reservation.id}</span>
+        </div>
+        
+        <div style="text-align:center; margin-top:10px; font-size:10px;">
+            ¡Gracias por su preferencia!<br>
+            www.casamunay.com
         </div>
     </body>
     </html>
