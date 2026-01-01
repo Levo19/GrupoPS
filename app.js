@@ -1832,6 +1832,11 @@ function openNewProduct() {
     document.getElementById('editProdImg').value = '';
     document.getElementById('editProdActivo').value = 'Activo';
 
+    // Reset File Input & Preview
+    document.getElementById('editProdFile').value = '';
+    document.getElementById('imgPreview').src = '';
+    document.getElementById('imagePreviewContainer').style.display = 'none';
+
     document.getElementById('modalProductEditor').style.display = 'flex';
 }
 
@@ -1848,8 +1853,46 @@ function editProduct(id) {
     document.getElementById('editProdImg').value = p.imagen_url;
     document.getElementById('editProdActivo').value = p.activo;
 
+    // Reset File Input
+    document.getElementById('editProdFile').value = '';
+
+    // Show Preview if URL exists
+    if (p.imagen_url) {
+        document.getElementById('imgPreview').src = p.imagen_url;
+        document.getElementById('imagePreviewContainer').style.display = 'block';
+    } else {
+        document.getElementById('imagePreviewContainer').style.display = 'none';
+        document.getElementById('imgPreview').src = '';
+    }
 
     document.getElementById('modalProductEditor').style.display = 'flex';
+}
+
+function previewImageUpload(input) {
+    const preview = document.getElementById('imgPreview');
+    const container = document.getElementById('imagePreviewContainer');
+
+    if (input.files && input.files[0]) {
+        const reader = new FileReader();
+        reader.onload = function (e) {
+            preview.src = e.target.result;
+            container.style.display = 'block';
+        }
+        reader.readAsDataURL(input.files[0]);
+    } else {
+        // Keep old image if cancelled? Or clear? 
+        // Usually if user cancels file dialog, value remains empty.
+        // We'll rely on the hidden input for the 'current' valid URL.
+    }
+}
+
+function fileToBase64(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = error => reject(error);
+    });
 }
 
 function closeProductEditor() {
@@ -1872,8 +1915,50 @@ async function saveProduct(e) {
         stock: document.getElementById('editProdStock').value,
         imagen_url: document.getElementById('editProdImg').value,
         activo: document.getElementById('editProdActivo').value,
-
     };
+
+    // 1.5 Handle Image Upload
+    const fileInput = document.getElementById('editProdFile');
+    if (fileInput.files.length > 0) {
+        const file = fileInput.files[0];
+        // Change button to loading state
+        btn.innerText = 'Subiendo Imagen...';
+        btn.disabled = true;
+
+        try {
+            const base64 = await fileToBase64(file);
+            // Call Backend Upload
+            const uploadRes = await fetch(CONFIG.API_URL, {
+                method: 'POST',
+                body: JSON.stringify({
+                    action: 'uploadImage',
+                    base64: base64,
+                    filename: file.name,
+                    mimeType: file.type || 'image/png'
+                })
+            });
+            const uploadData = await uploadRes.json();
+
+            if (uploadData.success) {
+                prodData.imagen_url = uploadData.url;
+                document.getElementById('editProdImg').value = uploadData.url; // Sync hidden
+            } else {
+                alert('⚠️ Error subiendo imagen: ' + uploadData.error);
+                btn.innerText = originalText;
+                btn.disabled = false;
+                return; // Stop save
+            }
+        } catch (e) {
+            alert('⚠️ Error subiendo imagen: ' + e.message);
+            btn.innerText = originalText;
+            btn.disabled = false;
+            return;
+        }
+        btn.innerText = originalText; // Restore text, keep disabled while saving product
+    } else {
+        // No new file, ensure we use the hidden value (which holds the old URL)
+        prodData.imagen_url = document.getElementById('editProdImg').value;
+    }
 
     // 2. Optimistic Update
     if (id) {
@@ -2911,4 +2996,3 @@ document.addEventListener('DOMContentLoaded', () => {
     setupSafeModalClose('modalProductAnalysis', 'closeProductAnalysis'); // Assuming this exists or simple hide
     setupSafeModalClose('modalStockAdjustment', null); // Default hide
 });
-
