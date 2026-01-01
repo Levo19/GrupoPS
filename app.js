@@ -1055,6 +1055,7 @@ function setupCheckInModal(roomId, roomNum, preSelectedDate) {
         initDatePicker(roomId, preSelectedDate);
     } else {
         roomIdInput.value = '';
+        roomLabel.innerText = ''; // Clear ghost text
         roomLabel.style.display = 'none';
         roomSelect.style.display = 'block';
 
@@ -2364,7 +2365,7 @@ function openRoomDetail(roomId) {
         btns += `<button class="rd-btn btn-checkin" style="background:#22c55e; color:white;" onclick="closeRoomDetail(); openCheckIn('${r.id}', '${r.numero}')"><i class="fas fa-check"></i> Check-In</button>`;
         btns += `<button class="rd-btn btn-reserve" style="background:#eab308; color:white;" onclick="closeRoomDetail(); openReservation('${r.id}', '${r.numero}')"><i class="fas fa-calendar-alt"></i> Reservar</button>`;
         if (status === 'sucio') {
-            btns += `<button class="rd-btn btn-clean" style="border:1px dashed #64748B; color:#64748B;" onclick="closeRoomDetail(); alert('Funcionalidad de limpieza rápida pendiente')"><i class="fas fa-broom"></i> Marcar Limpio</button>`;
+            btns += `<button class="rd-btn btn-clean" style="border:1px dashed #64748B; color:#64748B;" onclick="closeRoomDetail(); markRoomClean('${r.id}')"><i class="fas fa-broom"></i> Marcar Limpio</button>`;
         }
     } else if (status === 'ocupado') {
         // Check Out & Extend
