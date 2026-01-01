@@ -2244,11 +2244,18 @@ function openRoomDetail(roomId) {
         statusText = 'RESERVADO';
         badgeColor = '#eab308';
     } else if (status === 'sucio') {
-        statusText = 'LIMPIEZA';
-        badgeColor = '#3b82f6';
+        statusText = 'LIMPIEZA REQUERIDA'; // Warning Text
+        badgeColor = '#64748B'; // Plomo (Slate 500)
     }
     badge.innerText = statusText;
     badge.style.backgroundColor = badgeColor;
+
+    // Add Warning Icon if Dirty
+    if (status === 'sucio') {
+        badge.innerHTML = '<i class="fas fa-exclamation-triangle" style="color:#fcd34d; margin-right:5px;"></i> LIMPIEZA';
+    } else {
+        badge.innerText = statusText;
+    }
 
     // 4. Dynamic Actions
     let btns = '';
@@ -3347,8 +3354,46 @@ async function submitReservation() {
 // 2. CHECK-IN FLOW (Walk-In)
 function openCheckIn(roomId, roomNum) {
     document.getElementById('modalCheckIn').style.display = 'flex';
-    document.getElementById('ciRoomId').value = roomId;
-    document.getElementById('ciRoomDisplay').innerText = roomNum ? `Habitación ${roomNum}` : 'Habitación Selecciónada';
+    const display = document.getElementById('ciRoomDisplay');
+    const select = document.getElementById('ciRoomSelect');
+    const hiddenId = document.getElementById('ciRoomId');
+
+    hiddenId.value = roomId || '';
+
+    if (roomId) {
+        // Specific Room
+        display.style.display = 'block';
+        select.style.display = 'none';
+        display.innerText = roomNum ? `Habitación ${roomNum}` : 'Habitación Selecciónada';
+    } else {
+        // Global Check-In (Select Room)
+        display.style.display = 'none';
+        select.style.display = 'block';
+
+        // Populate Select with Available Rooms
+        select.innerHTML = '';
+        const available = currentRoomsList.filter(r => (r.estado || 'disponible').toLowerCase() === 'disponible');
+
+        if (available.length === 0) {
+            const opt = document.createElement('option');
+            opt.text = 'No hay habitaciones disponibles';
+            select.add(opt);
+            hiddenId.value = '';
+        } else {
+            available.forEach(r => {
+                const opt = document.createElement('option');
+                opt.value = r.id;
+                opt.text = `Habitación ${r.numero} (${r.tipo})`;
+                select.add(opt);
+            });
+            // Set first as default
+            select.value = available[0].id;
+            hiddenId.value = available[0].id;
+
+            // Listener
+            select.onchange = () => { hiddenId.value = select.value; };
+        }
+    }
 
     document.getElementById('ciClient').value = '';
 
@@ -3420,6 +3465,22 @@ async function submitCheckOut() {
     btn.innerText = 'Procesando...';
     btn.disabled = true;
 
+    // OPTIMISTIC UPDATE
+    // 1. Find Active Reservation & Mark Finalized
+    const activeRes = currentReservationsList.find(r =>
+        (String(r.habitacionId) === String(roomId) || String(r.habitacionNumero) === String(roomId)) &&
+        (r.estado === 'Activa' || r.estado === 'Ocupada')
+    );
+    if (activeRes) activeRes.estado = 'Finalizada';
+
+    // 2. Mark Room Dirty
+    const room = currentRoomsList.find(r => String(r.id) === String(roomId));
+    if (room) room.estado = 'sucio';
+
+    // 3. Render
+    renderCalendarTimeline(currentRoomsList, currentReservationsList);
+    document.getElementById('modalCheckOut').style.display = 'none';
+
     try {
         const res = await fetch(CONFIG.API_URL, {
             method: 'POST',
@@ -3432,15 +3493,15 @@ async function submitCheckOut() {
 
         if (d.success) {
             showToast('✅ Salida Exitosa');
-            document.getElementById('modalCheckOut').style.display = 'none';
-            loadCalendarView();
-            // TODO: Open Liquidation/Payment Modal here?
-            // For now, just mark Dirty.
+            loadCalendarView(); // Refresh real data
         } else {
+            // Rollback (Simplest is just reload or alert, but let's throw)
             throw new Error(d.error);
         }
     } catch (e) {
-        alert('❌ Error: ' + e.message);
+        showToast('❌ Error: ' + e.message);
+        // If error, we should reload to get true state
+        loadCalendarView();
     } finally {
         btn.innerText = originalText;
         btn.disabled = false;
