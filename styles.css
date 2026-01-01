@@ -1724,3 +1724,62 @@ thead tr th.sticky-col {
     color: var(--primary);
     border-bottom-color: var(--primary);
 }
+
+/* ===== TOAST NOTIFICATION ===== */
+#toast-container {
+    position: fixed;
+    bottom: 30px;
+    right: 30px;
+    /* Non-intrusive */
+    left: auto;
+    z-index: 10000;
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(20px);
+    transition: all 0.3s ease;
+}
+
+#toast-container.show {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
+}
+
+.toast-body {
+    background: #0f172a;
+    /* Slate 900 */
+    color: #f8fafc;
+    padding: 12px 24px;
+    border-radius: 30px;
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 0.95rem;
+    font-weight: 500;
+    border: 1px solid #334155;
+    white-space: nowrap;
+}
+
+/* ===== STOCK ADJUSTMENT ===== */
+.btn-adjust {
+    background: #fff7ed;
+    /* Orange 50 */
+    color: #c2410c;
+    /* Orange 700 */
+    border: 1px solid #fed7aa;
+    /* Orange 200 */
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-adjust:hover {
+    background: #ffedd5;
+    transform: scale(1.05);
+}
