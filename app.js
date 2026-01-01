@@ -798,21 +798,81 @@ function getDateDetails(roomId, dateStr) {
     // If Start is Finalized -> CheckIn-PM Gray? 
     // If End is Finalized -> CheckOut-AM Gray?
     // Complicated if mixing Statuses. Assuming simple dominance for now.
+}
 
-    if (hasStart && hasEnd) return { type: 'full-split', color: 'split' };
+if (hasStart && hasEnd) return { type: 'full-split', color: 'split' };
 
-    if (hasStart) {
-        let col = status === 'occupied' ? 'green' : 'yellow';
-        if (status === 'finalized') col = '#94a3b8';
-        return { type: 'checkin-pm', color: col };
+if (hasStart) {
+    let col = status === 'occupied' ? 'green' : 'yellow';
+    if (status === 'finalized') col = '#94a3b8';
+    return { type: 'checkin-pm', color: col };
+}
+if (hasEnd) {
+    let col = status === 'occupied' ? 'green' : 'yellow';
+    if (status === 'finalized') col = '#94a3b8';
+    return { type: 'checkout-am', color: col };
+}
+
+return { type: 'free', color: 'white' };
+}
+
+// ===== CLEANING LOGIC =====
+async function markRoomClean(id) {
+    if (!confirm('¿Confirmar que la habitación está limpia y lista?')) return;
+
+    // Optimistic Update
+    const r = currentRoomsList.find(r => r.id == id);
+    if (r) r.estado = 'Disponible';
+    renderRooms(currentRoomsList);
+
+    try {
+        const res = await fetch(CONFIG.API_URL, {
+            method: 'POST',
+            body: JSON.stringify({
+                action: 'cleanRoom',
+                habitacionId: id
+            })
+        });
+        const data = await res.json();
+
+        if (data.success) {
+            // alert('✅ Habitación Limpia'); 
+            showToast('Habitación Limpia');
+            loadRoomsView(); // Refresh real state
+        } else {
+            alert('❌ Error: ' + data.error);
+            loadRoomsView(); // Revert
+        }
+    } catch (e) {
+        alert('❌ Error de conexión');
+        console.error(e);
+        loadRoomsView();
     }
-    if (hasEnd) {
-        let col = status === 'occupied' ? 'green' : 'yellow';
-        if (status === 'finalized') col = '#94a3b8';
-        return { type: 'checkout-am', color: col };
-    }
+}
 
-    return { type: 'free', color: 'white' };
+// Helper Toast (Simple implementation if not exists)
+function showToast(msg) {
+    // If we have a toast system use it, otherwise alert
+    // checking if Toast exists in HTML... usually separate component
+    // For now simple console log or alert if needed, but alert interrupts.
+    // Let's create a temporary toast or use existing if any.
+    // Based on previous code, there is no explicit toast function shown in first 800 lines.
+    // Use fallback
+    const toast = document.createElement('div');
+    toast.innerText = msg;
+    toast.style.position = 'fixed';
+    toast.style.bottom = '20px';
+    toast.style.right = '20px';
+    toast.style.background = '#22c55e';
+    toast.style.color = 'white';
+    toast.style.padding = '10px 20px';
+    toast.style.borderRadius = '8px';
+    toast.style.zIndex = '9999';
+    toast.style.boxShadow = '0 4px 6px rgba(0,0,0,0.1)';
+    document.body.appendChild(toast);
+    setTimeout(() => {
+        toast.remove();
+    }, 3000);
 }
 
 function isDateBlocked(roomId, dateStr) {
@@ -2025,6 +2085,14 @@ function changeCalendarDate(days) {
     loadCalendarView();
 }
 
+// Helper for Local YYYY-MM-DD
+function getLocalISODate(d) {
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+}
+
 function renderCalendarTimeline(rooms, reservations) {
     const container = document.getElementById('view-calendar');
 
@@ -2074,8 +2142,8 @@ function renderCalendarTimeline(rooms, reservations) {
                     ${dates.map(d => {
         const dayName = d.toLocaleDateString('es-ES', { weekday: 'short' });
         const dayNum = d.getDate();
-        const fullIso = d.toISOString().split('T')[0];
-        const todayIso = new Date().toISOString().split('T')[0];
+        const fullIso = getLocalISODate(d); // FIXED: Local Date
+        const todayIso = getLocalISODate(new Date()); // FIXED: Local Date
         const isToday = fullIso === todayIso;
 
         return `<th class="sticky-header ${isToday ? 'today-highlight' : ''}" style="padding:10px; text-align:center; border-bottom:2px solid #e2e8f0; font-size:0.85rem; color:#64748B;">
@@ -2099,16 +2167,16 @@ function renderCalendarTimeline(rooms, reservations) {
                     </td>`;
 
         dates.forEach(date => {
-            const isoDate = date.toISOString().split('T')[0];
-            const todayIso = new Date().toISOString().split('T')[0];
+            const isoDate = getLocalISODate(date); // FIXED
+            const todayIso = getLocalISODate(new Date()); // FIXED
             const isToday = isoDate === todayIso;
+            const isPast = isoDate < todayIso;
 
             // Highlight Column & Dirty Logic
             let tdClass = isToday ? 'cell-today-col' : '';
 
             // Dirty Pattern (Only for empty slots in Today/Future)
             const isDirty = (r.estado || '').toLowerCase() === 'sucio';
-            const isPast = isoDate < todayIso;
 
             // Logic for Reservation Matching
             let activeRes = null;
@@ -2122,11 +2190,18 @@ function renderCalendarTimeline(rooms, reservations) {
                 if (String(res.habitacionId) !== String(r.id) && String(res.habitacionId) !== String(r.numero)) return false;
                 if (res.estado === 'Cancelada') return false;
 
-                // S/E Robust Parsing
+                // S/E Robust Parsing (Handling Timezones)
                 let s, e;
                 try {
-                    s = new Date(res.fechaEntrada).toISOString().split('T')[0];
-                    e = new Date(res.fechaSalida).toISOString().split('T')[0];
+                    // Backend returns ISO string. 
+                    // To handle "date" consistently, we need to map Reservation dates to LOCAL YYYY-MM-DD
+                    // BUT Backend "checkin" stores them as UTC moments.
+                    // If stored as "2024-01-01T19:00:00Z" (for 14:00 Local), 
+                    // new Date(str) -> Local Date Object (Jan 1 14:00).
+                    // getLocalISODate -> "2024-01-01". CORRECT.
+
+                    s = getLocalISODate(new Date(res.fechaEntrada));
+                    e = getLocalISODate(new Date(res.fechaSalida));
                 } catch (err) { return false; }
 
                 return isoDate >= s && isoDate <= e;
@@ -2136,8 +2211,8 @@ function renderCalendarTimeline(rooms, reservations) {
                 const res = matches[0];
                 barId = res.id;
 
-                let s = new Date(res.fechaEntrada).toISOString().split('T')[0];
-                let e = new Date(res.fechaSalida).toISOString().split('T')[0];
+                let s = getLocalISODate(new Date(res.fechaEntrada));
+                let e = getLocalISODate(new Date(res.fechaSalida));
 
                 // Color Logic
                 let col = colorFuture; // Default Yellow
@@ -2158,7 +2233,7 @@ function renderCalendarTimeline(rooms, reservations) {
                 } else {
                     barType = 'res-bar-mid';
                     // Repeat name if it's the first visible day of a long booking
-                    if (isoDate === dates[0].toISOString().split('T')[0]) {
+                    if (isoDate === getLocalISODate(dates[0])) {
                         barLabel = (res.cliente || '').split(' ')[0];
                     }
                 }
