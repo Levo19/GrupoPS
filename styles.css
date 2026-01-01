@@ -1783,3 +1783,72 @@ thead tr th.sticky-col {
     background: #ffedd5;
     transform: scale(1.05);
 }
+
+/* ===== VISUAL POLISH (PHASE 10) ===== */
+
+/* 1. Row Highlight */
+.calendar-row:hover {
+    background-color: rgba(31, 41, 55, 0.03);
+    /* Subtle dark overlay */
+    transition: background-color 0.1s;
+}
+
+/* 2. Today Column Highlight */
+.cell-today-col {
+    background-color: rgba(13, 148, 136, 0.05) !important;
+    border-left: 2px solid rgba(13, 148, 136, 0.3) !important;
+    border-right: 2px solid rgba(13, 148, 136, 0.3) !important;
+}
+
+/* 3. Global Dirty Pattern (Stripes) */
+.cell-dirty-pattern {
+    background: repeating-linear-gradient(45deg,
+            #f1f5f9,
+            #f1f5f9 10px,
+            #cbd5e1 10px,
+            #cbd5e1 12px) !important;
+    cursor: not-allowed;
+    position: relative;
+    border: 1px dashed #94a3b8;
+}
+
+.cell-dirty-pattern::after {
+    content: '⚠️';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 0.8rem;
+    opacity: 0.7;
+}
+
+/* 4. Advanced Tooltip */
+.res-tooltip {
+    position: absolute;
+    background: #1e293b;
+    /* Slate 800 */
+    color: white;
+    padding: 10px 14px;
+    border-radius: 8px;
+    font-size: 0.8rem;
+    z-index: 1000;
+    pointer-events: none;
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3);
+    white-space: nowrap;
+    display: none;
+    /* Controlled by JS */
+    border: 1px solid #475569;
+    text-align: left;
+    line-height: 1.4;
+}
+
+.res-tooltip strong {
+    color: #38bdf8;
+    /* Sky 400 */
+    display: block;
+    margin-bottom: 2px;
+    font-size: 0.9rem;
+    border-bottom: 1px solid #334155;
+    padding-bottom: 3px;
+    margin-bottom: 5px;
+}
