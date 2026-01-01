@@ -428,10 +428,24 @@
                     </div>
                 </div>
 
+                <!-- Image Upload Section -->
                 <div class="form-group">
-                    <label class="form-label" style="color:#64748B;">URL Imagen</label>
-                    <input type="text" id="editProdImg" class="form-input"
-                        style="color:black; background:#f1f5f9; border:1px solid #cbd5e1;">
+                    <label class="form-label" style="color:#64748B;">Imagen del Producto</label>
+                    <div style="display:flex; gap:10px; align-items:center;">
+                        <input type="file" id="editProdFile" accept="image/*" class="form-input"
+                            style="color:black; background:#f1f5f9; border:1px solid #cbd5e1; padding:8px;"
+                            onchange="previewImageUpload(this)">
+
+                        <!-- Hidden input to store the actual URL (existing or new) -->
+                        <input type="hidden" id="editProdImg">
+                    </div>
+
+                    <!-- Preview -->
+                    <div id="imagePreviewContainer" style="margin-top:10px; display:none; text-align:center;">
+                        <img id="imgPreview" src=""
+                            style="max-width:100px; max-height:100px; border-radius:8px; border:1px solid #ddd; padding:2px;">
+                        <div style="font-size:0.7rem; color:#64748B;">Vista previa</div>
+                    </div>
                 </div>
 
                 <div style="display:grid; grid-template-columns: 1fr 1fr; gap:15px;">
