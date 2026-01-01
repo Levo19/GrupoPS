@@ -959,77 +959,21 @@ function renderDatePicker() {
 // checkInMode is defined at global scope
 
 
-window.openCheckIn = function (roomId, roomNum) {
+
+// Restore openCheckIn for top-bar button
+function openCheckIn(roomId, roomNum) {
     checkInMode = 'checkin';
+    // Use the Legacy Modal for Walk-Ins (Room Selection support)
+    // Or redirect to new logic? 
+    // For now, keep legacy modal for Walk-In as it handles "Choose Room".
     const title = document.getElementById('modalTitleCheckIn');
     const btn = document.getElementById('btnSubmitCheckIn');
     if (title) title.innerHTML = '🏨 Check-In (Ingreso)';
     if (btn) {
         btn.innerText = 'Confirmar Ingreso';
-        btn.style.background = 'var(--accent)'; // Orange/Red
+        btn.style.background = 'var(--accent)';
     }
     setupCheckInModal(roomId, roomNum, null);
-}
-
-window.openReservation = function (roomId, roomNum, startDate, clientName, isExtension = false) {
-    checkInMode = isExtension ? 'extension' : 'reservation';
-    const title = document.getElementById('modalTitleCheckIn');
-    const btn = document.getElementById('btnSubmitCheckIn');
-
-    if (title) {
-        title.innerHTML = isExtension ? '🔄 Extender Estadía (Continuar)' : '📅 Nueva Reserva';
-    }
-
-    if (btn) {
-        btn.innerText = isExtension ? 'Confirmar Extensión' : 'Crear Reserva';
-        // Force Green if Extension (#22c55e), Yellow if Reserve (#eab308)
-        btn.style.background = isExtension ? '#22c55e' : '#eab308';
-        btn.style.color = 'white';
-    }
-
-    // Determine correct Start Date for Extension (Active CheckOut)
-    let finalStartDate = startDate;
-    if (isExtension) {
-        // Find active reservation check-out date
-        const activeRes = currentReservationsList.find(res =>
-            (String(res.habitacionId) === String(roomId) || String(res.habitacionId) === String(roomNum)) &&
-            (res.estado === 'Activa' || res.estado === 'Ocupada')
-        );
-        if (activeRes) {
-            // Cut off time part if exists
-            finalStartDate = activeRes.fechaSalida.split(' ')[0] || activeRes.fechaSalida.substring(0, 10);
-        }
-    }
-
-    setupCheckInModal(roomId, roomNum, finalStartDate);
-
-    // Pre-fill Client Name if provided (e.g. extending stay)
-    // Must be done AFTER setupCheckInModal because it calls form.reset()
-    const clientInput = document.getElementById('checkInCliente');
-    if (clientInput && clientName) {
-        clientInput.value = clientName;
-        // Lock Client Name if Extension
-        if (isExtension) {
-            clientInput.readOnly = true;
-            clientInput.style.backgroundColor = '#e2e8f0'; // Gray out
-            clientInput.title = "El nombre no se puede cambiar en una extensión.";
-        } else {
-            clientInput.readOnly = false;
-            clientInput.style.backgroundColor = '';
-        }
-    }
-
-    // Lock Start Date Logic if Extension
-    // We handle this by setting picker state but we might need UI feedback or just prevent changing start.
-    // For now, relies on user picking End Date, but if they click another start... 
-    // Ideally we lock the start in the picker.
-    if (isExtension && finalStartDate) {
-        // We can visualize this lock in renderDatePicker if needed, 
-        // or just rely on 'Locked Start' class if we add it.
-        // Let's manually trigger the picker's "First click" state?
-        // This requires exposing the picker state. 
-        // Simplest: Just inform user "Seleccione la nueva fecha de salida".
-    }
 }
 
 function setupCheckInModal(roomId, roomNum, preSelectedDate) {
