@@ -1796,7 +1796,7 @@ function renderProducts(products) {
             </td>
             <td style="padding:15px;"><span style="color:${catColor}; font-weight:bold;">${p.categoria}</span></td>
             
-            <td style="padding:15px;">S/ ${p.precio}</td>
+            <td style="padding:15px;">S/ ${Number(p.precio).toFixed(2)}</td>
             <td style="padding:15px; font-weight:bold;">${p.stock}</td>
             <td style="padding:15px;">${p.activo}</td>
 
