@@ -1003,7 +1003,123 @@
         </div>
     </div>
 
-    <!-- TOAST CONTAINER -->
+    <!-- ===== PHASE 6: CALENDAR MODALS ===== -->
+
+    <!-- MODAL: RESERVATION (NEW & EXTEND) -->
+    <div id="modalReservation" class="modal-overlay">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h2 id="resModalTitle" style="color:var(--primary);"><i class="fas fa-calendar-alt"></i> Nueva Reserva
+                </h2>
+                <button onclick="document.getElementById('modalReservation').style.display='none'"
+                    class="close-btn">&times;</button>
+            </div>
+
+            <input type="hidden" id="resRoomId">
+            <input type="hidden" id="resIsExtension" value="false">
+
+            <div class="form-group">
+                <label>Habitación</label>
+                <input type="text" id="resRoomNum" class="form-input" readonly
+                    style="background:#f1f5f9; color:#64748B;">
+            </div>
+
+            <div class="form-group">
+                <label>Cliente / Huésped</label>
+                <input type="text" id="resClient" class="form-input" placeholder="Nombre completo">
+            </div>
+
+            <div id="resDateContainer" style="display:grid; grid-template-columns: 1fr 1fr; gap:15px;">
+                <div class="form-group">
+                    <label>Fecha Llegada</label>
+                    <input type="date" id="resInDate" class="form-input">
+                </div>
+                <div class="form-group">
+                    <label>Fecha Salida</label>
+                    <input type="date" id="resOutDate" class="form-input">
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>Notas</label>
+                <textarea id="resNotes" class="form-input" placeholder="Detalles, adelantos, etc..."></textarea>
+            </div>
+
+            <div class="modal-footer">
+                <button onclick="document.getElementById('modalReservation').style.display='none'"
+                    class="btn-cancel">Cancelar</button>
+                <button onclick="submitReservation()" class="btn-submit">Guardar Reserva</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: CHECK-IN (WALK-IN) -->
+    <div id="modalCheckIn" class="modal-overlay">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h2 style="color:#22c55e;"><i class="fas fa-check-circle"></i> Check-In Inmediato</h2>
+                <button onclick="document.getElementById('modalCheckIn').style.display='none'"
+                    class="close-btn">&times;</button>
+            </div>
+
+            <input type="hidden" id="ciRoomId">
+
+            <div
+                style="background:#f0fdf4; padding:15px; border-radius:8px; border:1px solid #bbf7d0; margin-bottom:15px;">
+                <h3 id="ciRoomDisplay" style="margin:0; color:#166534;">Habitación 101</h3>
+                <p style="margin:5px 0 0 0; font-size:0.9rem; color:#15803d;">Entrada inmediata. El estado cambiará a
+                    <strong>OCUPADO</strong>.</p>
+            </div>
+
+            <div class="form-group">
+                <label>Nombre del Huésped</label>
+                <input type="text" id="ciClient" class="form-input" placeholder="Nombre completo">
+            </div>
+
+            <div class="form-group">
+                <label>Fecha Salida Prevista</label>
+                <input type="date" id="ciOutDate" class="form-input">
+            </div>
+
+            <div class="form-group">
+                <label>Notas</label>
+                <textarea id="ciNotes" class="form-input" placeholder="Opcional"></textarea>
+            </div>
+
+            <div class="modal-footer">
+                <button onclick="document.getElementById('modalCheckIn').style.display='none'"
+                    class="btn-cancel">Cancelar</button>
+                <button onclick="submitCheckIn()" class="btn-submit" style="background:#22c55e;">Confirmar
+                    Ingreso</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: CHECK-OUT -->
+    <div id="modalCheckOut" class="modal-overlay">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h2 style="color:#ef4444;"><i class="fas fa-sign-out-alt"></i> Salida / Check-Out</h2>
+                <button onclick="document.getElementById('modalCheckOut').style.display='none'"
+                    class="close-btn">&times;</button>
+            </div>
+
+            <input type="hidden" id="coRoomId">
+
+            <div style="text-align:center; padding:20px;">
+                <i class="fas fa-concierge-bell" style="font-size:3rem; color:#cbd5e1; margin-bottom:15px;"></i>
+                <p style="font-size:1.1rem; color:#334155;">¿Confirmar salida de la habitación?</p>
+                <p style="color:#64748B; font-size:0.9rem;">El estado cambiará a <strong>LIMPIEZA</strong>.</p>
+            </div>
+
+            <div class="modal-footer">
+                <button onclick="document.getElementById('modalCheckOut').style.display='none'"
+                    class="btn-cancel">Cancelar</button>
+                <button onclick="submitCheckOut()" class="btn-submit" style="background:#ef4444;">Confirmar
+                    Salida</button>
+            </div>
+        </div>
+    </div>
     <div id="toast-container">
         <div class="toast-body">
             <i class="fas fa-check-circle" style="color:#4ade80; font-size:1.2rem;"></i>
