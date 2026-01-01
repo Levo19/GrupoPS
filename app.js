@@ -2088,9 +2088,12 @@ function renderCalendarTimeline(rooms, reservations) {
             <tbody>
     `;
 
+    // Tooltip Helpers (Injected here or global)
+    // We rely on Global showTooltip defined later or inline
+
     rooms.forEach(r => {
-        html += `<tr style="border-bottom:1px solid #f1f5f9;">
-                    <td class="sticky-col" style="padding:15px 10px; font-weight:bold; color:var(--primary); cursor:pointer;" onclick="openRoomDetail('${r.id}')" title="Ver detalle">
+        html += `<tr class="calendar-row" style="border-bottom:1px solid #f1f5f9;">
+                    <td class="sticky-col" style="padding:15px 10px; font-weight:bold; color:var(--primary); cursor:pointer;" onclick="openRoomDetail('${r.id}')" onmouseenter="showTooltip(event, 'Habitación ${r.numero}<br><small>${r.tipo}</small>')" onmouseleave="hideTooltip()">
                         ${r.numero} <br>
                         <span style="font-size:0.7rem; color:#94a3b8; font-weight:normal;">${r.tipo}</span>
                     </td>`;
@@ -2100,8 +2103,12 @@ function renderCalendarTimeline(rooms, reservations) {
             const todayIso = new Date().toISOString().split('T')[0];
             const isToday = isoDate === todayIso;
 
-            // Highlight Column
-            const tdClass = isToday ? 'today-highlight' : '';
+            // Highlight Column & Dirty Logic
+            let tdClass = isToday ? 'cell-today-col' : '';
+
+            // Dirty Pattern (Only for empty slots in Today/Future)
+            const isDirty = (r.estado || '').toLowerCase() === 'sucio';
+            const isPast = isoDate < todayIso;
 
             // Logic for Reservation Matching
             let activeRes = null;
@@ -2158,15 +2165,33 @@ function renderCalendarTimeline(rooms, reservations) {
 
                 if (!barLabel && barType === 'res-bar-single') barLabel = (res.cliente || '').split(' ')[0];
 
+                const tooltipHtml = `<strong>${res.cliente}</strong>Status: ${res.estado}<br>${res.notas || ''}`;
+
                 html += `<td class="${tdClass}" style="padding:5px;">
-                            <div class="res-bar-base ${barType}" style="background:${barColor};" onclick="openReservationDetail('${barId}')" title="${res.cliente} (${res.estado})">
+                            <div class="res-bar-base ${barType}" style="background:${barColor};" 
+                                 onclick="openReservationDetail('${barId}')" 
+                                 onmouseenter="showTooltip(event, '${tooltipHtml}')" 
+                                 onmouseleave="hideTooltip()">
                                 ${barLabel}
                             </div>
                          </td>`;
             } else {
                 // Empty - Click to add new
+                // If Dirty and Today/Future -> Add Pattern
+                let cellInnerClass = "cell-hover";
+                let dirtyAttr = "";
+
+                if (isDirty && !isPast) {
+                    cellInnerClass += " cell-dirty-pattern";
+                    dirtyAttr = `data-dirty="true"`;
+                }
+
                 html += `<td class="${tdClass}" style="padding:5px; text-align:center;">
-                            <div onclick="openNewReservation('${r.id}', '${r.numero}', '${isoDate}')" style="height:30px; border-radius:6px; cursor:pointer;" class="cell-hover" title="Nueva Reserva"></div>
+                            <div onclick="openNewReservation('${r.id}', '${r.numero}', '${isoDate}')" 
+                                 style="height:30px; border-radius:6px; cursor:pointer;" 
+                                 class="${cellInnerClass}" 
+                                 title="${isDirty && !isPast ? '⚠️ Limpieza Requerida' : 'Nueva Reserva'}"
+                                 ${dirtyAttr}></div>
                         </td>`;
             }
         });
@@ -3465,12 +3490,6 @@ async function submitCheckOut() {
     btn.innerText = 'Procesando...';
     btn.disabled = true;
 
-    // OPTIMISTIC UPDATE
-    // 1. Find Active Reservation & Mark Finalized
-    const activeRes = currentReservationsList.find(r =>
-        (String(r.habitacionId) === String(roomId) || String(r.habitacionNumero) === String(roomId)) &&
-        (r.estado === 'Activa' || r.estado === 'Ocupada')
-    );
     if (activeRes) activeRes.estado = 'Finalizada';
 
     // 2. Mark Room Dirty
@@ -3505,5 +3524,43 @@ async function submitCheckOut() {
     } finally {
         btn.innerText = originalText;
         btn.disabled = false;
+    }
+}
+
+// ===== TOOLTIP HELPERS (PHASE 10) =====
+let tooltipEl = null;
+
+function showTooltip(e, htmlContent) {
+    if (!tooltipEl) {
+        tooltipEl = document.createElement('div');
+        tooltipEl.className = 'res-tooltip';
+        document.body.appendChild(tooltipEl);
+    }
+    tooltipEl.innerHTML = htmlContent;
+    tooltipEl.style.display = 'block';
+
+    // Position Initial
+    moveTooltip(e);
+
+    // Track mouse move for this element specifically? 
+    // Or just rely on mouseenter/leave + static position if we don't move it?
+    // User DX: Following mouse is nicer.
+    e.target.onmousemove = moveTooltip;
+}
+
+function moveTooltip(e) {
+    if (!tooltipEl) return;
+    const x = e.clientX;
+    const y = e.clientY;
+
+    // Position above cursor with offset
+    // Check boundaries if needed, but for now simple offset
+    tooltipEl.style.left = (x) + 'px';
+    tooltipEl.style.top = (y - 10) + 'px';
+}
+
+function hideTooltip() {
+    if (tooltipEl) {
+        tooltipEl.style.display = 'none';
     }
 }
