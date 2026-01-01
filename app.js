@@ -2868,8 +2868,7 @@ async function submitStockAdjustment() {
 }
 
 
-    // ... (rest of stock adjust logic) ...
-}
+
 
 // ===== UTILS: UI ROBUSTNESS =====
 
