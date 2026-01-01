@@ -1071,7 +1071,7 @@ function setupCheckInModal(roomId, roomNum, preSelectedDate) {
 
         // Populate
         let ops = '<option value="" disabled selected>-- Elija Habitación --</option>';
-        if (typeof currentRoomsList !== 'undefined' && currentRoomsList.length > 0) {
+        if (currentRoomsList && currentRoomsList.length > 0) {
             let count = 0;
             currentRoomsList.forEach(r => {
                 // Strict Filter for Check-In Mode
