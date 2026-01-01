@@ -1795,6 +1795,10 @@ function renderProducts(products) {
                 <div style="font-size:0.8rem; color:#94a3b8;">${p.descripcion || ''}</div>
             </td>
             <td style="padding:15px;"><span style="color:${catColor}; font-weight:bold;">${p.categoria}</span></td>
+            
+            <td style="padding:15px;">S/ ${p.precio}</td>
+            <td style="padding:15px; font-weight:bold;">${p.stock}</td>
+            <td style="padding:15px;">${p.activo}</td>
 
             <td style="padding:15px; display:flex; gap:10px;">
                 <button class="btn-icon" onclick="openProductAnalysis('${p.id}')" title="Análisis Logístico" style="color:#0ea5e9; background:#f0f9ff;"><i class="fas fa-chart-line"></i></button>
