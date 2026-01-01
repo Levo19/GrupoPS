@@ -3035,4 +3035,241 @@ document.addEventListener('DOMContentLoaded', () => {
     setupSafeModalClose('modalProductEditor', 'closeProductEditor');
     setupSafeModalClose('modalProductAnalysis', 'closeProductAnalysis'); // Assuming this exists or simple hide
     setupSafeModalClose('modalStockAdjustment', null); // Default hide
+    setupSafeModalClose('modalReservation', null);
+    setupSafeModalClose('modalCheckIn', null);
+    setupSafeModalClose('modalCheckOut', null);
 });
+
+
+// ===== PHASE 6: CALENDAR INTERACTION LOGIC =====
+
+// 1. RESERVATION FLOW (New & Extend)
+function openReservation(roomId, roomNum, date, existingClient, isExtension = false) {
+    if (!roomId) return console.error('Missing roomId for reservation');
+
+    // UI Setup
+    document.getElementById('modalReservation').style.display = 'flex';
+    document.getElementById('resRoomId').value = roomId;
+    document.getElementById('resRoomNum').value = roomNum || 'Habitación ' + roomId;
+    document.getElementById('resIsExtension').value = isExtension;
+
+    const title = document.getElementById('resModalTitle');
+    const btn = document.querySelector('#modalReservation .btn-submit');
+    const clientInput = document.getElementById('resClient');
+
+    // Dates
+    const inDate = document.getElementById('resInDate');
+    const outDate = document.getElementById('resOutDate');
+
+    if (isExtension) {
+        title.innerHTML = '<i class="fas fa-calendar-plus"></i> Extender Estadía';
+        btn.innerText = 'Confirmar Extensión';
+
+        // Locked fields
+        clientInput.value = existingClient || '';
+        clientInput.disabled = true;
+        inDate.disabled = true; // Can't change start of active reservation
+
+        // Set context (we don't know exact start here easily without lookup, but backend handles it)
+        // We only care about NEW End Date.
+        // For UI, maybe just show Today as start? Or leave blank?
+        // Better: Set Start to Today (reference) and End to Tomorrow
+        inDate.valueAsDate = new Date();
+        const tmr = new Date();
+        tmr.setDate(tmr.getDate() + 1);
+        outDate.valueAsDate = tmr;
+
+    } else {
+        title.innerHTML = '<i class="fas fa-calendar-alt"></i> Nueva Reserva';
+        btn.innerText = 'Guardar Reserva';
+
+        clientInput.value = '';
+        clientInput.disabled = false;
+        inDate.disabled = false;
+
+        // Date Logic
+        if (date) {
+            inDate.value = date;
+            // Default 1 night
+            const d = new Date(date);
+            d.setDate(d.getDate() + 1); // +1 day
+            d.setHours(d.getHours() + 5); // Timezone safety fix
+            outDate.value = d.toISOString().split('T')[0];
+        } else {
+            inDate.valueAsDate = new Date();
+            const tmr = new Date();
+            tmr.setDate(tmr.getDate() + 1);
+            outDate.valueAsDate = tmr;
+        }
+    }
+}
+
+async function submitReservation() {
+    const roomId = document.getElementById('resRoomId').value;
+    const isExtension = document.getElementById('resIsExtension').value === 'true';
+    const notes = document.getElementById('resNotes').value;
+
+    // UI Feedback
+    const btn = document.querySelector('#modalReservation .btn-submit');
+    const originalText = btn.innerText;
+    btn.innerText = 'Procesando...';
+    btn.disabled = true;
+
+    try {
+        if (isExtension) {
+            const newEnd = document.getElementById('resOutDate').value; // Only verify End Date
+            if (!newEnd) throw new Error('Selecciona nueva fecha de salida');
+
+            const res = await fetch(CONFIG.API_URL, {
+                method: 'POST',
+                body: JSON.stringify({
+                    action: 'extendReservation',
+                    habitacionId: roomId,
+                    newCheckOutDate: newEnd,
+                    notas: notes
+                })
+            });
+            const d = await res.json();
+            if (!d.success) throw new Error(d.error);
+            showToast('✅ Estadía Extendida');
+
+        } else {
+            // New Reservation
+            const client = document.getElementById('resClient').value;
+            const start = document.getElementById('resInDate').value;
+            const end = document.getElementById('resOutDate').value;
+
+            if (!client || !start || !end) throw new Error('Completa todos los campos');
+
+            const res = await fetch(CONFIG.API_URL, {
+                method: 'POST',
+                body: JSON.stringify({
+                    action: 'checkIn', // We use checkIn endpoint with flag
+                    habitacionId: roomId,
+                    cliente: client,
+                    fechaEntrada: start,
+                    fechaSalida: end,
+                    notas: notes,
+                    isReservation: true // <--- Critical Flag
+                })
+            });
+            const d = await res.json();
+            if (!d.success) throw new Error(d.error);
+            showToast('✅ Reserva Creada');
+        }
+
+        document.getElementById('modalReservation').style.display = 'none';
+        loadCalendarView(); // Refresh Calendar
+        // Also refresh rooms view to sync badges?
+        // loadRoomsView(); 
+
+    } catch (e) {
+        alert('❌ Error: ' + e.message);
+    } finally {
+        btn.innerText = originalText;
+        btn.disabled = false;
+    }
+}
+
+// 2. CHECK-IN FLOW (Walk-In)
+function openCheckIn(roomId, roomNum) {
+    document.getElementById('modalCheckIn').style.display = 'flex';
+    document.getElementById('ciRoomId').value = roomId;
+    document.getElementById('ciRoomDisplay').innerText = roomNum ? `Habitación ${roomNum}` : 'Habitación Selecciónada';
+
+    document.getElementById('ciClient').value = '';
+
+    // Default checkout tomorrow
+    const tmr = new Date();
+    tmr.setDate(tmr.getDate() + 1);
+    document.getElementById('ciOutDate').valueAsDate = tmr;
+}
+
+async function submitCheckIn() {
+    const roomId = document.getElementById('ciRoomId').value;
+    const client = document.getElementById('ciClient').value;
+    const end = document.getElementById('ciOutDate').value;
+    const notes = document.getElementById('ciNotes').value;
+
+    if (!client || !end) return alert('Completa los campos obligatorios');
+
+    // Feedback
+    const btn = document.querySelector('#modalCheckIn .btn-submit');
+    const originalText = btn.innerText;
+    btn.innerText = 'Registrando...';
+    btn.disabled = true;
+
+    try {
+        // Start date is TODAY/NOW automatically in backend for Check-In
+        const res = await fetch(CONFIG.API_URL, {
+            method: 'POST',
+            body: JSON.stringify({
+                action: 'checkIn',
+                habitacionId: roomId,
+                cliente: client,
+                fechaEntrada: new Date().toISOString().split('T')[0], // Today
+                fechaSalida: end,
+                notas: notes,
+                isReservation: false // Immediate Occupancy
+            })
+        });
+        const d = await res.json();
+
+        if (d.success) {
+            showToast('✅ Bienvenida/o Realizada');
+            document.getElementById('modalCheckIn').style.display = 'none';
+            // Refresh Both Views (Calendar + Rooms)
+            loadCalendarView();
+            // If we are on calendar view, Rooms View might not strictly need refresh unless we switch.
+            // But good practice.
+        } else {
+            throw new Error(d.error);
+        }
+    } catch (e) {
+        alert('❌ Error: ' + e.message);
+    } finally {
+        btn.innerText = originalText;
+        btn.disabled = false;
+    }
+}
+
+// 3. CHECK-OUT FLOW
+function openCheckOut(roomId) {
+    document.getElementById('modalCheckOut').style.display = 'flex';
+    document.getElementById('coRoomId').value = roomId;
+}
+
+async function submitCheckOut() {
+    const roomId = document.getElementById('coRoomId').value;
+
+    const btn = document.querySelector('#modalCheckOut .btn-submit');
+    const originalText = btn.innerText;
+    btn.innerText = 'Procesando...';
+    btn.disabled = true;
+
+    try {
+        const res = await fetch(CONFIG.API_URL, {
+            method: 'POST',
+            body: JSON.stringify({
+                action: 'checkOut',
+                habitacionId: roomId
+            })
+        });
+        const d = await res.json();
+
+        if (d.success) {
+            showToast('✅ Salida Exitosa');
+            document.getElementById('modalCheckOut').style.display = 'none';
+            loadCalendarView();
+            // TODO: Open Liquidation/Payment Modal here?
+            // For now, just mark Dirty.
+        } else {
+            throw new Error(d.error);
+        }
+    } catch (e) {
+        alert('❌ Error: ' + e.message);
+    } finally {
+        btn.innerText = originalText;
+        btn.disabled = false;
+    }
+}
