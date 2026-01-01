@@ -2301,6 +2301,8 @@ function renderFinanceTable(type) {
     const tbody = document.getElementById('financeTbody');
     const r = currentFinanceReport;
 
+    if (!r) return; // Guard: Data not loaded yet
+
     if (type === 'ingresos') {
         thead.innerHTML = `
             <tr>
@@ -2909,3 +2911,4 @@ document.addEventListener('DOMContentLoaded', () => {
     setupSafeModalClose('modalProductAnalysis', 'closeProductAnalysis'); // Assuming this exists or simple hide
     setupSafeModalClose('modalStockAdjustment', null); // Default hide
 });
+
