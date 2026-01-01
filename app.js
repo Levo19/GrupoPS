@@ -2867,3 +2867,46 @@ async function submitStockAdjustment() {
     } catch (e) { alert('Error de conexión'); }
 }
 
+
+    // ... (rest of stock adjust logic) ...
+}
+
+// ===== UTILS: UI ROBUSTNESS =====
+
+// Fix for "Text Selection closes Modal" issue
+// Instead of simple onclick, we track mousedown to ensure it started on backdrop
+function setupSafeModalClose(modalId, closeFn) {
+    const modal = document.getElementById(modalId);
+    if (!modal) return;
+
+    let isMouseDownOnBackdrop = false;
+
+    modal.addEventListener('mousedown', (e) => {
+        if (e.target === modal) {
+            isMouseDownOnBackdrop = true;
+        } else {
+            isMouseDownOnBackdrop = false;
+        }
+    });
+
+    modal.addEventListener('mouseup', (e) => {
+        if (e.target === modal && isMouseDownOnBackdrop) {
+            // Only close if started AND ended on backdrop
+            // Also check if text selection exists? Usually not needed if we check strict target.
+            // But dragging out from input will fail 'mousedown on backdrop' check (good).
+            window[closeFn] ? window[closeFn]() : (modal.style.display = 'none');
+        }
+        isMouseDownOnBackdrop = false; // Reset
+    });
+
+    // Remove the old aggressive onclick
+    modal.onclick = null;
+}
+
+// Initialize Safe Closers
+document.addEventListener('DOMContentLoaded', () => {
+    // We can call this for known modals
+    setupSafeModalClose('modalProductEditor', 'closeProductEditor');
+    setupSafeModalClose('modalProductAnalysis', 'closeProductAnalysis'); // Assuming this exists or simple hide
+    setupSafeModalClose('modalStockAdjustment', null); // Default hide
+});
