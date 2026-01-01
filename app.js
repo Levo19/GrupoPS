@@ -3236,8 +3236,15 @@ function openReservation(roomId, roomNum, date, existingClient, mode = 'new', ex
         clientInput.disabled = false;
         inDate.disabled = false;
 
-        if (date) inDate.value = date;
-        if (currentEnd) outDate.value = currentEnd;
+        // Ensure YYYY-MM-DD
+        if (date) {
+            try { inDate.value = new Date(date).toISOString().split('T')[0]; }
+            catch (e) { inDate.value = date.substring(0, 10); }
+        }
+        if (currentEnd) {
+            try { outDate.value = new Date(currentEnd).toISOString().split('T')[0]; }
+            catch (e) { outDate.value = currentEnd.substring(0, 10); }
+        }
 
         document.getElementById('resNotes').value = '';
 
