@@ -1025,6 +1025,7 @@ function renderDatePicker() {
 
 // Restore openCheckIn for top-bar button
 function openCheckIn(roomId, roomNum) {
+    console.log("OpenCheckIn ID:", roomId);
     checkInMode = 'checkin';
     // Use the Legacy Modal for Walk-Ins (Room Selection support)
     // Or redirect to new logic? 
@@ -1055,7 +1056,7 @@ function setupCheckInModal(roomId, roomNum, preSelectedDate) {
         roomIdInput.value = roomId;
         roomLabel.innerText = 'Habitación ' + roomNum;
         roomLabel.style.display = 'inline-block';
-        roomSelect.style.display = 'none';
+        roomSelect.style.setProperty('display', 'none', 'important');
 
         // Init Picker for Room
         initDatePicker(roomId, preSelectedDate);
