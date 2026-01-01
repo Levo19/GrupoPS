@@ -798,22 +798,21 @@ function getDateDetails(roomId, dateStr) {
     // If Start is Finalized -> CheckIn-PM Gray? 
     // If End is Finalized -> CheckOut-AM Gray?
     // Complicated if mixing Statuses. Assuming simple dominance for now.
-}
 
-if (hasStart && hasEnd) return { type: 'full-split', color: 'split' };
+    if (hasStart && hasEnd) return { type: 'full-split', color: 'split' };
 
-if (hasStart) {
-    let col = status === 'occupied' ? 'green' : 'yellow';
-    if (status === 'finalized') col = '#94a3b8';
-    return { type: 'checkin-pm', color: col };
-}
-if (hasEnd) {
-    let col = status === 'occupied' ? 'green' : 'yellow';
-    if (status === 'finalized') col = '#94a3b8';
-    return { type: 'checkout-am', color: col };
-}
+    if (hasStart) {
+        let col = status === 'occupied' ? 'green' : 'yellow';
+        if (status === 'finalized') col = '#94a3b8';
+        return { type: 'checkin-pm', color: col };
+    }
+    if (hasEnd) {
+        let col = status === 'occupied' ? 'green' : 'yellow';
+        if (status === 'finalized') col = '#94a3b8';
+        return { type: 'checkout-am', color: col };
+    }
 
-return { type: 'free', color: 'white' };
+    return { type: 'free', color: 'white' };
 }
 
 // ===== CLEANING LOGIC =====
