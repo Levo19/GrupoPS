@@ -1072,15 +1072,20 @@ function setupCheckInModal(roomId, roomNum, preSelectedDate) {
         // Populate
         let ops = '<option value="" disabled selected>-- Elija Habitación --</option>';
         if (typeof currentRoomsList !== 'undefined' && currentRoomsList.length > 0) {
+            let count = 0;
             currentRoomsList.forEach(r => {
                 // Strict Filter for Check-In Mode
                 if (checkInMode === 'checkin' && (r.estado === 'Ocupado' || r.estado === 'Sucio')) return;
 
                 ops += `<option value="${r.id}">Hab. ${r.numero} - ${r.tipo} (S/ ${r.precio})</option>`;
+                count++;
             });
+            if (count === 0) ops += '<option disabled>Sin habitaciones disponibles</option>';
         } else {
-            ops += '<option disabled>Cargando habitaciones...</option>';
+            ops += '<option disabled>Error: Datos no cargados. Reintentando...</option>';
+            setTimeout(() => loadRoomsView(), 500);
         }
+
         roomSelect.innerHTML = ops;
 
         // On Change -> Update Picker Blocks
