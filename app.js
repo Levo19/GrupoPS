@@ -1041,68 +1041,73 @@ function openCheckIn(roomId, roomNum) {
 }
 
 function setupCheckInModal(roomId, roomNum, preSelectedDate) {
-    // console.log("Setup CheckIn: ", roomId); 
-    const form = document.getElementById('formCheckIn');
-    form.reset();
+    try {
+        // console.log("Setup CheckIn: ", roomId); 
+        const form = document.getElementById('formCheckIn');
+        form.reset();
 
-    // UI Elements
-    const roomLabel = document.getElementById('checkInRoomNum');
-    if (!roomId) roomLabel.style.display = 'none'; // Pre-emptive hide
-    const roomSelect = document.getElementById('checkInRoomSelect');
-    const roomIdInput = document.getElementById('checkInRoomId');
+        // UI Elements
+        const roomLabel = document.getElementById('checkInRoomNum');
+        if (!roomId) roomLabel.style.display = 'none'; // Pre-emptive hide
+        const roomSelect = document.getElementById('checkInRoomSelect');
+        const roomIdInput = document.getElementById('checkInRoomId');
 
-    // 1. Setup Room Selection
-    if (roomId) {
-        roomIdInput.value = roomId;
-        roomLabel.innerText = 'Habitación ' + roomNum;
-        roomLabel.style.display = 'inline-block';
-        roomSelect.style.setProperty('display', 'none', 'important');
+        // 1. Setup Room Selection
+        if (roomId) {
+            roomIdInput.value = roomId;
+            roomLabel.innerText = 'Habitación ' + roomNum;
+            roomLabel.style.display = 'inline-block';
+            roomSelect.style.setProperty('display', 'none', 'important');
 
-        // Init Picker for Room
-        initDatePicker(roomId, preSelectedDate);
-    } else {
-        // GLOBAL (No ID)
-        roomIdInput.value = '';
-        roomLabel.innerText = '';
-        roomLabel.style.display = 'none';
-
-        roomSelect.style.display = 'block';
-        roomSelect.value = ""; // Reset selection
-
-        // Populate
-        let ops = '<option value="" disabled selected>-- Elija Habitación --</option>';
-        if (currentRoomsList && currentRoomsList.length > 0) {
-            let count = 0;
-            currentRoomsList.forEach(r => {
-                // Strict Filter for Check-In Mode
-                if (checkInMode === 'checkin' && (r.estado === 'Ocupado' || r.estado === 'Sucio')) return;
-
-                ops += `<option value="${r.id}">Hab. ${r.numero} - ${r.tipo} (S/ ${r.precio})</option>`;
-                count++;
-            });
-            if (count === 0) ops += '<option disabled>Sin habitaciones disponibles</option>';
+            // Init Picker for Room
+            initDatePicker(roomId, preSelectedDate);
         } else {
-            ops += '<option disabled>Error: Datos no cargados. Reintentando...</option>';
-            setTimeout(() => loadRoomsView(), 500);
+            // GLOBAL (No ID)
+            roomIdInput.value = '';
+            roomLabel.innerText = '';
+            roomLabel.style.display = 'none';
+
+            roomSelect.style.display = 'block';
+            roomSelect.value = ""; // Reset selection
+
+            // Populate
+            let ops = '<option value="" disabled selected>-- Elija Habitación --</option>';
+            if (currentRoomsList && Array.isArray(currentRoomsList) && currentRoomsList.length > 0) {
+                let count = 0;
+                currentRoomsList.forEach(r => {
+                    // Strict Filter for Check-In Mode
+                    if (checkInMode === 'checkin' && (r.estado === 'Ocupado' || r.estado === 'Sucio')) return;
+
+                    ops += `<option value="${r.id}">Hab. ${r.numero} - ${r.tipo} (S/ ${r.precio})</option>`;
+                    count++;
+                });
+                if (count === 0) ops += '<option disabled>Sin habitaciones disponibles</option>';
+            } else {
+                ops += '<option disabled>Error: Datos no cargados. Reintentando...</option>';
+                setTimeout(() => loadRoomsView(), 500);
+            }
+
+            roomSelect.innerHTML = ops;
+
+            // On Change -> Update Picker Blocks
+            roomSelect.onchange = function () {
+                roomIdInput.value = this.value;
+                // Also update label purely for visual confirmation if needed, but keeping select visible is better
+                initDatePicker(this.value);
+            };
+
+            // Init Empty Picker
+            initDatePicker(null);
         }
 
-        roomSelect.innerHTML = ops;
+        // Ensure blocks are loaded
+        ensureReservationsLoaded();
 
-        // On Change -> Update Picker Blocks
-        roomSelect.onchange = function () {
-            roomIdInput.value = this.value;
-            // Also update label purely for visual confirmation if needed, but keeping select visible is better
-            initDatePicker(this.value);
-        };
-
-        // Init Empty Picker
-        initDatePicker(null);
+        document.getElementById('modalCheckIn').style.display = 'flex';
+    } catch (e) {
+        alert("Error crítico en CheckIn: " + e.message);
+        console.error(e);
     }
-
-    // Ensure blocks are loaded
-    ensureReservationsLoaded();
-
-    document.getElementById('modalCheckIn').style.display = 'flex';
 }
 
 function closeCheckIn() {
