@@ -1796,11 +1796,9 @@ function renderProducts(products) {
             </td>
             <td style="padding:15px;"><span style="color:${catColor}; font-weight:bold;">${p.categoria}</span></td>
 
-            <td style="padding:15px;">S/ ${p.precio}</td>
-            <td style="padding:15px; font-weight:bold;">${p.stock}</td>
-            <td style="padding:15px;">${p.activo}</td>
             <td style="padding:15px; display:flex; gap:10px;">
                 <button class="btn-icon" onclick="openProductAnalysis('${p.id}')" title="Análisis Logístico" style="color:#0ea5e9; background:#f0f9ff;"><i class="fas fa-chart-line"></i></button>
+                <button class="btn-adjust" onclick="openStockAdjustment('${p.id}')" title="Ajuste de Stock"><i class="fas fa-wrench"></i></button>
                 <button class="btn-icon" onclick="editProduct('${p.id}')" title="Editar Producto"><i class="fas fa-edit"></i></button>
             </td>
         </tr>
@@ -2769,9 +2767,96 @@ async function saveAnalyzedPrice() {
         });
         const d = await res.json();
         if (d.success) {
-            alert('Precio Actualizado ✅');
+            // alert('Precio Actualizado ✅');
+            showToast('✅ Precio Actualizado');
             document.getElementById('modalProductAnalysis').style.display = 'none';
             loadProductsView();
+        } else {
+            alert('Error: ' + d.error);
+        }
+    } catch (e) { alert('Error de conexión'); }
+}
+
+// ===== PHASE 16: STOCK ADJUSTMENT & TOAST =====
+
+let currentAdjProdId = null;
+let currentAdjOldStock = 0;
+
+function showToast(message) {
+    const container = document.getElementById('toast-container');
+    const msgSpan = document.getElementById('toast-message');
+    if (!container || !msgSpan) return console.warn('Toast elements missing');
+
+    msgSpan.innerText = message;
+    container.classList.add('show');
+
+    setTimeout(() => {
+        container.classList.remove('show');
+    }, 3000);
+}
+
+function openStockAdjustment(id) {
+    const p = currentProductsList.find(x => x.id == id);
+    if (!p) return;
+
+    currentAdjProdId = id;
+    currentAdjOldStock = Number(p.stock);
+
+    document.getElementById('modalStockAdjustment').style.display = 'flex';
+    document.getElementById('adjProdName').innerText = p.nombre;
+    document.getElementById('adjCurrentStock').innerText = p.stock;
+    document.getElementById('adjNewStock').value = '';
+    document.getElementById('adjDiff').innerText = '-';
+    document.getElementById('adjNotes').value = '';
+    document.getElementById('adjReason').value = 'Correccion Conteo';
+    calculateStockDiff();
+}
+
+function calculateStockDiff() {
+    const val = document.getElementById('adjNewStock').value;
+    // Keep diff blank if empty input
+    if (val === '') {
+        document.getElementById('adjDiff').innerText = '-';
+        return;
+    }
+    const newStock = Number(val);
+    const diff = newStock - currentAdjOldStock;
+    const sign = diff > 0 ? '+' : '';
+
+    const diffEl = document.getElementById('adjDiff');
+    diffEl.innerText = `${sign}${diff}`;
+
+    if (diff < 0) diffEl.style.color = '#ef4444'; // Red (Loss)
+    else if (diff > 0) diffEl.style.color = '#22c55e'; // Green (Gain)
+    else diffEl.style.color = '#64748B'; // Gray (No change)
+}
+
+async function submitStockAdjustment() {
+    const newStock = document.getElementById('adjNewStock').value;
+    if (newStock === '') return alert('Ingresa el stock real');
+
+    const reason = document.getElementById('adjReason').value;
+    const notes = document.getElementById('adjNotes').value;
+
+    if (!confirm(`¿Confirmar ajuste de stock a ${newStock}?`)) return;
+
+    try {
+        const res = await fetch(CONFIG.API_URL, {
+            method: 'POST',
+            body: JSON.stringify({
+                action: 'adjustStock',
+                id: currentAdjProdId,
+                newStock: newStock,
+                reason: reason,
+                notes: notes
+            })
+        });
+        const d = await res.json();
+
+        if (d.success) {
+            document.getElementById('modalStockAdjustment').style.display = 'none';
+            showToast('✅ Stock Ajustado Correctamente');
+            loadProductsView(); // Refresh
         } else {
             alert('Error: ' + d.error);
         }
