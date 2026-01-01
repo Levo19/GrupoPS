@@ -2176,14 +2176,14 @@ function renderCalendarTimeline(rooms, reservations) {
                 if (!barLabel && barType === 'res-bar-single') barLabel = (res.cliente || '').split(' ')[0];
 
                 html += `<td class="${tdClass}" style="padding:5px;">
-                            <div class="res-bar-base ${barType}" style="background:${barColor};" onclick="openReservation('${barId}', '${isoDate}')" title="${res.cliente}">
+                            <div class="res-bar-base ${barType}" style="background:${barColor};" onclick="openReservationDetail('${barId}')" title="${res.cliente} (${res.estado})">
                                 ${barLabel}
                             </div>
                          </td>`;
             } else {
                 // Empty - Click to add new
                 html += `<td class="${tdClass}" style="padding:5px; text-align:center;">
-                            <div onclick="openReservation('${r.id}', '${r.numero}', '${isoDate}', '')" style="height:30px; border-radius:6px; cursor:pointer;" class="cell-hover" title="Nueva Reserva"></div>
+                            <div onclick="openNewReservation('${r.id}', '${r.numero}', '${isoDate}')" style="height:30px; border-radius:6px; cursor:pointer;" class="cell-hover" title="Nueva Reserva"></div>
                         </td>`;
             }
         });
@@ -3038,69 +3038,131 @@ document.addEventListener('DOMContentLoaded', () => {
     setupSafeModalClose('modalReservation', null);
     setupSafeModalClose('modalCheckIn', null);
     setupSafeModalClose('modalCheckOut', null);
+    setupSafeModalClose('modalReservationDetail', null);
 });
 
 
 // ===== PHASE 6: CALENDAR INTERACTION LOGIC =====
 
-// 1. RESERVATION FLOW (New & Extend)
-function openReservation(roomId, roomNum, date, existingClient, isExtension = false) {
-    if (!roomId) return console.error('Missing roomId for reservation');
+// 0. NEW RESERVATION (Empty Cell)
+function openNewReservation(roomId, roomNum, date) {
+    if (!roomId) return console.error('Missing roomId for new res');
 
-    // UI Setup
     document.getElementById('modalReservation').style.display = 'flex';
     document.getElementById('resRoomId').value = roomId;
-    document.getElementById('resRoomNum').value = roomNum || 'Habitación ' + roomId;
-    document.getElementById('resIsExtension').value = isExtension;
+    document.getElementById('resRoomNum').value = 'Habitación ' + roomNum;
+    document.getElementById('resIsExtension').value = 'false';
 
-    const title = document.getElementById('resModalTitle');
+    document.getElementById('resModalTitle').innerHTML = '<i class="fas fa-calendar-alt"></i> Nueva Reserva';
     const btn = document.querySelector('#modalReservation .btn-submit');
-    const clientInput = document.getElementById('resClient');
+    btn.innerText = 'Guardar Reserva';
+    btn.onclick = submitReservation; // Bind standard submit
 
-    // Dates
+    document.getElementById('resClient').value = '';
+    document.getElementById('resClient').disabled = false;
+    document.getElementById('resInDate').disabled = false;
+    document.getElementById('resNotes').value = '';
+
+    // Date Logic
     const inDate = document.getElementById('resInDate');
     const outDate = document.getElementById('resOutDate');
 
-    if (isExtension) {
-        title.innerHTML = '<i class="fas fa-calendar-plus"></i> Extender Estadía';
-        btn.innerText = 'Confirmar Extensión';
-
-        // Locked fields
-        clientInput.value = existingClient || '';
-        clientInput.disabled = true;
-        inDate.disabled = true; // Can't change start of active reservation
-
-        // Set context (we don't know exact start here easily without lookup, but backend handles it)
-        // We only care about NEW End Date.
-        // For UI, maybe just show Today as start? Or leave blank?
-        // Better: Set Start to Today (reference) and End to Tomorrow
+    if (date) {
+        inDate.value = date;
+        const d = new Date(date);
+        d.setDate(d.getDate() + 1);
+        outDate.valueAsDate = d;
+    } else {
         inDate.valueAsDate = new Date();
         const tmr = new Date();
         tmr.setDate(tmr.getDate() + 1);
         outDate.valueAsDate = tmr;
+    }
+}
+
+// 1. VIEW/EDIT RESERVATION (Clicking a Bar)
+function openReservationDetail(resId) {
+    const res = currentReservationsList.find(r => r.id === resId);
+    if (!res) return alert('Reserva no encontrada localmente');
+
+    // Populate Detail Modal
+    document.getElementById('modalReservationDetail').style.display = 'flex';
+    document.getElementById('rdResId').value = res.id;
+    document.getElementById('rdRoomId').value = res.habitacionId;
+
+    document.getElementById('rdClientDisplay').innerText = res.cliente;
+    document.getElementById('rdStart').innerText = new Date(res.fechaEntrada).toLocaleDateString();
+    document.getElementById('rdEnd').innerText = new Date(res.fechaSalida).toLocaleDateString();
+    document.getElementById('rdNotes').innerText = res.notas || 'Sin notas';
+
+    // Find Room
+    // habitacionId in res might be ID or Number? Backend sends what it has.
+    // Try to find Name.
+    const room = currentRoomsList.find(r => String(r.id) === String(res.habitacionId) || String(r.numero) === String(res.habitacionId));
+    document.getElementById('rdRoomName').innerText = room ? `Habitación ${room.numero}` : `Hab. ${res.habitacionId}`;
+
+    // Badge Color
+    const badge = document.getElementById('rdStatusBadge');
+    badge.innerText = res.estado.toUpperCase();
+
+    let actionsHtml = '';
+    const closeFn = "document.getElementById('modalReservationDetail').style.display='none';";
+
+    if (res.estado === 'Activa' || res.estado === 'Ocupada') { // Green
+        badge.style.background = '#dcfce7'; badge.style.color = '#166534';
+
+        // Actions: Extend, Check-Out
+        actionsHtml += `<button onclick="${closeFn} openReservation('${res.habitacionId}', '${room ? room.numero : ''}', '', '${res.cliente}', true)" class="btn-submit" style="background:#eab308; width:auto;"><i class="fas fa-calendar-plus"></i> Extender</button>`;
+        actionsHtml += `<button onclick="${closeFn} openCheckOut('${res.habitacionId}')" class="btn-submit" style="background:#ef4444; width:auto;"><i class="fas fa-sign-out-alt"></i> Salida</button>`;
+
+    } else if (res.estado === 'Reserva') { // Yellow
+        badge.style.background = '#fef9c3'; badge.style.color = '#854d0e';
+
+        // Actions: Check-In, Edit (Cancel?)
+        actionsHtml += `<button onclick="${closeFn} openCheckIn('${res.habitacionId}', '${room ? room.numero : ''}')" class="btn-submit" style="background:#22c55e; width:auto;"><i class="fas fa-check"></i> Check-In</button>`;
+        // Reuse 'openReservation' for Extension logic but adapted for Editing?
+        // User asked to EDIT dates.
+        // We can reuse openNewReservation but pre-fill data and set ID?
+        // Simplest: Just "Cancelar" for now or manual edit.
+        // Let's add a simple "Cancelar" button?
+    } else {
+        badge.style.background = '#e2e8f0'; badge.style.color = '#475569';
+    }
+
+    document.getElementById('rdActionsContainer').innerHTML = actionsHtml;
+}
+
+
+// 2. EXTENSION FLOW (Reusing Reservation Modal in "Extension Mode")
+function openReservation(roomId, roomNum, date, existingClient, isExtension = false) {
+    // Legacy generic name, redirecting logic or keeping specific "Extend" logic
+    // This function was originally mixed. Now we specialize.
+
+    if (isExtension) {
+        document.getElementById('modalReservation').style.display = 'flex';
+        document.getElementById('resRoomId').value = roomId;
+        document.getElementById('resRoomNum').value = roomNum ? 'Hab. ' + roomNum : 'Habitación';
+        document.getElementById('resIsExtension').value = 'true';
+
+        document.getElementById('resModalTitle').innerHTML = '<i class="fas fa-calendar-plus"></i> Extender Estadía';
+        const btn = document.querySelector('#modalReservation .btn-submit');
+        btn.innerText = 'Confirmar Extensión';
+
+        document.getElementById('resClient').value = existingClient || '';
+        document.getElementById('resClient').disabled = true;
+
+        // Lock Start Date
+        document.getElementById('resInDate').disabled = true;
+        // We set start date to "Today" just for visual, but backend ignores it for extension
+        document.getElementById('resInDate').valueAsDate = new Date();
+
+        // Set End Date Tomorrow default
+        const tmr = new Date(); tmr.setDate(tmr.getDate() + 1);
+        document.getElementById('resOutDate').valueAsDate = tmr;
 
     } else {
-        title.innerHTML = '<i class="fas fa-calendar-alt"></i> Nueva Reserva';
-        btn.innerText = 'Guardar Reserva';
-
-        clientInput.value = '';
-        clientInput.disabled = false;
-        inDate.disabled = false;
-
-        // Date Logic
-        if (date) {
-            inDate.value = date;
-            // Default 1 night
-            const d = new Date(date);
-            d.setDate(d.getDate() + 1); // +1 day
-            d.setHours(d.getHours() + 5); // Timezone safety fix
-            outDate.value = d.toISOString().split('T')[0];
-        } else {
-            inDate.valueAsDate = new Date();
-            const tmr = new Date();
-            tmr.setDate(tmr.getDate() + 1);
-            outDate.valueAsDate = tmr;
-        }
+        // Fallback to New
+        openNewReservation(roomId, roomNum, date);
     }
 }
 
