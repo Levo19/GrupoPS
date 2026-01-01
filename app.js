@@ -819,10 +819,13 @@ function getDateDetails(roomId, dateStr) {
 async function markRoomClean(id) {
     if (!confirm('¿Confirmar que la habitación está limpia y lista?')) return;
 
-    // Optimistic Update
     const r = currentRoomsList.find(r => r.id == id);
     if (r) r.estado = 'Disponible';
     renderRooms(currentRoomsList);
+    // Optimistic Calendar Update
+    if (document.getElementById('view-calendar').style.display !== 'none' && typeof renderCalendarTimeline === 'function') {
+        renderCalendarTimeline(currentRoomsList, currentReservationsList || []);
+    }
 
     try {
         const res = await fetch(CONFIG.API_URL, {
@@ -1054,26 +1057,32 @@ function setupCheckInModal(roomId, roomNum, preSelectedDate) {
         // Init Picker for Room
         initDatePicker(roomId, preSelectedDate);
     } else {
+        // GLOBAL (No ID)
         roomIdInput.value = '';
-        roomLabel.innerText = ''; // Clear ghost text
+        roomLabel.innerText = '';
         roomLabel.style.display = 'none';
+
         roomSelect.style.display = 'block';
+        roomSelect.value = ""; // Reset selection
 
         // Populate
         let ops = '<option value="" disabled selected>-- Elija Habitación --</option>';
-        if (typeof currentRoomsList !== 'undefined') {
+        if (typeof currentRoomsList !== 'undefined' && currentRoomsList.length > 0) {
             currentRoomsList.forEach(r => {
                 // Strict Filter for Check-In Mode
-                if (checkInMode === 'checkin' && r.estado === 'Ocupado') return; // Skip occupied
+                if (checkInMode === 'checkin' && (r.estado === 'Ocupado' || r.estado === 'Sucio')) return;
 
                 ops += `<option value="${r.id}">Hab. ${r.numero} - ${r.tipo} (S/ ${r.precio})</option>`;
             });
+        } else {
+            ops += '<option disabled>Cargando habitaciones...</option>';
         }
         roomSelect.innerHTML = ops;
 
         // On Change -> Update Picker Blocks
         roomSelect.onchange = function () {
             roomIdInput.value = this.value;
+            // Also update label purely for visual confirmation if needed, but keeping select visible is better
             initDatePicker(this.value);
         };
 
