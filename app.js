@@ -1,3 +1,4 @@
+console.log("APP JS VERSION: 20260101_1435 - HARD RELOAD");
 // ===== STATE =====
 let currentUser = null;
 let currentView = 'dashboard';
