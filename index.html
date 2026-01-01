@@ -1003,7 +1003,55 @@
         </div>
     </div>
 
-    <!-- ===== PHASE 6: CALENDAR MODALS ===== -->
+    <!-- MODAL: RESERVATION DETAIL (VIEW/EDIT) -->
+    <div id="modalReservationDetail" class="modal-overlay">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h2 style="color:var(--primary);"><i class="fas fa-ticket-alt"></i> Detalle de Reserva</h2>
+                <button onclick="document.getElementById('modalReservationDetail').style.display='none'"
+                    class="close-btn">&times;</button>
+            </div>
+
+            <input type="hidden" id="rdResId">
+            <input type="hidden" id="rdRoomId">
+
+            <!-- Status Badge -->
+            <div
+                style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; background:#f8fafc; padding:10px; border-radius:8px;">
+                <span id="rdStatusBadge"
+                    style="padding:4px 10px; border-radius:20px; font-weight:bold; font-size:0.85rem; background:#cbd5e1;">ESTADO</span>
+                <span id="rdRoomName" style="font-weight:600; color:#475569;">Habitación -</span>
+            </div>
+
+            <div class="form-group">
+                <label>Cliente</label>
+                <div id="rdClientDisplay" style="font-size:1.1rem; font-weight:bold; color:#1e293b;">-</div>
+            </div>
+
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:15px; margin-bottom:15px;">
+                <div>
+                    <label style="font-size:0.85rem; color:#64748B;">Llegada</label>
+                    <div id="rdStart" style="font-weight:600;">-</div>
+                </div>
+                <div>
+                    <label style="font-size:0.85rem; color:#64748B;">Salida</label>
+                    <div id="rdEnd" style="font-weight:600;">-</div>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>Notas</label>
+                <div id="rdNotes"
+                    style="background:#f1f5f9; padding:10px; border-radius:6px; min-height:40px; font-size:0.9rem; color:#475569;">
+                </div>
+            </div>
+
+            <!-- Dynamic Actions -->
+            <div id="rdActionsContainer" class="modal-footer" style="justify-content:space-between;">
+                <!-- Injected via JS -->
+            </div>
+        </div>
+    </div>
 
     <!-- MODAL: RESERVATION (NEW & EXTEND) -->
     <div id="modalReservation" class="modal-overlay">
@@ -1068,7 +1116,8 @@
                 style="background:#f0fdf4; padding:15px; border-radius:8px; border:1px solid #bbf7d0; margin-bottom:15px;">
                 <h3 id="ciRoomDisplay" style="margin:0; color:#166534;">Habitación 101</h3>
                 <p style="margin:5px 0 0 0; font-size:0.9rem; color:#15803d;">Entrada inmediata. El estado cambiará a
-                    <strong>OCUPADO</strong>.</p>
+                    <strong>OCUPADO</strong>.
+                </p>
             </div>
 
             <div class="form-group">
