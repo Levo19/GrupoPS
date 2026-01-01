@@ -2070,7 +2070,7 @@ function renderCalendarTimeline(rooms, reservations) {
     // Colors
     const colorActive = '#22c55e'; // Green
     const colorFuture = '#eab308'; // Yellow
-    const colorPast = '#94a3b8'; // Gray
+    const colorPast = '#64748b'; // Slate (Finalized)
 
     let html = `
     <div class="calendar-container">
@@ -2086,6 +2086,7 @@ function renderCalendarTimeline(rooms, reservations) {
                 <div style="font-size:0.9rem; color:#64748B;">
                     <span style="display:inline-block; width:12px; height:12px; background:${colorActive}; border-radius:50%; margin-right:5px;"></span>Ocupado
                     <span style="display:inline-block; width:12px; height:12px; background:${colorFuture}; border-radius:50%; margin-right:5px; margin-left:10px;"></span>Reservado
+                    <span style="display:inline-block; width:12px; height:12px; background:${colorPast}; border-radius:50%; margin-right:5px; margin-left:10px;"></span>Finalizado
                 </div>
                 <div style="display:flex; gap:10px;">
                      <button onclick="openCheckIn('', '')" style="background:#22c55e; color:white; border:none; padding:8px 16px; border-radius:6px; font-weight:bold; cursor:pointer; display:flex; align-items:center; gap:5px;"><i class="fas fa-check-circle"></i> Check-In</button>
@@ -2153,7 +2154,12 @@ function renderCalendarTimeline(rooms, reservations) {
 
                 const s = res.fechaEntrada.substring(0, 10);
                 const e = res.fechaSalida.substring(0, 10);
-                const col = (res.estado === 'Activa' || res.estado === 'Ocupada') ? colorActive : colorFuture;
+
+                // Color Logic
+                let col = colorFuture; // Default Yellow
+                if (res.estado === 'Activa' || res.estado === 'Ocupada') col = colorActive;
+                if (res.estado === 'Finalizada') col = colorPast;
+
                 barColor = col;
 
                 // Determine Bar Shape (Proportional)
@@ -3140,6 +3146,10 @@ function openReservationDetail(resId) {
 
         actionsHtml += `<button onclick="${closeFn} openReservation('${res.habitacionId}', '${room ? room.numero : ''}', '${res.fechaEntrada}', '${res.cliente}', 'edit', '${res.id}', '${res.fechaSalida}')" class="btn-submit" style="background:#3b82f6; width:auto;"><i class="fas fa-edit"></i> Editar</button>`;
         actionsHtml += `<button onclick="${closeFn} cancelReservation('${res.id}', '${res.habitacionId}')" class="btn-submit" style="background:#ef4444; width:auto;"><i class="fas fa-trash-alt"></i> Cancelar / No Show</button>`;
+
+    } else if (res.estado === 'Finalizada') { // Gray (New)
+        badge.style.background = '#e2e8f0'; badge.style.color = '#475569';
+        actionsHtml += `<div style="text-align:center; width:100%; color:#64748B; font-style:italic;">Reserva Finalizada</div>`;
 
     } else {
         badge.style.background = '#e2e8f0'; badge.style.color = '#475569';
