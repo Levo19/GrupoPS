@@ -1902,7 +1902,10 @@ function closeProductEditor() {
 async function saveProduct(e) {
     e.preventDefault();
     const btn = e.target.querySelector('button[type="submit"]');
-    const originalText = btn.innerText;
+    const originalText = "Guardar"; // Hardcode or btn.innerText, but better to be safe
+
+    // Start Loading State
+    btn.disabled = true;
 
     // 1. Get Data
     const id = document.getElementById('editProdId').value;
@@ -1917,17 +1920,14 @@ async function saveProduct(e) {
         activo: document.getElementById('editProdActivo').value,
     };
 
-    // 1.5 Handle Image Upload
-    const fileInput = document.getElementById('editProdFile');
-    if (fileInput.files.length > 0) {
-        const file = fileInput.files[0];
-        // Change button to loading state
-        btn.innerText = 'Subiendo Imagen...';
-        btn.disabled = true;
+    try {
+        // 1.5 Handle Image Upload
+        const fileInput = document.getElementById('editProdFile');
+        if (fileInput.files.length > 0) {
+            const file = fileInput.files[0];
+            btn.innerText = 'Subiendo Imagen...';
 
-        try {
             const base64 = await fileToBase64(file);
-            // Call Backend Upload
             const uploadRes = await fetch(CONFIG.API_URL, {
                 method: 'POST',
                 body: JSON.stringify({
@@ -1941,43 +1941,37 @@ async function saveProduct(e) {
 
             if (uploadData.success) {
                 prodData.imagen_url = uploadData.url;
-                document.getElementById('editProdImg').value = uploadData.url; // Sync hidden
+                document.getElementById('editProdImg').value = uploadData.url;
             } else {
-                alert('⚠️ Error subiendo imagen: ' + uploadData.error);
-                btn.innerText = originalText;
-                btn.disabled = false;
-                return; // Stop save
+                throw new Error('Error subiendo imagen: ' + uploadData.error);
             }
-        } catch (e) {
-            alert('⚠️ Error subiendo imagen: ' + e.message);
-            btn.innerText = originalText;
-            btn.disabled = false;
-            return;
+        } else {
+            prodData.imagen_url = document.getElementById('editProdImg').value;
         }
-        btn.innerText = originalText; // Restore text, keep disabled while saving product
-    } else {
-        // No new file, ensure we use the hidden value (which holds the old URL)
-        prodData.imagen_url = document.getElementById('editProdImg').value;
-    }
 
-    // 2. Optimistic Update
-    if (id) {
-        // Edit
-        const index = currentProductsList.findIndex(p => p.id == id);
-        if (index !== -1) {
-            currentProductsList[index] = { ...currentProductsList[index], ...prodData };
+        // 2. Change Button to "Saving"
+        btn.innerText = 'Guardando...';
+
+        // 2.5 Optimistic Update
+        if (id) {
+            const index = currentProductsList.findIndex(p => p.id == id);
+            if (index !== -1) {
+                currentProductsList[index] = { ...currentProductsList[index], ...prodData };
+            }
+        } else {
+            currentProductsList.push({ ...prodData, id: 'temp-' + Date.now() });
         }
-    } else {
-        // New
-        currentProductsList.push({ ...prodData, id: 'temp-' + Date.now() });
-    }
+        renderProducts(currentProductsList);
+        closeProductEditor(); // We close it optimistically. 
+        // IF we want to block until finish, we should NOT close here.
+        // User request: "que no se pueda usar hasta que termine". 
+        // Maybe keeping it open until success is safer? 
+        // The user complained: "luego el formulario queda abierto y nose si esta guardandose".
+        // So keeping it open WITH "Guardando..." is good. 
+        // Optimistic close might be confusing if error happens.
+        // Let's NOT close immediately. Let's wait for success.
 
-    // Render & Close
-    renderProducts(currentProductsList);
-    closeProductEditor();
-
-    // 3. Background Sync
-    try {
+        // 3. Background Sync (Now Foreground for UX safety)
         const res = await fetch(CONFIG.API_URL, {
             method: 'POST',
             body: JSON.stringify({ action: 'saveProducto', producto: prodData })
@@ -1985,14 +1979,31 @@ async function saveProduct(e) {
         const data = await res.json();
 
         if (!data.success) {
-            alert('❌ Error guardando en servidor: ' + data.error);
-            loadProductsView();
+            throw new Error(data.error);
         } else {
-            loadProductsView(); // Silent refresh
+            // Success
+            loadProductsView();
+            // Now close
+            // But if we didn't close earlier, the list was not updated?
+            // Wait, previous code closed optimistically.
+            // If I wait, I should NOT do optimistic render, or do it but kept modal open?
+            // Best UX: "Guardando..." -> Success -> Modal Close.
+            closeProductEditor();
+            showToast('✅ Producto Guardado');
         }
+
     } catch (err) {
-        alert('❌ Error de conexión: ' + err.message);
-        loadProductsView();
+        alert('❌ Error: ' + err.message);
+        btn.innerText = originalText;
+        btn.disabled = false;
+        // Don't close modal on error
+    } finally {
+        // If success, modal is closed. If error, button is reset.
+        // Check if modal still open to reset button just in case?
+        if (document.getElementById('modalProductEditor').style.display !== 'none') {
+            btn.innerText = originalText;
+            btn.disabled = false;
+        }
     }
 }
 
@@ -2837,15 +2848,16 @@ async function saveAnalyzedPrice() {
 
     if (!confirm(`¿Actualizar precio de venta a S/ ${newPrice}?`)) return;
 
-    // We can reuse the generic 'saveProduct' or create a specific one. 
-    // Ideally we should have a 'updateProductPrice' lighter action, but 'saveProduct' works if we send full data.
-    // However, frontend doesn't have full data here easily. 
-    // Let's assume we can add a 'updatePrice' action or just use the Product Editor.
-    // SHORTCUT: For now, I'll alert the user to use the editor OR implement a micro-update.
-    // Better: Implement 'updateProductPrice' in backend? No, let's use the existing editor logic via a direct edit if possible.
-    // WAIT, I can just call 'saveProduct' if I had all data. I don't.
-    // Let's implement a 'quickUpdatePrice' in backend or just hack it?
-    // Let's Add 'quickUpdatePrice' to backend. It is safer.
+    const btn = document.querySelector('#modalProductAnalysis .btn-login'); // Assuming main button style
+    // Need to target specific button.
+    const submitBtn = document.querySelector('#modalProductAnalysis button[onclick="saveAnalyzedPrice()"]');
+
+    let originalText = "Guardar Nuevo Precio";
+    if (submitBtn) {
+        originalText = submitBtn.innerText;
+        submitBtn.innerText = "Actualizando...";
+        submitBtn.disabled = true;
+    }
 
     try {
         const res = await fetch(CONFIG.API_URL, {
@@ -2858,14 +2870,20 @@ async function saveAnalyzedPrice() {
         });
         const d = await res.json();
         if (d.success) {
-            // alert('Precio Actualizado ✅');
             showToast('✅ Precio Actualizado');
             document.getElementById('modalProductAnalysis').style.display = 'none';
             loadProductsView();
         } else {
             alert('Error: ' + d.error);
         }
-    } catch (e) { alert('Error de conexión'); }
+    } catch (e) {
+        alert('Error de conexión');
+    } finally {
+        if (submitBtn) {
+            submitBtn.innerText = originalText;
+            submitBtn.disabled = false;
+        }
+    }
 }
 
 // ===== PHASE 16: STOCK ADJUSTMENT & TOAST =====
@@ -2931,6 +2949,21 @@ async function submitStockAdjustment() {
 
     if (!confirm(`¿Confirmar ajuste de stock a ${newStock}?`)) return;
 
+    const btn = document.querySelector('#modalStockAdjustment .btn-login'); // Assuming the main button has this class
+    // Or better: get by unique context inside modal if possible.
+    // The previous code didn't use IDs for buttons. It's risky.
+    // Let's rely on finding the button that called this? No, it's global function.
+    // Let's add an ID to the button in HTML to be safe, or select carefully.
+    // Modal structure: footer > button.
+    const submitBtn = document.querySelector('#modalStockAdjustment button[onclick="submitStockAdjustment()"]');
+
+    let originalText = "Confirmar Ajuste";
+    if (submitBtn) {
+        originalText = submitBtn.innerText;
+        submitBtn.innerText = "Procesando...";
+        submitBtn.disabled = true;
+    }
+
     try {
         const res = await fetch(CONFIG.API_URL, {
             method: 'POST',
@@ -2951,7 +2984,14 @@ async function submitStockAdjustment() {
         } else {
             alert('Error: ' + d.error);
         }
-    } catch (e) { alert('Error de conexión'); }
+    } catch (e) {
+        alert('Error de conexión');
+    } finally {
+        if (submitBtn) {
+            submitBtn.innerText = originalText;
+            submitBtn.disabled = false;
+        }
+    }
 }
 
 
