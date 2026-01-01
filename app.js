@@ -1040,6 +1040,7 @@ function openCheckIn(roomId, roomNum) {
 }
 
 function setupCheckInModal(roomId, roomNum, preSelectedDate) {
+    // console.log("Setup CheckIn: ", roomId); 
     const form = document.getElementById('formCheckIn');
     form.reset();
 
