@@ -2115,8 +2115,12 @@ function renderCalendarTimeline(rooms, reservations) {
                 if (String(res.habitacionId) !== String(r.id) && String(res.habitacionId) !== String(r.numero)) return false;
                 if (res.estado === 'Cancelada') return false;
 
-                const s = res.fechaEntrada.substring(0, 10);
-                const e = res.fechaSalida.substring(0, 10);
+                // S/E Robust Parsing
+                let s, e;
+                try {
+                    s = new Date(res.fechaEntrada).toISOString().split('T')[0];
+                    e = new Date(res.fechaSalida).toISOString().split('T')[0];
+                } catch (err) { return false; }
 
                 return isoDate >= s && isoDate <= e;
             });
@@ -2125,8 +2129,8 @@ function renderCalendarTimeline(rooms, reservations) {
                 const res = matches[0];
                 barId = res.id;
 
-                const s = res.fechaEntrada.substring(0, 10);
-                const e = res.fechaSalida.substring(0, 10);
+                let s = new Date(res.fechaEntrada).toISOString().split('T')[0];
+                let e = new Date(res.fechaSalida).toISOString().split('T')[0];
 
                 // Color Logic
                 let col = colorFuture; // Default Yellow
@@ -3289,6 +3293,21 @@ async function submitReservation() {
 
             if (!client || !start || !end) throw new Error('Completa todos los campos');
 
+            // OPTIMISTIC UI: Render immediately
+            const tempId = 'OPT-' + new Date().getTime();
+            const tempRes = {
+                id: tempId,
+                habitacionId: roomId,
+                cliente: client,
+                fechaEntrada: start + ' 14:00', // Mock time
+                fechaSalida: end + ' 11:00',
+                estado: 'Reserva', // Assuming New Reservation
+                notas: notes
+            };
+            currentReservationsList.push(tempRes);
+            renderCalendarTimeline(currentRoomsList, currentReservationsList);
+            document.getElementById('modalReservation').style.display = 'none';
+
             const res = await fetch(CONFIG.API_URL, {
                 method: 'POST',
                 body: JSON.stringify({
@@ -3302,20 +3321,23 @@ async function submitReservation() {
                 })
             });
             const d = await res.json();
-            if (!d.success) throw new Error(d.error);
+            if (!d.success) {
+                // Rollback
+                currentReservationsList = currentReservationsList.filter(r => r.id !== tempId);
+                renderCalendarTimeline(currentRoomsList, currentReservationsList);
+                throw new Error(d.error);
+            }
+
             showToast('✅ Reserva Creada');
+            // Refresh to get real ID
+            loadCalendarView();
         }
 
-        document.getElementById('modalReservation').style.display = 'none';
-        loadCalendarView();
+        // Modal closed optimistically above
+        // loadCalendarView(); // Removed here, called inside success/fail logic or kept for sync
 
     } catch (e) {
-        // alert('❌ Error: ' + e.message); // Ugly
-        // Better Alert
-        showToast('❌ ' + e.message); // Reuse toast or specific error
-        // Ideally use a Modal Alert, but Toast is better than native.
-        // Or keep alert for critical errors if toast disappears too fast. 
-        // User asked for "Más bonito".
+        showToast('❌ ' + e.message);
     } finally {
         btn.innerText = originalText;
         btn.disabled = false;
