@@ -1044,6 +1044,7 @@ function setupCheckInModal(roomId, roomNum, preSelectedDate) {
 
     // UI Elements
     const roomLabel = document.getElementById('checkInRoomNum');
+    if (!roomId) roomLabel.style.display = 'none'; // Pre-emptive hide
     const roomSelect = document.getElementById('checkInRoomSelect');
     const roomIdInput = document.getElementById('checkInRoomId');
 
