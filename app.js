@@ -1064,9 +1064,6 @@ function renderDatePicker() {
 function openCheckIn(roomId, roomNum) {
     console.log("OpenCheckIn ID:", roomId);
     checkInMode = 'checkin';
-    // Use the Legacy Modal for Walk-Ins (Room Selection support)
-    // Or redirect to new logic? 
-    // For now, keep legacy modal for Walk-In as it handles "Choose Room".
     const title = document.getElementById('modalTitleCheckIn');
     const btn = document.getElementById('btnSubmitCheckIn');
     if (title) title.innerHTML = '🏨 Check-In (Ingreso)';
@@ -1075,6 +1072,22 @@ function openCheckIn(roomId, roomNum) {
         btn.style.background = 'var(--accent)';
     }
     setupCheckInModal(roomId, roomNum, null);
+}
+
+// [NEW] Open New Reservation from Calendar
+function openNewReservation(roomId, roomNum, dateStr) {
+    console.log("OpenNewReservation:", roomId, dateStr);
+    checkInMode = 'reservation';
+
+    const title = document.getElementById('modalTitleCheckIn');
+    const btn = document.getElementById('btnSubmitCheckIn');
+    if (title) title.innerHTML = '📅 Nueva Reserva';
+    if (btn) {
+        btn.innerText = 'Guardar Reserva';
+        btn.style.background = '#eab308'; // Orange/Yellow
+    }
+
+    setupCheckInModal(roomId, roomNum, dateStr);
 }
 
 async function setupCheckInModal(roomId, roomNum, preSelectedDate) {
