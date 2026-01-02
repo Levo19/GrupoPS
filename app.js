@@ -3678,86 +3678,100 @@ function createPaymentsContainer() {
     return div;
 }
 
-async function loadReservationPayments(resId, container) {
-    container.innerHTML = '<div style="font-size:0.85rem; color:#64748B;"><i class="fas fa-spinner fa-spin"></i> Cargando historial de pagos...</div>';
+// [OPTIMIZED] Load Payments from Local State (Preloaded)
+function loadReservationPayments(resId, container) {
+    // container.innerHTML = '<div style="font-size:0.85rem; color:#64748B;"><i class="fas fa-spinner fa-spin"></i> Cargando historial de pagos...</div>';
 
-    try {
-        const res = await fetch(CONFIG.API_URL, {
-            method: 'POST',
-            body: JSON.stringify({ action: 'getReservationPayments', reservaId: resId })
+    // 1. Find Reservation in Local State
+    const res = currentReservationsList.find(r => String(r.id) === String(resId));
+    const pagos = (res && res.pagos) ? res.pagos : [];
+
+    renderPaymentsTable(resId, container, pagos);
+}
+
+function renderPaymentsTable(resId, container, pagos) {
+    let html = `
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+            <h4 style="margin:0; font-size:0.95rem; color:#334155;">Pagos Realizados</h4>
+            <button onclick="addPaymentToReservation('${resId}')" style="background:#fff; border:1px solid #22c55e; color:#22c55e; border-radius:4px; font-size:0.75rem; padding:2px 8px; cursor:pointer;">
+                <i class="fas fa-plus"></i> Agregar Pago
+            </button>
+        </div>
+    `;
+
+    if (pagos.length === 0) {
+        html += '<div style="font-size:0.85rem; color:#94a3b8; font-style:italic;">No hay pagos registrados.</div>';
+    } else {
+        html += '<table style="width:100%; font-size:0.8rem; border-collapse:collapse;">';
+        let total = 0;
+
+        pagos.forEach(p => {
+            total += p.monto;
+            html += `
+            <tr style="border-bottom:1px solid #f1f5f9;">
+                <td style="padding:4px;">${new Date(p.fecha).toLocaleDateString()}</td>
+                <td style="padding:4px;">${p.metodo}</td>
+                <td style="padding:4px; text-align:right; font-weight:bold;">S/ ${p.monto.toFixed(2)}</td>
+            </tr>`;
         });
-        const d = await res.json();
-
-        if (d.success) {
-            let html = `
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-                    <h4 style="margin:0; font-size:0.95rem; color:#334155;">Pagos Realizados</h4>
-                    <button onclick="addPaymentToReservation('${resId}')" style="background:#fff; border:1px solid #22c55e; color:#22c55e; border-radius:4px; font-size:0.75rem; padding:2px 8px; cursor:pointer;">
-                        <i class="fas fa-plus"></i> Agregar Pago
-                    </button>
-                </div>
-            `;
-
-            if (d.pagos.length === 0) {
-                html += '<div style="font-size:0.85rem; color:#94a3b8; font-style:italic;">No hay pagos registrados.</div>';
-            } else {
-                html += '<table style="width:100%; font-size:0.8rem; border-collapse:collapse;">';
-                let total = 0;
-                d.pagos.forEach(p => {
-                    total += p.monto;
-                    html += `
-                    <tr style="border-bottom:1px solid #f1f5f9;">
-                        <td style="padding:4px;">${new Date(p.fecha).toLocaleDateString()}</td>
-                        <td style="padding:4px;">${p.metodo}</td>
-                        <td style="padding:4px; text-align:right; font-weight:bold;">S/ ${p.monto.toFixed(2)}</td>
-                    </tr>`;
-                });
-                html += `
-                    <tr style="font-weight:bold; color:#166534; background:#f0fdf4;">
-                        <td colspan="2" style="padding:6px;">TOTAL PAGADO</td>
-                        <td style="padding:6px; text-align:right;">S/ ${total.toFixed(2)}</td>
-                    </tr>
-               `;
-                html += '</table>';
-            }
-            container.innerHTML = html;
-        } else {
-            container.innerHTML = '<div style="color:red; font-size:0.8rem;">Error cargando pagos.</div>';
-        }
-    } catch (e) { console.error(e); container.innerHTML = '-'; }
+        html += `
+            <tr style="font-weight:bold; color:#166534; background:#f0fdf4;">
+                <td colspan="2" style="padding:6px;">TOTAL PAGADO</td>
+                <td style="padding:6px; text-align:right;">S/ ${total.toFixed(2)}</td>
+            </tr>
+       `;
+        html += '</table>';
+    }
+    container.innerHTML = html;
 }
 
 async function addPaymentToReservation(resId) {
-    const amount = prompt("Ingrese el monto a pagar (S/):");
-    if (!amount || isNaN(amount) || amount <= 0) return;
+    const amountStr = prompt("Ingrese el monto a pagar (S/):");
+    if (!amountStr) return;
+    const amount = Number(amountStr);
+    if (isNaN(amount) || amount <= 0) return;
 
     const method = prompt("Medio de pago (Efectivo, Yape, Plin, Tarjeta):", "Efectivo");
     if (!method) return;
 
-    // Use existing savePago endpoint
-    // Optimistic UI update could be done, but let's wait for safety
-    try {
-        const res = await fetch(CONFIG.API_URL, {
-            method: 'POST',
-            body: JSON.stringify({
-                action: 'savePago',
-                reservaId: resId,
-                monto: Number(amount),
-                metodo: method,
-                notas: 'Pago manual desde Detalle Reserva',
-                fecha: new Date()
-            })
+    // [OPTIMISTIC UI UPDATE]
+    const res = currentReservationsList.find(r => String(r.id) === String(resId));
+    if (res) {
+        if (!res.pagos) res.pagos = [];
+        // Add Temporary Entry
+        res.pagos.push({
+            id: 'temp-' + new Date().getTime(),
+            monto: amount,
+            metodo: method,
+            fecha: new Date().toISOString(),
+            notas: 'Pago manual (Sincronizando...)'
         });
-        const d = await res.json();
-        if (d.success) {
-            alert('Pago registrado correctamente');
-            // Refresh payments list
-            const container = document.getElementById('rdPaymentsContainer');
-            loadReservationPayments(resId, container);
-        } else {
-            alert('Error: ' + d.error);
-        }
-    } catch (e) { alert('Error de conexión'); }
+
+        // Re-render immediately
+        const container = document.getElementById('rdPaymentsContainer');
+        if (container) renderPaymentsTable(resId, container, res.pagos);
+    }
+
+    // Backend Sync (Background)
+    try {
+        const payload = {
+            action: 'savePago',
+            reservaId: resId,
+            monto: amount,
+            metodo: method,
+            notas: 'Pago manual desde Detalle Reserva',
+            fecha: new Date()
+        };
+
+        // Just send, don't block
+        fetch(CONFIG.API_URL, {
+            method: 'POST', body: JSON.stringify(payload)
+        }).then(r => r.json()).then(d => {
+            if (!d.success) alert("Error guardando pago en servidor: " + d.error);
+            else showToast('Pago sincronizado');
+        }).catch(e => console.error("Error background pago", e));
+
+    } catch (e) { alert('Error iniciando solicitud de pago'); }
 }
 
 
