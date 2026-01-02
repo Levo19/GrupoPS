@@ -3588,6 +3588,10 @@ function openReservationDetail(resId) {
     // Check-In Active Condition: Today >= StartDate
     const canCheckIn = today >= startDate;
 
+    // 4. Load Payments (Async)
+    const paymentsContainer = document.getElementById('rdPaymentsContainer') || createPaymentsContainer();
+    loadReservationPayments(res.id, paymentsContainer);
+
     if (res.estado === 'Activa' || res.estado === 'Ocupada') { // Green
         badge.style.background = '#dcfce7'; badge.style.color = '#166534';
 
@@ -3619,6 +3623,104 @@ function openReservationDetail(resId) {
 
     document.getElementById('rdActionsContainer').innerHTML = actionsHtml;
 }
+
+// Helper for UI
+function createPaymentsContainer() {
+    const parent = document.querySelector('.modal-card #rdNotes').parentNode.parentNode; // Locate somewhat safely
+    const div = document.createElement('div');
+    div.id = 'rdPaymentsContainer';
+    div.style.marginTop = '15px';
+    div.style.paddingTop = '15px';
+    div.style.borderTop = '1px solid #e2e8f0';
+
+    // Insert before footer actions
+    const footer = document.getElementById('rdActionsContainer');
+    footer.parentNode.insertBefore(div, footer);
+    return div;
+}
+
+async function loadReservationPayments(resId, container) {
+    container.innerHTML = '<div style="font-size:0.85rem; color:#64748B;"><i class="fas fa-spinner fa-spin"></i> Cargando historial de pagos...</div>';
+
+    try {
+        const res = await fetch(CONFIG.API_URL, {
+            method: 'POST',
+            body: JSON.stringify({ action: 'getReservationPayments', reservaId: resId })
+        });
+        const d = await res.json();
+
+        if (d.success) {
+            let html = `
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                    <h4 style="margin:0; font-size:0.95rem; color:#334155;">Pagos Realizados</h4>
+                    <button onclick="addPaymentToReservation('${resId}')" style="background:#fff; border:1px solid #22c55e; color:#22c55e; border-radius:4px; font-size:0.75rem; padding:2px 8px; cursor:pointer;">
+                        <i class="fas fa-plus"></i> Agregar Pago
+                    </button>
+                </div>
+            `;
+
+            if (d.pagos.length === 0) {
+                html += '<div style="font-size:0.85rem; color:#94a3b8; font-style:italic;">No hay pagos registrados.</div>';
+            } else {
+                html += '<table style="width:100%; font-size:0.8rem; border-collapse:collapse;">';
+                let total = 0;
+                d.pagos.forEach(p => {
+                    total += p.monto;
+                    html += `
+                    <tr style="border-bottom:1px solid #f1f5f9;">
+                        <td style="padding:4px;">${new Date(p.fecha).toLocaleDateString()}</td>
+                        <td style="padding:4px;">${p.metodo}</td>
+                        <td style="padding:4px; text-align:right; font-weight:bold;">S/ ${p.monto.toFixed(2)}</td>
+                    </tr>`;
+                });
+                html += `
+                    <tr style="font-weight:bold; color:#166534; background:#f0fdf4;">
+                        <td colspan="2" style="padding:6px;">TOTAL PAGADO</td>
+                        <td style="padding:6px; text-align:right;">S/ ${total.toFixed(2)}</td>
+                    </tr>
+               `;
+                html += '</table>';
+            }
+            container.innerHTML = html;
+        } else {
+            container.innerHTML = '<div style="color:red; font-size:0.8rem;">Error cargando pagos.</div>';
+        }
+    } catch (e) { console.error(e); container.innerHTML = '-'; }
+}
+
+async function addPaymentToReservation(resId) {
+    const amount = prompt("Ingrese el monto a pagar (S/):");
+    if (!amount || isNaN(amount) || amount <= 0) return;
+
+    const method = prompt("Medio de pago (Efectivo, Yape, Plin, Tarjeta):", "Efectivo");
+    if (!method) return;
+
+    // Use existing savePago endpoint
+    // Optimistic UI update could be done, but let's wait for safety
+    try {
+        const res = await fetch(CONFIG.API_URL, {
+            method: 'POST',
+            body: JSON.stringify({
+                action: 'savePago',
+                reservaId: resId,
+                monto: Number(amount),
+                metodo: method,
+                notas: 'Pago manual desde Detalle Reserva',
+                fecha: new Date()
+            })
+        });
+        const d = await res.json();
+        if (d.success) {
+            alert('Pago registrado correctamente');
+            // Refresh payments list
+            const container = document.getElementById('rdPaymentsContainer');
+            loadReservationPayments(resId, container);
+        } else {
+            alert('Error: ' + d.error);
+        }
+    } catch (e) { alert('Error de conexión'); }
+}
+
 
 async function confirmReservation(resId) {
     if (!confirm('¿Confirmar ingreso del huésped? Estado pasará a Activa.')) return;
@@ -3655,6 +3757,9 @@ function openReservation(roomId, roomNum, date, existingClient, mode = 'new', ex
     document.getElementById('resRoomNum').value = roomNum ? 'Hab. ' + roomNum : 'Habitación';
     document.getElementById('resIsExtension').value = mode;
     document.getElementById('resResId').value = existingResId || '';
+
+    // [FIX] Reset Adelanto to avoid persistence
+    if (document.getElementById('resAdelanto')) document.getElementById('resAdelanto').value = '';
 
     const title = document.getElementById('resModalTitle');
     const btn = document.querySelector('#modalReservation .btn-submit');
