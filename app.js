@@ -784,6 +784,7 @@ function selectPickerDate(dateStr) {
     document.getElementById('checkInSalida').value = pickerState.endDate || '';
 
     renderDatePicker();
+    calculateCheckInBalance(); // [FIX] Instant Recalculation
 }
 
 // Helper: Determine status of a date
@@ -1453,81 +1454,73 @@ async function processCheckIn(e) {
             // Also need to update the grid view?
             // renderCalendar() will pick this up.
         }
-    } else if (data.action === 'confirmReservation') {
-        const existingRes = currentReservationsList.find(r => r.id === data.id);
-        if (existingRes) {
-            existingRes.estado = 'Activa';
-
-            // Optimistic Payment Update
-            if (Number(data.adelanto) > 0) {
-                existingRes.pagado = (Number(existingRes.pagado) || 0) + Number(data.adelanto);
-            }
-
-            // Update Room Status
-            const roomIdx = currentRoomsList.findIndex(r => r.id == data.habitacionId);
-            if (roomIdx !== -1) {
-                currentRoomsList[roomIdx].estado = 'Ocupado';
-                currentRoomsList[roomIdx].cliente = data.cliente;
-            }
-        }
     } else {
-        // Walk In
-        const tempId = 'TEMP-' + new Date().getTime();
-        let tempStatus = 'Activa';
-        if (data.isReservation) tempStatus = 'Reserva';
+        // Update Room Status Locally
+        const room = currentRoomsList.find(r => r.id == data.habitacionId);
+        if (room) {
+            room.estado = 'Ocupado';
+            room.cliente = data.cliente;
+        }
 
-        const newRes = {
-            id: tempId,
-            habitacionId: data.habitacionId,
-            cliente: data.cliente,
-            fechaEntrada: data.fechaEntrada + ' 14:00',
-            fechaSalida: data.fechaSalida + ' 11:00',
-            estado: tempStatus,
-            notas: data.notas,
-            total: 0, // Backend will calculate, but init for UI
-            pagado: Number(data.adelanto) || 0 // Init with adelanto
-        };
-        currentReservationsList.push(newRes);
-
-        if (!data.isReservation) {
-            const roomIdx = currentRoomsList.findIndex(r => r.id == data.habitacionId);
-            if (roomIdx !== -1) {
-                currentRoomsList[roomIdx].estado = 'Ocupado';
-                currentRoomsList[roomIdx].cliente = data.cliente;
+        // Update / Create Reservation Locally
+        if (data.reservationId) {
+            // Confirming existing
+            const existing = currentReservationsList.find(r => r.id === data.reservationId);
+            if (existing) {
+                existing.estado = 'Activa';
+                existing.habitacionId = data.habitacionId;
+                // Optimistic Payment Update
+                if (Number(data.adelanto) > 0) {
+                    if (!existing.pagos) existing.pagos = [];
+                    existing.pagos.push({
+                        monto: Number(data.adelanto),
+                        metodo: data.metodo,
+                        fecha: new Date().toISOString()
+                    });
+                    existing.pagado = (Number(existing.pagado) || 0) + Number(data.adelanto);
+                }
             }
+        } else {
+            // New Walk-In
+            const tempId = 'temp-' + new Date().getTime();
+            currentReservationsList.push({
+                id: tempId,
+                habitacionId: data.habitacionId,
+                cliente: data.cliente,
+                fechaEntrada: data.fechaEntrada,
+                fechaSalida: data.fechaSalida,
+                estado: 'Activa',
+                total: 100, // Dummy until reload
+                pagado: Number(data.adelanto),
+                notas: data.notas + ' (Sincronizando...)'
+            });
         }
     }
 
-    // Update UI
-    if (document.getElementById('view-calendar').style.display === 'block') {
-        renderCalendarTimeline(currentRoomsList, currentReservationsList);
-    } else {
-        renderRooms(); // Assumes this function exists and works
-    }
+    // Render Immediately
+    renderCalendarTimeline();
+    showToast('Check-In registrado. Sincronizando...');
 
+    // 5. Backend Sync
     try {
-        const response = await fetch(CONFIG.API_URL, {
+        const res = await fetch(CONFIG.API_URL, {
             method: 'POST',
             body: JSON.stringify(data)
         });
-        const result = await response.json();
+        const d = await res.json();
 
-        if (result.success) {
-            alert(data.isExtension ? '¡Estadía extendida correctamente!' : (data.isReservation ? '¡Reserva creada!' : '¡Check-In exitoso!'));
-            // Reload real data
-            loadReservations();
-            loadRooms();
+        if (d.success) {
+            showToast('Check-In Sincronizado Correctamente');
+            // Allow backend to refresh full real data
+            loadCalendarView();
         } else {
-            alert('Error: ' + result.error);
-            // Revert optimistic?
-            loadReservations();
+            alert('Error en servidor: ' + d.error);
+            loadCalendarView(); // Revert
         }
-    } catch (error) {
-        console.error('Error:', error);
-        alert('Error de conexión');
-    } finally {
-        submitBtn.innerText = 'Confirmar'; // Reset text just in case re-opened
-        submitBtn.disabled = false;
+    } catch (e) {
+        console.error(e);
+        alert('Error de conexión. Verifique internet.');
+        loadCalendarView(); // Revert
     }
 }
 
@@ -1779,6 +1772,23 @@ function printVoucher() {
     const checkIn = new Date(d.reservation.fechaEntrada).toLocaleDateString();
     const checkOut = new Date(d.reservation.fechaSalida).toLocaleDateString();
 
+    // Payments List
+    let paymentsHtml = '';
+    if (d.payments && d.payments.length > 0) {
+        paymentsHtml = `
+            <div style="margin-top:5px; border-bottom:1px dashed black; padding-bottom:2px;">
+                <div style="font-weight:bold; margin-bottom:2px;">HISTORIAL PAGOS:</div>
+                <table style="width:100%">`;
+        d.payments.forEach(p => {
+            paymentsHtml += `
+              <tr>
+                 <td style="font-size:10px;">${new Date(p.fecha).toLocaleDateString()} ${p.metodo.substring(0, 6)}</td>
+                 <td align="right">S/ ${p.monto.toFixed(2)}</td>
+              </tr>`;
+        });
+        paymentsHtml += `</table></div>`;
+    }
+
     const html = `
     <html>
     <head>
@@ -1801,7 +1811,7 @@ function printVoucher() {
             <div class="sub-brand">RUC: 20610099999</div>
             ----------------<br>
             Cliente: <b>${d.reservation.cliente}</b><br>
-            Hab: <b>${d.reservation.habitacionId}</b> | Recibo: ${new Date().getTime().toString().substr(-6)}<br>
+            Hab: <b>${d.reservation.habitacionNombre || d.reservation.habitacionId}</b> | Recibo: ${new Date().getTime().toString().substr(-6)}<br>
             Estadía: ${checkIn} - ${checkOut}<br>
             Fecha Emisión: ${new Date().toLocaleString()}
         </div>
@@ -1812,6 +1822,8 @@ function printVoucher() {
             ${itemsHtml}
         </table>
         
+        ${paymentsHtml}
+
         <div class="totals">
             <table>
                 <tr><td><strong>TOTAL:</strong></td><td align="right"><strong>S/ ${d.totals.consumption.toFixed(2)}</strong></td></tr>
