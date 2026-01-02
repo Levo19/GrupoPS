@@ -1114,59 +1114,137 @@ async function setupCheckInModal(roomId, roomNum, preSelectedDate) {
 
         // 1. Setup Room Selection
         if (roomId) {
-            roomIdInput.value = roomId;
-            roomLabel.innerText = 'Habitación ' + roomNum;
-            roomLabel.style.display = 'inline-block';
-            roomSelect.style.setProperty('display', 'none', 'important');
+            if (roomIdInput) roomIdInput.value = roomId;
+            if (roomLabel) {
+                roomLabel.innerText = 'Habitación ' + roomNum;
+                roomLabel.style.display = 'inline-block';
+            }
+            if (roomSelect) roomSelect.style.setProperty('display', 'none', 'important');
 
             // Init Picker for Room
             initDatePicker(roomId, preSelectedDate);
         } else {
             // GLOBAL (No ID)
-            roomIdInput.value = '';
-            roomLabel.innerText = '';
-            roomLabel.style.display = 'none';
-
-            roomSelect.style.display = 'block';
-            roomSelect.value = ""; // Reset selection
-
-            // Populate
-            let ops = '<option value="" disabled selected>-- Elija Habitación --</option>';
-            if (currentRoomsList && Array.isArray(currentRoomsList) && currentRoomsList.length > 0) {
-                let count = 0;
-                currentRoomsList.forEach(r => {
-                    // Strict Filter for Check-In Mode
-                    if (checkInMode === 'checkin' && (r.estado === 'Ocupado' || r.estado === 'Sucio')) return;
-
-                    ops += `<option value="${r.id}">Hab. ${r.numero} - ${r.tipo} (S/ ${r.precio})</option>`;
-                    count++;
-                });
-                if (count === 0) ops += '<option disabled>Sin habitaciones disponibles</option>';
-            } else {
-                ops += '<option disabled>Error: No se pudieron cargar las habitaciones</option>';
+            if (roomIdInput) roomIdInput.value = '';
+            if (roomLabel) {
+                roomLabel.innerText = '';
+                roomLabel.style.display = 'none';
             }
 
-            roomSelect.innerHTML = ops;
+            if (roomSelect) {
+                roomSelect.style.display = 'block';
+                roomSelect.value = ""; // Reset selection
 
-            // On Change -> Update Picker Blocks
-            roomSelect.onchange = function () {
-                roomIdInput.value = this.value;
-                // Also update label purely for visual confirmation if needed, but keeping select visible is better
-                initDatePicker(this.value);
-            };
+                // Populate
+                let ops = '<option value="" disabled selected>-- Elija Habitación --</option>';
+                if (currentRoomsList && Array.isArray(currentRoomsList) && currentRoomsList.length > 0) {
+                    let count = 0;
+                    currentRoomsList.forEach(r => {
+                        // Strict Filter for Check-In Mode
+                        if (checkInMode === 'checkin' && (r.estado === 'Ocupado' || r.estado === 'Sucio')) return;
 
-            // Init Empty Picker
-            initDatePicker(null);
+                        // [MOD] Add data-price
+                        ops += `<option value="${r.id}" data-price="${r.precio}">Hab. ${r.numero} - ${r.tipo} (S/ ${r.precio})</option>`;
+                        count++;
+                    });
+                    if (count === 0) ops += '<option disabled>Sin habitaciones disponibles</option>';
+                } else {
+                    ops += '<option disabled>Error: No se pudieron cargar las habitaciones</option>';
+                }
+
+                roomSelect.innerHTML = ops;
+
+                // Listener for Global Select
+                roomSelect.onchange = function () {
+                    if (roomIdInput) roomIdInput.value = this.value;
+                    initDatePicker(this.value);
+                    calculateCheckInBalance(); // Trig calc
+                };
+            }
         }
 
-        // Ensure blocks are loaded
-        await ensureReservationsLoaded();
+        // Listeners for Balance Calculation
+        const adelantoInput = document.getElementById('checkInAdelanto');
+        if (adelantoInput) adelantoInput.oninput = calculateCheckInBalance;
 
+
+        // Ensure modal is visible
         document.getElementById('modalCheckIn').style.display = 'flex';
+
     } catch (e) {
-        alert("Error crítico en CheckIn: " + e.message);
+        alert("Error crítico en CheckIn setup: " + e.message);
         console.error(e);
     }
+}
+
+function calculateCheckInBalance() {
+    try {
+        const rParam = document.getElementById('checkInRoomId') ? document.getElementById('checkInRoomId').value : '';
+        const rSelect = document.getElementById('checkInRoomSelect');
+
+        // Determine Price
+        let price = 0;
+        if (rSelect && rSelect.offsetParent !== null && rSelect.selectedOptions[0]) {
+            price = Number(rSelect.selectedOptions[0].getAttribute('data-price')) || 0;
+        } else {
+            // Find in list
+            if (currentRoomsList) {
+                const r = currentRoomsList.find(x => x.id == rParam);
+                if (r) price = Number(r.precio) || 0;
+            }
+        }
+
+        // Determine Days
+        const fIn = document.getElementById('checkInEntrada') ? document.getElementById('checkInEntrada').value : '';
+        const fOut = document.getElementById('checkInSalida') ? document.getElementById('checkInSalida').value : '';
+
+        let days = 1;
+        if (fIn && fOut) {
+            const d1 = new Date(fIn);
+            const d2 = new Date(fOut);
+            const diff = d2 - d1;
+            days = Math.ceil(diff / (1000 * 60 * 60 * 24));
+            if (days < 1) days = 1;
+        }
+
+        const total = days * price;
+        const adelanto = Number(document.getElementById('checkInAdelanto') ? document.getElementById('checkInAdelanto').value : 0) || 0;
+        const restante = total - adelanto;
+
+        // Find or Create Display Info
+        let infoDiv = document.getElementById('checkInBalanceInfo');
+        if (!infoDiv) {
+            const notes = document.getElementById('checkInNotas');
+            if (notes) {
+                infoDiv = document.createElement('div');
+                infoDiv.id = 'checkInBalanceInfo';
+                infoDiv.style.marginTop = '10px';
+                infoDiv.style.padding = '10px';
+                infoDiv.style.background = '#f8fafc';
+                infoDiv.style.borderRadius = '8px';
+                infoDiv.style.fontSize = '0.9rem';
+                notes.parentNode.appendChild(infoDiv); // Append inside form-group or after
+            }
+        }
+
+        if (infoDiv) {
+            let color = restante > 0 ? '#ef4444' : '#22c55e'; // Red if debt, Green if paid
+            let text = restante > 0 ? 'Falta Pagar' : 'Pagado';
+            if (price === 0) text = 'Precio no disp.';
+
+            infoDiv.innerHTML = `
+                <div style="display:flex; justify-content:space-between; font-weight:bold; color:#475569;">
+                    <span>Total (${days} noches):</span>
+                    <span>S/ ${total.toFixed(2)}</span>
+                </div>
+                <div style="display:flex; justify-content:space-between; color:${color}; margin-top:5px;">
+                    <span>${text}:</span>
+                    <span>S/ ${restante.toFixed(2)}</span>
+                </div>
+            `;
+            infoDiv.style.display = 'block';
+        }
+    } catch (e) { console.warn("Balance calc error", e); }
 }
 
 function closeCheckIn() {
@@ -3506,6 +3584,71 @@ function openReservation(roomId, roomNum, date, existingClient, mode = 'new', ex
             outDate.valueAsDate = tmr;
         }
     }
+
+    // Attach Listeners for Balance
+    const adelanto = document.getElementById('resAdelanto');
+    if (adelanto) adelanto.oninput = calculateReservationBalance;
+    inDate.onchange = calculateReservationBalance;
+    outDate.onchange = calculateReservationBalance;
+
+    // Trigger initial
+    calculateReservationBalance();
+}
+
+function calculateReservationBalance() {
+    try {
+        const roomId = document.getElementById('resRoomId').value;
+        const r = currentRoomsList.find(x => x.id == roomId);
+        const price = r ? (Number(r.precio) || 0) : 0;
+
+        const inDate = document.getElementById('resInDate').value;
+        const outDate = document.getElementById('resOutDate').value;
+        const adelanto = Number(document.getElementById('resAdelanto').value) || 0;
+
+        // Calculate Days
+        let days = 1;
+        if (inDate && outDate) {
+            const d1 = new Date(inDate);
+            const d2 = new Date(outDate);
+            const diff = d2 - d1;
+            days = Math.ceil(diff / (1000 * 60 * 60 * 24));
+            if (days < 1) days = 1;
+        }
+
+        const total = days * price;
+        const restante = total - adelanto;
+
+        // Find Info Div or Create
+        let infoDiv = document.getElementById('resBalanceInfo');
+        if (!infoDiv) {
+            const notesGroup = document.getElementById('resNotes').parentNode;
+            infoDiv = document.createElement('div');
+            infoDiv.id = 'resBalanceInfo';
+            infoDiv.style.marginTop = '10px';
+            infoDiv.style.padding = '10px';
+            infoDiv.style.background = '#f8fafc';
+            infoDiv.style.borderRadius = '8px';
+            infoDiv.style.fontSize = '0.9rem';
+            notesGroup.parentNode.insertBefore(infoDiv, notesGroup.nextSibling);
+        }
+
+        if (infoDiv) {
+            let color = restante > 0 ? '#ef4444' : '#22c55e';
+            let text = restante > 0 ? 'Falta Pagar' : 'Pagado';
+
+            infoDiv.innerHTML = `
+                <div style="display:flex; justify-content:space-between; font-weight:bold; color:#475569;">
+                    <span>Total (${days} noches):</span>
+                    <span>S/ ${total.toFixed(2)}</span>
+                </div>
+                <div style="display:flex; justify-content:space-between; color:${color}; margin-top:5px;">
+                    <span>${text}:</span>
+                    <span>S/ ${restante.toFixed(2)}</span>
+                </div>
+            `;
+        }
+
+    } catch (e) { console.warn("Balance Res Error", e); }
 }
 
 async function submitReservation() {
