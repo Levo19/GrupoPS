@@ -2573,8 +2573,27 @@ function renderCalendarTimeline(rooms, reservations) {
                 return isoDate >= s && isoDate <= e;
             });
 
+            // [NEW] Detect overlapping reservations (check-out + check-in on same day)
+            let checkOutRes = null;
+            let checkInRes = null;
+
+            matches.forEach(res => {
+                const s = getLocalISODate(new Date(res.fechaEntrada));
+                const e = getLocalISODate(new Date(res.fechaSalida));
+
+                if (isoDate === e && isoDate !== s) {
+                    checkOutRes = res; // This reservation ends today
+                } else if (isoDate === s) {
+                    checkInRes = res; // This reservation starts today
+                }
+            });
+
+            // If both exist, we have overlapping reservations
+            const hasOverlap = checkOutRes && checkInRes;
+
             if (matches.length > 0) {
-                const res = matches[0];
+                // Prioritize rendering logic
+                const res = hasOverlap ? checkOutRes : matches[0];
                 barId = res.id;
 
                 let s = getLocalISODate(new Date(res.fechaEntrada));
@@ -2608,7 +2627,7 @@ function renderCalendarTimeline(rooms, reservations) {
 
                 // Calculate tooltip data
                 const total = Number(res.total) || 0;
-                const paid = Number(res.pagado) || 0;
+                const paid = Number(res.pagado) || 0; // This might need a refresh signal or be approx
                 let realPaid = paid;
                 if (res.pagos && Array.isArray(res.pagos)) {
                     realPaid = res.pagos.reduce((sum, p) => sum + (Number(p.monto) || 0), 0);
@@ -2640,9 +2659,69 @@ function renderCalendarTimeline(rooms, reservations) {
                     debtHtml = `<span style="position:absolute; right:2px; top:2px; height:6px; width:6px; background:red; border-radius:50%;"></span>`;
                 }
 
-                // [NEW] SPLIT CELL for Check-Out (res-bar-end)
-                // Allow clicking the right half to create a new reservation starting that day
-                if (barType === 'res-bar-end') {
+                // [NEW] OVERLAPPING RESERVATIONS: Render both if they exist
+                if (hasOverlap) {
+                    // Calculate data for check-in reservation
+                    const res2 = checkInRes;
+                    const total2 = Number(res2.total) || 0;
+                    const paid2 = Number(res2.pagado) || 0;
+                    let realPaid2 = paid2;
+                    if (res2.pagos && Array.isArray(res2.pagos)) {
+                        realPaid2 = res2.pagos.reduce((sum, p) => sum + (Number(p.monto) || 0), 0);
+                    }
+                    const pending2 = total2 - realPaid2;
+                    const d1_2 = new Date(res2.fechaEntrada);
+                    const d2_2 = new Date(res2.fechaSalida);
+                    const nights2 = Math.max(1, Math.ceil((d2_2 - d1_2) / (1000 * 60 * 60 * 24)));
+
+                    const tooltipData2 = {
+                        cliente: res2.cliente || '',
+                        estado: res2.estado,
+                        nights: nights2,
+                        total: total2.toFixed(2),
+                        paid: realPaid2.toFixed(2),
+                        pending: pending2.toFixed(2),
+                        pendingColor: pending2 > 0 ? '#f87171' : '#4ade80',
+                        paidColor: pending2 <= 0 ? '#4ade80' : '#fff',
+                        notas: res2.notas || ''
+                    };
+                    const tooltipJson2 = JSON.stringify(tooltipData2).replace(/"/g, '&quot;');
+
+                    let debtHtml2 = '';
+                    if (pending2 > 0.5) {
+                        debtHtml2 = `<span style="position:absolute; right:2px; top:2px; height:6px; width:6px; background:red; border-radius:50%;"></span>`;
+                    }
+
+                    // Color for check-in
+                    let col2 = colorFuture;
+                    if (res2.estado === 'Activa' || res2.estado === 'Ocupada') col2 = colorActive;
+                    if (res2.estado === 'Finalizada') col2 = colorPast;
+
+                    const label2 = (res2.cliente || '').split(' ')[0];
+
+                    html += `<td class="${tdClass}" style="padding:5px; position:relative;">
+                                <div style="display:flex; height:32px; position:relative; align-items:stretch; gap:2px;">
+                                    <!-- Left: Check-out ending -->
+                                    <div class="res-bar-base" style="background:${barColor}; flex:1; border-radius:6px 2px 2px 6px; position:relative;" 
+                                         onclick="openReservationDetail('${checkOutRes.id}')" 
+                                         onmouseenter="showTooltipFromData(event, this)" 
+                                         onmouseleave="hideTooltip()"
+                                         data-tooltip-data="${tooltipJson}">
+                                        ${debtHtml}
+                                    </div>
+                                    <!-- Right: Check-in starting -->
+                                    <div class="res-bar-base" style="background:${col2}; flex:1; border-radius:2px 6px 6px 2px; position:relative;" 
+                                         onclick="openReservationDetail('${checkInRes.id}')" 
+                                         onmouseenter="showTooltipFromData(event, this)" 
+                                         onmouseleave="hideTooltip()"
+                                         data-tooltip-data="${tooltipJson2}">
+                                        ${label2}
+                                        ${debtHtml2}
+                                    </div>
+                                </div>
+                             </td>`;
+                } else if (barType === 'res-bar-end') {
+                    // Single check-out: split cell with clickable right half
                     html += `<td class="${tdClass}" style="padding:5px; position:relative;">
                                 <div style="display:flex; height:32px; position:relative; align-items:stretch;">
                                     <!-- Left Half: Existing reservation ending (uses CSS .res-bar-end which is 50% width) -->
