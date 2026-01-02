@@ -1040,7 +1040,7 @@ function openCheckIn(roomId, roomNum) {
     setupCheckInModal(roomId, roomNum, null);
 }
 
-function setupCheckInModal(roomId, roomNum, preSelectedDate) {
+async function setupCheckInModal(roomId, roomNum, preSelectedDate) {
     try {
         // console.log("Setup CheckIn: ", roomId); 
         const form = document.getElementById('formCheckIn');
@@ -1051,6 +1051,16 @@ function setupCheckInModal(roomId, roomNum, preSelectedDate) {
         if (!roomId) roomLabel.style.display = 'none'; // Pre-emptive hide
         const roomSelect = document.getElementById('checkInRoomSelect');
         const roomIdInput = document.getElementById('checkInRoomId');
+
+        // Ensure Data exists (Fix for "Cargando..." issue)
+        if (!currentRoomsList || currentRoomsList.length === 0) {
+            // If global, show loading in the select
+            if (!roomId) {
+                roomSelect.style.display = 'block';
+                roomSelect.innerHTML = '<option>Cargando datos...</option>';
+            }
+            await loadRooms(); // Wait for fetch
+        }
 
         // 1. Setup Room Selection
         if (roomId) {
@@ -1083,8 +1093,7 @@ function setupCheckInModal(roomId, roomNum, preSelectedDate) {
                 });
                 if (count === 0) ops += '<option disabled>Sin habitaciones disponibles</option>';
             } else {
-                ops += '<option disabled>Error: Datos no cargados. Reintentando...</option>';
-                setTimeout(() => loadRoomsView(), 500);
+                ops += '<option disabled>Error: No se pudieron cargar las habitaciones</option>';
             }
 
             roomSelect.innerHTML = ops;
@@ -1101,7 +1110,7 @@ function setupCheckInModal(roomId, roomNum, preSelectedDate) {
         }
 
         // Ensure blocks are loaded
-        ensureReservationsLoaded();
+        await ensureReservationsLoaded();
 
         document.getElementById('modalCheckIn').style.display = 'flex';
     } catch (e) {
