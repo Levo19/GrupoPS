@@ -2624,7 +2624,7 @@ function renderCalendarTimeline(rooms, reservations) {
                 const tooltipHtml = `
                     <div style='text-align:left; font-size:0.85rem; min-width:180px;'>
                         <div style='font-weight:bold; border-bottom:1px solid rgba(255,255,255,0.2); padding-bottom:5px; margin-bottom:5px; font-size:0.95rem;'>
-                            ${res.cliente}
+                            ${(res.cliente || '').replace(/'/g, "&apos;")}
                         </div>
                         <div style='display:flex; justify-content:space-between;'><span>Estado:</span> <strong>${res.estado}</strong></div>
                         <div style='display:flex; justify-content:space-between;'><span>Noches:</span> <strong>${nights}</strong></div>
@@ -2635,9 +2635,9 @@ function renderCalendarTimeline(rooms, reservations) {
                                 <span>Falta:</span> <span style='color:${pending > 0 ? '#f87171' : '#4ade80'};'>S/ ${pending > 0 ? pending.toFixed(2) : '0.00'}</span>
                              </div>
                         </div>
-                        ${res.notas ? `<div style='margin-top:5px; font-style:italic; font-size:0.75rem; color:#cbd5e1;'>${res.notas}</div>` : ''}
+                        ${res.notas ? `<div style='margin-top:5px; font-style:italic; font-size:0.75rem; color:#cbd5e1;'>${(res.notas || '').replace(/'/g, "&apos;")}</div>` : ''}
                     </div>
-                `;
+                `.replace(/\n/g, '').replace(/\s+/g, ' ');
 
                 // Single Debt Dot
                 let debtHtml = '';
@@ -2645,15 +2645,37 @@ function renderCalendarTimeline(rooms, reservations) {
                     debtHtml = `<span style="position:absolute; right:2px; top:2px; height:6px; width:6px; background:red; border-radius:50%;"></span>`;
                 }
 
-                html += `<td class="${tdClass}" style="padding:5px;">
-                            <div class="res-bar-base ${barType}" style="background:${barColor}; position:relative;" 
-                                 onclick="openReservationDetail('${barId}')" 
-                                 onmouseenter="showTooltip(event, '${tooltipHtml}')" 
-                                 onmouseleave="hideTooltip()">
-                                ${barLabel}
-                                ${debtHtml}
-                            </div>
-                         </td>`;
+                // [NEW] SPLIT CELL for Check-Out (res-bar-end)
+                // Allow clicking the right half to create a new reservation starting that day
+                if (barType === 'res-bar-end') {
+                    html += `<td class="${tdClass}" style="padding:5px; position:relative;">
+                                <div style="display:flex; height:30px; position:relative;">
+                                    <!-- Left Half: Existing reservation ending -->
+                                    <div class="res-bar-base ${barType}" style="background:${barColor}; width:50%; border-radius:6px 0 0 6px; position:relative;" 
+                                         onclick="openReservationDetail('${barId}')" 
+                                         onmouseenter="showTooltip(event, '${tooltipHtml}')" 
+                                         onmouseleave="hideTooltip()">
+                                        ${debtHtml}
+                                    </div>
+                                    <!-- Right Half: Clickable for new reservation -->
+                                    <div onclick="openNewReservation('${r.id}', '${r.numero}', '${isoDate}')"
+                                         style="width:50%; height:30px; border-radius:0 6px 6px 0; cursor:pointer; border:1px dashed #cbd5e1; background:#f8fafc;"
+                                         class="cell-hover"
+                                         title="Nueva Reserva (Check-In ${isoDate})"></div>
+                                </div>
+                             </td>`;
+                } else {
+                    // Normal reservation cell (start, mid, single)
+                    html += `<td class="${tdClass}" style="padding:5px;">
+                                <div class="res-bar-base ${barType}" style="background:${barColor}; position:relative;" 
+                                     onclick="openReservationDetail('${barId}')" 
+                                     onmouseenter="showTooltip(event, '${tooltipHtml}')" 
+                                     onmouseleave="hideTooltip()">
+                                    ${barLabel}
+                                    ${debtHtml}
+                                </div>
+                             </td>`;
+                }
             } else {
                 // Empty - Click to add new
                 // If Dirty and Today/Future -> Add Pattern
