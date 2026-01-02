@@ -2,6 +2,9 @@ console.log("APP JS VERSION: 20260101_1435 - HARD RELOAD");
 // ===== STATE =====
 let currentUser = null;
 let currentView = 'dashboard';
+let currentRoomsList = [];
+let currentProductsList = [];
+let currentUsersList = [];
 let currentReservationsList = [];
 let checkInMode = 'checkin';
 let pickerState = {
@@ -98,6 +101,25 @@ async function preloadAppSession() {
 }
 
 // ===== DATA REFRESH HELPERS =====
+async function loadRooms() {
+    try {
+        const response = await fetch(CONFIG.API_URL, {
+            method: 'POST',
+            body: JSON.stringify({ action: 'getHabitaciones' })
+        });
+        const data = await response.json();
+        if (data.success) {
+            currentRoomsList = data.habitaciones;
+            // Optionally update views if they are active?
+            // renderRooms(currentRoomsList); // Only if needed based on view
+            console.log('Habitaciones recargadas:', currentRoomsList.length);
+        } else {
+            console.error('Error cargando habitaciones:', data.error);
+        }
+    } catch (e) {
+        console.error('Error de red al cargar habitaciones:', e);
+    }
+}
 async function loadReservations() {
     try {
         const res = await fetch(CONFIG.API_URL, { method: 'POST', body: JSON.stringify({ action: 'getReservas' }) });
@@ -287,7 +309,7 @@ async function loadRoomsView() {
 
 
 // ===== ROOM EDITOR LOGIC =====
-let currentRoomsList = []; // Store fetched rooms to find by ID easily
+// currentRoomsList is now global at top
 
 function editRoom(id) {
     const room = currentRoomsList.find(r => r.id == id);
@@ -1184,10 +1206,12 @@ async function processCheckIn(e) {
             data.id = existingRes.id;
             // Also pass adelanto if any, to be added as payment
             data.adelanto = document.getElementById('checkInAdelanto') ? document.getElementById('checkInAdelanto').value : 0;
+            data.metodo = document.getElementById('checkInMetodo') ? document.getElementById('checkInMetodo').value : 'Efectivo';
         } else {
             // Normal Walk-In / New Reservation
             data.action = 'checkIn';
             data.adelanto = document.getElementById('checkInAdelanto') ? document.getElementById('checkInAdelanto').value : 0;
+            data.metodo = document.getElementById('checkInMetodo') ? document.getElementById('checkInMetodo').value : 'Efectivo';
         }
     }
 
@@ -1634,7 +1658,6 @@ async function finalizeCheckOut() {
 }
 
 // ===== USERS MODULE =====
-let currentUsersList = [];
 
 async function markRoomClean(roomId) {
     if (!confirm('¿Marcar habitación como LIMPIA y DISPONIBLE?')) return;
@@ -1830,7 +1853,6 @@ async function saveUser(e) {
 
 
 // ===== PRODUCTS MODULE =====
-let currentProductsList = [];
 let currentServicesList = []; // [PHASE 9]
 let qcSelectedPrice = 0; // [PHASE 9]
 let currentProductFilter = 'Todos';
