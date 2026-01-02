@@ -1182,10 +1182,12 @@ async function processCheckIn(e) {
             console.log("Found existing reservation for Check-In:", existingRes);
             data.action = 'confirmReservation';
             data.id = existingRes.id;
-            // We pass other fields just in case we want to update them during confirm (not currently supported by backend confirm, but safe)
+            // Also pass adelanto if any, to be added as payment
+            data.adelanto = document.getElementById('checkInAdelanto') ? document.getElementById('checkInAdelanto').value : 0;
         } else {
-            // Normal Walk-In
+            // Normal Walk-In / New Reservation
             data.action = 'checkIn';
+            data.adelanto = document.getElementById('checkInAdelanto') ? document.getElementById('checkInAdelanto').value : 0;
         }
     }
 
@@ -1216,6 +1218,12 @@ async function processCheckIn(e) {
         const existingRes = currentReservationsList.find(r => r.id === data.id);
         if (existingRes) {
             existingRes.estado = 'Activa';
+
+            // Optimistic Payment Update
+            if (Number(data.adelanto) > 0) {
+                existingRes.pagado = (Number(existingRes.pagado) || 0) + Number(data.adelanto);
+            }
+
             // Update Room Status
             const roomIdx = currentRoomsList.findIndex(r => r.id == data.habitacionId);
             if (roomIdx !== -1) {
@@ -1236,7 +1244,9 @@ async function processCheckIn(e) {
             fechaEntrada: data.fechaEntrada + ' 14:00',
             fechaSalida: data.fechaSalida + ' 11:00',
             estado: tempStatus,
-            notas: data.notas
+            notas: data.notas,
+            total: 0, // Backend will calculate, but init for UI
+            pagado: Number(data.adelanto) || 0 // Init with adelanto
         };
         currentReservationsList.push(newRes);
 
