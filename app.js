@@ -2606,38 +2606,33 @@ function renderCalendarTimeline(rooms, reservations) {
 
                 if (!barLabel && barType === 'res-bar-single') barLabel = (res.cliente || '').split(' ')[0];
 
-                // [MOD] Enhanced Rich Tooltip
-                const total = Number(res.total) || 0; // Total Reserva
-                const paid = Number(res.pagado) || 0; // Historically paid
-                // Calculate Real Paid from embedded payments if available
+                // Calculate tooltip data
+                const total = Number(res.total) || 0;
+                const paid = Number(res.pagado) || 0;
                 let realPaid = paid;
                 if (res.pagos && Array.isArray(res.pagos)) {
                     realPaid = res.pagos.reduce((sum, p) => sum + (Number(p.monto) || 0), 0);
                 }
                 const pending = total - realPaid;
 
-                // Duration
                 const d1 = new Date(res.fechaEntrada);
                 const d2 = new Date(res.fechaSalida);
                 const nights = Math.max(1, Math.ceil((d2 - d1) / (1000 * 60 * 60 * 24)));
 
-                const tooltipHtml = `
-                    <div style='text-align:left; font-size:0.85rem; min-width:180px;'>
-                        <div style='font-weight:bold; border-bottom:1px solid rgba(255,255,255,0.2); padding-bottom:5px; margin-bottom:5px; font-size:0.95rem;'>
-                            ${(res.cliente || '').replace(/'/g, "&apos;")}
-                        </div>
-                        <div style='display:flex; justify-content:space-between;'><span>Estado:</span> <strong>${res.estado}</strong></div>
-                        <div style='display:flex; justify-content:space-between;'><span>Noches:</span> <strong>${nights}</strong></div>
-                        <div style='margin-top:8px; border-top:1px dashed rgba(255,255,255,0.2); padding-top:5px;'>
-                            <div style='display:flex; justify-content:space-between;'><span>Total:</span> <span>S/ ${total.toFixed(2)}</span></div>
-                             <div style='display:flex; justify-content:space-between;'><span>Pagado:</span> <span style='color:${pending <= 0 ? '#4ade80' : '#fff'};'>S/ ${realPaid.toFixed(2)}</span></div>
-                             <div style='display:flex; justify-content:space-between; font-weight:bold; margin-top:2px;'>
-                                <span>Falta:</span> <span style='color:${pending > 0 ? '#f87171' : '#4ade80'};'>S/ ${pending > 0 ? pending.toFixed(2) : '0.00'}</span>
-                             </div>
-                        </div>
-                        ${res.notas ? `<div style='margin-top:5px; font-style:italic; font-size:0.75rem; color:#cbd5e1;'>${(res.notas || '').replace(/'/g, "&apos;")}</div>` : ''}
-                    </div>
-                `.replace(/\n/g, '').replace(/\s+/g, ' ');
+                // [MOD] Enhanced Rich Tooltip - Use JSON data attribute to avoid quote escaping issues
+                const tooltipData = {
+                    cliente: res.cliente || '',
+                    estado: res.estado,
+                    nights: nights,
+                    total: total.toFixed(2),
+                    paid: realPaid.toFixed(2),
+                    pending: pending.toFixed(2),
+                    pendingColor: pending > 0 ? '#f87171' : '#4ade80',
+                    paidColor: pending <= 0 ? '#4ade80' : '#fff',
+                    notas: res.notas || ''
+                };
+
+                const tooltipJson = JSON.stringify(tooltipData).replace(/"/g, '&quot;');
 
                 // Single Debt Dot
                 let debtHtml = '';
@@ -2649,17 +2644,18 @@ function renderCalendarTimeline(rooms, reservations) {
                 // Allow clicking the right half to create a new reservation starting that day
                 if (barType === 'res-bar-end') {
                     html += `<td class="${tdClass}" style="padding:5px; position:relative;">
-                                <div style="display:flex; height:30px; position:relative;">
-                                    <!-- Left Half: Existing reservation ending -->
-                                    <div class="res-bar-base ${barType}" style="background:${barColor}; width:50%; border-radius:6px 0 0 6px; position:relative;" 
+                                <div style="display:flex; height:32px; position:relative; align-items:stretch;">
+                                    <!-- Left Half: Existing reservation ending (uses CSS .res-bar-end which is 50% width) -->
+                                    <div class="res-bar-base res-bar-end" style="background:${barColor}; position:relative; margin-left:0;" 
                                          onclick="openReservationDetail('${barId}')" 
-                                         onmouseenter="showTooltip(event, '${tooltipHtml}')" 
-                                         onmouseleave="hideTooltip()">
+                                         onmouseenter="showTooltipFromData(event, this)" 
+                                         onmouseleave="hideTooltip()"
+                                         data-tooltip-data="${tooltipJson}">
                                         ${debtHtml}
                                     </div>
                                     <!-- Right Half: Clickable for new reservation -->
                                     <div onclick="openNewReservation('${r.id}', '${r.numero}', '${isoDate}')"
-                                         style="width:50%; height:30px; border-radius:0 6px 6px 0; cursor:pointer; border:1px dashed #cbd5e1; background:#f8fafc;"
+                                         style="flex:1; height:32px; border-radius:0 6px 6px 0; cursor:pointer; border:1px dashed #cbd5e1; background:#f8fafc;"
                                          class="cell-hover"
                                          title="Nueva Reserva (Check-In ${isoDate})"></div>
                                 </div>
@@ -2669,8 +2665,9 @@ function renderCalendarTimeline(rooms, reservations) {
                     html += `<td class="${tdClass}" style="padding:5px;">
                                 <div class="res-bar-base ${barType}" style="background:${barColor}; position:relative;" 
                                      onclick="openReservationDetail('${barId}')" 
-                                     onmouseenter="showTooltip(event, '${tooltipHtml}')" 
-                                     onmouseleave="hideTooltip()">
+                                     onmouseenter="showTooltipFromData(event, this)" 
+                                     onmouseleave="hideTooltip()"
+                                     data-tooltip-data="${tooltipJson}">
                                     ${barLabel}
                                     ${debtHtml}
                                 </div>
@@ -4199,6 +4196,38 @@ function showTooltip(e, htmlContent) {
     // Or just rely on mouseenter/leave + static position if we don't move it?
     // User DX: Following mouse is nicer.
     e.target.onmousemove = moveTooltip;
+}
+
+// [NEW] Helper to show tooltip from JSON data attribute (avoids quote escaping issues)
+function showTooltipFromData(e, element) {
+    const jsonStr = element.getAttribute('data-tooltip-data');
+    if (!jsonStr) return;
+
+    try {
+        const data = JSON.parse(jsonStr.replace(/&quot;/g, '"'));
+
+        const tooltipHtml = `
+            <div style='text-align:left; font-size:0.85rem; min-width:180px;'>
+                <div style='font-weight:bold; border-bottom:1px solid rgba(255,255,255,0.2); padding-bottom:5px; margin-bottom:5px; font-size:0.95rem;'>
+                    ${data.cliente}
+                </div>
+                <div style='display:flex; justify-content:space-between;'><span>Estado:</span> <strong>${data.estado}</strong></div>
+                <div style='display:flex; justify-content:space-between;'><span>Noches:</span> <strong>${data.nights}</strong></div>
+                <div style='margin-top:8px; border-top:1px dashed rgba(255,255,255,0.2); padding-top:5px;'>
+                    <div style='display:flex; justify-content:space-between;'><span>Total:</span> <span>S/ ${data.total}</span></div>
+                    <div style='display:flex; justify-content:space-between;'><span>Pagado:</span> <span style='color:${data.paidColor};'>S/ ${data.paid}</span></div>
+                    <div style='display:flex; justify-content:space-between; font-weight:bold; margin-top:2px;'>
+                        <span>Falta:</span> <span style='color:${data.pendingColor};'>S/ ${data.pending}</span>
+                    </div>
+                </div>
+                ${data.notas ? `<div style='margin-top:5px; font-style:italic; font-size:0.75rem; color:#cbd5e1;'>${data.notas}</div>` : ''}
+            </div>
+        `;
+
+        showTooltip(e, tooltipHtml);
+    } catch (err) {
+        console.error('Tooltip parse error:', err);
+    }
 }
 
 function moveTooltip(e) {
