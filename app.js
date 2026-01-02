@@ -3566,6 +3566,8 @@ async function submitReservation() {
             const client = document.getElementById('resClient').value;
             const start = document.getElementById('resInDate').value;
             const end = document.getElementById('resOutDate').value;
+            const adelanto = document.getElementById('resAdelanto') ? document.getElementById('resAdelanto').value : 0;
+            const metodo = document.getElementById('resMetodo') ? document.getElementById('resMetodo').value : 'Efectivo';
 
             if (!client || !start || !end) throw new Error('Completa todos los campos');
 
@@ -3578,7 +3580,8 @@ async function submitReservation() {
                 fechaEntrada: start + ' 14:00', // Mock time
                 fechaSalida: end + ' 11:00',
                 estado: 'Reserva', // Assuming New Reservation
-                notas: notes
+                notas: notes,
+                pagado: Number(adelanto) || 0 // Optimistic Payment
             };
             currentReservationsList.push(tempRes);
             renderCalendarTimeline(currentRoomsList, currentReservationsList);
@@ -3593,7 +3596,9 @@ async function submitReservation() {
                     fechaEntrada: start,
                     fechaSalida: end,
                     notas: notes,
-                    isReservation: true
+                    isReservation: true,
+                    adelanto: adelanto, // [NEW] Pass Advance Payment
+                    metodo: metodo      // [NEW] Pass Payment Method
                 })
             });
             const d = await res.json();
