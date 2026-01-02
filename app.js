@@ -4367,3 +4367,4 @@ function hideTooltip() {
         tooltipEl.style.display = 'none';
     }
 }
+
