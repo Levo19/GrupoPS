@@ -2594,14 +2594,43 @@ function renderCalendarTimeline(rooms, reservations) {
 
                 if (!barLabel && barType === 'res-bar-single') barLabel = (res.cliente || '').split(' ')[0];
 
-                const tooltipHtml = `<strong>${res.cliente}</strong><br>Status: ${res.estado}<br>${res.notas || ''}`;
+                // [MOD] Enhanced Rich Tooltip
+                const total = Number(res.total) || 0; // Total Reserva
+                const paid = Number(res.pagado) || 0; // Historically paid
+                // Calculate Real Paid from embedded payments if available
+                let realPaid = paid;
+                if (res.pagos && Array.isArray(res.pagos)) {
+                    realPaid = res.pagos.reduce((sum, p) => sum + (Number(p.monto) || 0), 0);
+                }
+                const pending = total - realPaid;
 
-                // [NEW] Debt Indicator
+                // Duration
+                const d1 = new Date(res.fechaEntrada);
+                const d2 = new Date(res.fechaSalida);
+                const nights = Math.max(1, Math.ceil((d2 - d1) / (1000 * 60 * 60 * 24)));
+
+                const tooltipHtml = `
+                    <div style='text-align:left; font-size:0.85rem; min-width:180px;'>
+                        <div style='font-weight:bold; border-bottom:1px solid rgba(255,255,255,0.2); padding-bottom:5px; margin-bottom:5px; font-size:0.95rem;'>
+                            ${res.cliente}
+                        </div>
+                        <div style='display:flex; justify-content:space-between;'><span>Estado:</span> <strong>${res.estado}</strong></div>
+                        <div style='display:flex; justify-content:space-between;'><span>Noches:</span> <strong>${nights}</strong></div>
+                        <div style='margin-top:8px; border-top:1px dashed rgba(255,255,255,0.2); padding-top:5px;'>
+                            <div style='display:flex; justify-content:space-between;'><span>Total:</span> <span>S/ ${total.toFixed(2)}</span></div>
+                             <div style='display:flex; justify-content:space-between;'><span>Pagado:</span> <span style='color:${pending <= 0 ? '#4ade80' : '#fff'};'>S/ ${realPaid.toFixed(2)}</span></div>
+                             <div style='display:flex; justify-content:space-between; font-weight:bold; margin-top:2px;'>
+                                <span>Falta:</span> <span style='color:${pending > 0 ? '#f87171' : '#4ade80'};'>S/ ${pending > 0 ? pending.toFixed(2) : '0.00'}</span>
+                             </div>
+                        </div>
+                        ${res.notas ? `<div style='margin-top:5px; font-style:italic; font-size:0.75rem; color:#cbd5e1;'>${res.notas}</div>` : ''}
+                    </div>
+                `;
+
+                // Single Debt Dot
                 let debtHtml = '';
-                const total = Number(res.total) || 0;
-                const paid = Number(res.pagado) || 0;
-                if (total > paid) {
-                    debtHtml = `<span style="position:absolute; right:2px; top:2px; font-size:0.6rem; background:red; color:white; padding:0 3px; border-radius:3px;">S/</span>`;
+                if (pending > 0.5) { // Small tolerance
+                    debtHtml = `<span style="position:absolute; right:2px; top:2px; height:6px; width:6px; background:red; border-radius:50%;"></span>`;
                 }
 
                 html += `<td class="${tdClass}" style="padding:5px;">
