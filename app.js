@@ -2452,6 +2452,15 @@ function getLocalISODate(d) {
 }
 
 function renderCalendarTimeline(rooms, reservations) {
+    // Guard against undefined/null inputs (Fix for crash)
+    if (!rooms || !Array.isArray(rooms)) {
+        console.warn('renderCalendarTimeline: rooms is invalid', rooms);
+        rooms = [];
+    }
+    if (!reservations || !Array.isArray(reservations)) {
+        reservations = [];
+    }
+
     const container = document.getElementById('view-calendar');
 
     // Phase 12: Premium Concierge Calendar
