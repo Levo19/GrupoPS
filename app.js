@@ -2935,7 +2935,8 @@ function renderCalendarTimeline(rooms, reservations) {
                 let cellInnerClass = "cell-hover";
                 let dirtyMarker = "";
                 if (isDirty && !isPast) {
-                    dirtyMarker = `<i class="fas fa-broom" style="color:#ef4444; font-size:0.8rem;" title="Sucio"></i>`;
+                    // dirtyMarker = ... (User requested to remove this from cells)
+                    dirtyMarker = "";
                 }
 
                 html += `<td class="${tdClass}" style="padding:0; height:40px; border-bottom:1px solid #f1f5f9; border-right:1px solid #f1f5f9; text-align:center;">
