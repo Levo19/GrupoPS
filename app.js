@@ -2232,6 +2232,13 @@ function openNewProduct() {
     document.getElementById('imgPreview').src = '';
     document.getElementById('imagePreviewContainer').style.display = 'none';
 
+    // RESET BUTTON
+    const btn = document.querySelector('#modalProductEditor button[type="submit"]');
+    if (btn) {
+        btn.disabled = false;
+        btn.innerText = 'Guardar Producto';
+    }
+
     document.getElementById('modalProductEditor').style.display = 'flex';
 }
 
@@ -2252,12 +2259,20 @@ function editProduct(id) {
     document.getElementById('editProdFile').value = '';
 
     // Show Preview if URL exists
+    // Show Preview if URL exists
     if (p.imagen_url) {
         document.getElementById('imgPreview').src = p.imagen_url;
         document.getElementById('imagePreviewContainer').style.display = 'block';
     } else {
         document.getElementById('imagePreviewContainer').style.display = 'none';
         document.getElementById('imgPreview').src = '';
+    }
+
+    // RESET BUTTON
+    const btn = document.querySelector('#modalProductEditor button[type="submit"]');
+    if (btn) {
+        btn.disabled = false;
+        btn.innerText = 'Guardar Cambios';
     }
 
     document.getElementById('modalProductEditor').style.display = 'flex';
@@ -2548,9 +2563,9 @@ function renderCalendarTimeline(rooms, reservations) {
         const isDirty = (r.estado || '').toLowerCase() === 'sucio';
         let statusDot = '';
         if (isDirty) {
-            statusDot = `<i class="fas fa-broom" style="color:#f59e0b; margin-left:5px; font-size:0.8rem;" title="Limpieza Requerida"></i>`;
+            statusDot = `<i class='fas fa-broom' style='color:#f59e0b; margin-left:5px; font-size:0.8rem;' title='Limpieza Requerida'></i>`;
         } else if ((r.estado || '').toLowerCase() === 'ocupado') {
-            statusDot = `<span style="display:inline-block; width:8px; height:8px; background:${colorActive}; border-radius:50%; margin-left:5px;"></span>`;
+            statusDot = `<span style='display:inline-block; width:8px; height:8px; background:${colorActive}; border-radius:50%; margin-left:5px;'></span>`;
         }
 
         html += `<tr class="calendar-row" style="border-bottom:1px solid #f1f5f9;">
@@ -2683,7 +2698,8 @@ function renderCalendarTimeline(rooms, reservations) {
                 // Single Debt Dot
                 let debtHtml = '';
                 if (pending > 0.5) { // Small tolerance
-                    debtHtml = `<span style="position:absolute; right:2px; top:2px; height:6px; width:6px; background:red; border-radius:50%;"></span>`;
+                    // FIXED: Use single quotes inside HTML string to avoid conflict
+                    debtHtml = `<span style='position:absolute; right:2px; top:2px; height:6px; width:6px; background:red; border-radius:50%;'></span>`;
                 }
 
                 // [NEW] OVERLAPPING RESERVATIONS: Render both if they exist
