@@ -1164,6 +1164,29 @@ async function processCheckIn(e) {
     if (data.isExtension) {
         data.action = 'extendReservation';
         data.newCheckOutDate = data.fechaSalida;
+    } else {
+        // [NEW] Smart Check-In: Detect if we are keeping a Reservation
+        // If there is a 'Reserva' (Yellow) for this Room starting TODAY, we should CONFIRM it, not create a new one.
+        // Unless the user explicitly wants a new one (unlikely for same room).
+
+        const todayIso = new Date().toLocaleDateString('sv').split('T')[0];
+        const startIso = new Date(data.fechaEntrada).toLocaleDateString('sv').split('T')[0]; // Assuming input is YYYY-MM-DD
+
+        const existingRes = currentReservationsList.find(r =>
+            (String(r.habitacionId) === String(data.habitacionId) || String(r.habitacionNumero) === String(data.habitacionId)) &&
+            r.estado === 'Reserva' &&
+            new Date(r.fechaEntrada).toLocaleDateString('sv').split('T')[0] === startIso
+        );
+
+        if (existingRes) {
+            console.log("Found existing reservation for Check-In:", existingRes);
+            data.action = 'confirmReservation';
+            data.id = existingRes.id;
+            // We pass other fields just in case we want to update them during confirm (not currently supported by backend confirm, but safe)
+        } else {
+            // Normal Walk-In
+            data.action = 'checkIn';
+        }
     }
 
     if ((!data.isExtension && !data.fechaEntrada) || !data.fechaSalida || !data.cliente) {
@@ -1189,7 +1212,19 @@ async function processCheckIn(e) {
             // Also need to update the grid view?
             // renderCalendar() will pick this up.
         }
+    } else if (data.action === 'confirmReservation') {
+        const existingRes = currentReservationsList.find(r => r.id === data.id);
+        if (existingRes) {
+            existingRes.estado = 'Activa';
+            // Update Room Status
+            const roomIdx = currentRoomsList.findIndex(r => r.id == data.habitacionId);
+            if (roomIdx !== -1) {
+                currentRoomsList[roomIdx].estado = 'Ocupado';
+                currentRoomsList[roomIdx].cliente = data.cliente;
+            }
+        }
     } else {
+        // Walk In
         const tempId = 'TEMP-' + new Date().getTime();
         let tempStatus = 'Activa';
         if (data.isReservation) tempStatus = 'Reserva';
@@ -2178,9 +2213,9 @@ function renderCalendarTimeline(rooms, reservations) {
     const colorPast = '#64748b'; // Slate (Finalized)
 
     let html = `
-    <div class="calendar-container">
+    <div class="calendar-container" style="overflow-x:auto;"> 
         <!-- Sticky Header Context -->
-        <div style="display:flex; justify-content:space-between; align-items:center; padding:15px; background:white; position:sticky; top:0; left:0; z-index:40; border-bottom:1px solid #f1f5f9;">
+        <div style="display:flex; justify-content:space-between; align-items:center; padding:15px; background:white; position:sticky; top:0; left:0; z-index:40; border-bottom:1px solid #f1f5f9; min-width:800px;">
             <div style="display:flex; gap:10px; align-items:center;">
                 <button onclick="changeCalendarDate(-15)" style="border:1px solid #cbd5e1; background:white; padding:5px 10px; border-radius:6px; cursor:pointer;"><i class="fas fa-chevron-left"></i></button>
                 <h2 style="color:var(--primary); font-size:1.5rem; margin:0;">Oc. ${start.toLocaleDateString()}</h2>
@@ -2202,7 +2237,7 @@ function renderCalendarTimeline(rooms, reservations) {
         <table style="width:100%; border-collapse:collapse; min-width:800px;">
             <thead>
                 <tr>
-                    <th class="sticky-header sticky-col" style="padding:10px; text-align:left; border-bottom:2px solid #e2e8f0; width:100px;">Hab.</th>
+                    <th class="sticky-header sticky-col" style="padding:10px; text-align:left; border-bottom:2px solid #e2e8f0; width:100px; background:white; z-index:41;">Hab.</th>
                     ${dates.map(d => {
         const dayName = d.toLocaleDateString('es-ES', { weekday: 'short' });
         const dayNum = d.getDate();
@@ -2224,9 +2259,17 @@ function renderCalendarTimeline(rooms, reservations) {
     // We rely on Global showTooltip defined later or inline
 
     rooms.forEach(r => {
+        const isDirty = (r.estado || '').toLowerCase() === 'sucio';
+        let statusDot = '';
+        if (isDirty) {
+            statusDot = `<i class="fas fa-broom" style="color:#f59e0b; margin-left:5px; font-size:0.8rem;" title="Limpieza Requerida"></i>`;
+        } else if ((r.estado || '').toLowerCase() === 'ocupado') {
+            statusDot = `<span style="display:inline-block; width:8px; height:8px; background:${colorActive}; border-radius:50%; margin-left:5px;"></span>`;
+        }
+
         html += `<tr class="calendar-row" style="border-bottom:1px solid #f1f5f9;">
-                    <td class="sticky-col" style="padding:15px 10px; font-weight:bold; color:var(--primary); cursor:pointer;" onclick="openRoomDetail('${r.id}')" onmouseenter="showTooltip(event, 'Habitación ${r.numero}<br><small>${r.tipo}</small>')" onmouseleave="hideTooltip()">
-                        ${r.numero} <br>
+                    <td class="sticky-col" style="padding:15px 10px; font-weight:bold; color:var(--primary); cursor:pointer; background:white; z-index:30;" onclick="openRoomDetail('${r.id}')" onmouseenter="showTooltip(event, 'Habitación ${r.numero}<br><small>${r.tipo}</small>')" onmouseleave="hideTooltip()">
+                        ${r.numero} ${statusDot}<br>
                         <span style="font-size:0.7rem; color:#94a3b8; font-weight:normal;">${r.tipo}</span>
                     </td>`;
 
