@@ -2648,20 +2648,6 @@ function openRoomDetail(roomId) {
     const r = currentRoomsList.find(x => x.id == roomId);
     if (!r) return;
 
-    // [NEW] Smart Redirection: If there is a Pending Reservation for TODAY, open it directly.
-    // This unifies the UX with the "Reservation Bar" click.
-    const todayIso = new Date().toLocaleDateString('sv').split('T')[0];
-    const pendingResForToday = currentReservationsList.find(res =>
-        (String(res.habitacionId) === String(roomId) || String(res.habitacionNumero) === String(r.numero)) &&
-        res.estado === 'Reserva' &&
-        new Date(res.fechaEntrada).toLocaleDateString('sv').split('T')[0] <= todayIso
-    );
-
-    if (pendingResForToday && typeof openReservationDetail === 'function') {
-        openReservationDetail(pendingResForToday.id);
-        return;
-    }
-
     // Elements
     const img = document.getElementById('rdImg');
     const badge = document.getElementById('rdStatus');
@@ -2670,26 +2656,14 @@ function openRoomDetail(roomId) {
     const price = document.getElementById('rdPrice');
     const cap = document.getElementById('rdCap');
     const beds = document.getElementById('rdBeds');
-    const actions = document.getElementById('rdActions');
 
-    // Lookup Active Reservation for Client Name
-    // Relaxed match: ID or Number, Status Activa OR Ocupada
-    let clientName = '';
-    const activeRes = currentReservationsList.find(res =>
-        (String(res.habitacionId) === String(r.id) || String(res.habitacionId) === String(r.numero)) &&
-        (res.estado === 'Activa' || res.estado === 'Ocupada')
-    );
-    if (activeRes) clientName = activeRes.cliente;
-    // Fallback: Check if room has "reservado" status but 'Reserva' object?
-    if (!clientName && r.estado === 'ocupado') {
-        // Maybe manual check-in stored elsewhere or just use generic text?
-        // Let's check 'Reserva' status too just in case of mismatch
-        const pendingRes = currentReservationsList.find(res =>
-            (String(res.habitacionId) === String(r.id) || String(res.habitacionId) === String(r.numero)) &&
-            (res.estado === 'Reserva')
-        );
-        if (pendingRes) clientName = pendingRes.cliente;
-    }
+    // [MOD] Concierge Info Elements (Need to ensure these exist in HTML or inject them)
+    // For now, we'll inject meaningful HTML into 'rdActions' or a new container if needed.
+    // Let's assume we reuse the modal structure and inject a "Dashboard" into a specific container.
+    // Or simpler: Build a rich HTML string for the "Actions" area which is actually the body of the card?
+    // Looking at index.html (not fully visible but checking standard modal layout), 
+    // usually there are specific fields.
+    // Let's use the 'rdActions' container to append the Dashboard Info + Buttons.
 
     // 1. Image
     let imgUrl = 'https://images.unsplash.com/photo-1611892440504-42a792e24d32?q=80&w=600';
@@ -2706,10 +2680,23 @@ function openRoomDetail(roomId) {
     cap.innerText = (r.capacidad || 2) + ' Personas';
     beds.innerText = (r.camas || 1) + ' Cama';
 
-    // 3. Status & Colors
+    // 3. Status logic
     const status = (r.estado || 'Disponible').toLowerCase();
     let statusText = 'DISPONIBLE';
     let badgeColor = '#10b981'; // green
+
+    // Find Active Reservation Context
+    let activeRes = currentReservationsList.find(res =>
+        (String(res.habitacionId) === String(r.id) || String(res.habitacionNumero) === String(r.numero)) &&
+        (res.estado === 'Activa' || res.estado === 'Ocupada')
+    );
+
+    // Fallback for "Dirty" but physically occupied? Or "Reserved" pending?
+    let pendingRes = currentReservationsList.find(res =>
+        (String(res.habitacionId) === String(r.id) || String(res.habitacionNumero) === String(r.numero)) &&
+        (res.estado === 'Reserva') &&
+        new Date(res.fechaEntrada).toDateString() === new Date().toDateString() // Today
+    );
 
     if (status === 'ocupado') {
         statusText = 'OCUPADO';
@@ -2721,50 +2708,102 @@ function openRoomDetail(roomId) {
         statusText = 'RESERVADO';
         badgeColor = '#eab308';
     } else if (status === 'sucio') {
-        statusText = 'LIMPIEZA REQUERIDA'; // Warning Text
-        badgeColor = '#64748B'; // Plomo (Slate 500)
+        statusText = 'LIMPIEZA';
+        badgeColor = '#64748B';
     }
     badge.innerText = statusText;
     badge.style.backgroundColor = badgeColor;
 
-    // Add Warning Icon if Dirty
-    if (status === 'sucio') {
-        badge.innerHTML = '<i class="fas fa-exclamation-triangle" style="color:#fcd34d; margin-right:5px;"></i> LIMPIEZA';
-    } else {
-        badge.innerText = statusText;
+    // 4. Build Dashboard HTML
+    let dashHtml = '';
+
+    // A. Guest Info Section (If Occupied or Active)
+    if (activeRes) {
+        // Calculate Balance
+        const total = activeRes.total || 0;
+        const paid = activeRes.pagado || 0; // This might need a refresh signal or be approx
+        // We can't easily get live balance here without async. 
+        // For "Concierge View", let's show what we have or a "Ver Detalle" to fetch updated.
+        // Or reuse r.deuda from Room List? 
+        // r.deuda was populated by getHabitaciones backend!
+        const debt = r.deuda !== undefined ? r.deuda : 0;
+        const debtColor = debt > 0 ? '#ef4444' : '#22c55e';
+        const debtText = debt > 0 ? `Pendiente: S/ ${debt.toFixed(2)}` : 'Pagado';
+
+        dashHtml += `
+            <div style="background:#f8fafc; padding:15px; border-radius:8px; margin-bottom:15px; border-left:4px solid ${badgeColor};">
+                <div style="font-size:0.8rem; color:#64748B; font-weight:bold; text-transform:uppercase;">Huésped Actual</div>
+                <div style="font-size:1.2rem; font-weight:bold; color:#1e293b; margin-bottom:5px;">${activeRes.cliente}</div>
+                <div style="display:flex; gap:15px; font-size:0.9rem; color:#334155;">
+                    <div><i class="fas fa-sign-in-alt"></i> ${new Date(activeRes.fechaEntrada).toLocaleDateString()}</div>
+                    <div><i class="fas fa-sign-out-alt"></i> ${new Date(activeRes.fechaSalida).toLocaleDateString()}</div>
+                </div>
+                <div style="margin-top:10px; font-weight:bold; color:${debtColor}; display:flex; justify-content:space-between; align-items:center;">
+                    <span>${debtText}</span>
+                    <button onclick="closeRoomDetail(); openReservationDetail('${activeRes.id}')" style="background:#fff; border:1px solid #3b82f6; color:#3b82f6; border-radius:4px; font-size:0.75rem; padding:4px 10px; cursor:pointer;">
+                        Ver Detalle / Pagos <i class="fas fa-arrow-right"></i>
+                    </button>
+                </div>
+            </div>
+        `;
+    } else if (pendingRes) {
+        dashHtml += `
+            <div style="background:#fffbeb; padding:15px; border-radius:8px; margin-bottom:15px; border-left:4px solid #eab308;">
+                <div style="font-size:0.8rem; color:#b45309; font-weight:bold; text-transform:uppercase;">Reservado para Hoy</div>
+                <div style="font-size:1.1rem; font-weight:bold; color:#78350f;">${pendingRes.cliente}</div>
+                <div style="margin-top:5px; font-size:0.9rem; color:#92400e;">Llegada esperando confirmación.</div>
+                <button onclick="closeRoomDetail(); openReservationDetail('${pendingRes.id}')" style="margin-top:8px; background:#fff; border:1px solid #d97706; color:#d97706; border-radius:4px; font-size:0.75rem; padding:4px 10px; cursor:pointer;">
+                    Ver Reserva / Check-In
+                </button>
+            </div>
+        `;
+    } else if (status === 'disponible') {
+        dashHtml += `
+            <div style="background:#f0fdf4; padding:15px; border-radius:8px; margin-bottom:15px; text-align:center;">
+                <div style="color:#15803d; font-weight:600;">Habitación Lista</div>
+                <div style="font-size:0.85rem; color:#166534;">Limpia y preparada para recibir huéspedes.</div>
+            </div>
+        `;
     }
 
-    // 4. Dynamic Actions
-    let btns = '';
+    // B. Actions Buttons
+    dashHtml += '<div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">';
 
-    if (status === 'disponible' || status === 'sucio') {
-        // Check In & Reserve
-        btns += `<button class="rd-btn btn-checkin" style="background:#22c55e; color:white;" onclick="closeRoomDetail(); openCheckIn('${r.id}', '${r.numero}')"><i class="fas fa-check"></i> Check-In</button>`;
-        btns += `<button class="rd-btn btn-reserve" style="background:#eab308; color:white;" onclick="closeRoomDetail(); openReservation('${r.id}', '${r.numero}')"><i class="fas fa-calendar-alt"></i> Reservar</button>`;
-        if (status === 'sucio') {
-            btns += `<button class="rd-btn btn-clean" style="border:1px dashed #64748B; color:#64748B;" onclick="closeRoomDetail(); markRoomClean('${r.id}')"><i class="fas fa-broom"></i> Marcar Limpio</button>`;
+    if (status === 'disponible') {
+        dashHtml += `<button class="rd-btn" style="background:#22c55e; color:white; padding:12px; border:none; border-radius:8px; font-weight:bold;" onclick="closeRoomDetail(); openCheckIn('${r.id}', '${r.numero}')"><i class="fas fa-check"></i> Check-In</button>`;
+        dashHtml += `<button class="rd-btn" style="background:#eab308; color:white; padding:12px; border:none; border-radius:8px; font-weight:bold;" onclick="closeRoomDetail(); openReservation('${r.id}', '${r.numero}')"><i class="fas fa-calendar-alt"></i> Reservar</button>`;
+    }
+    else if (status === 'ocupado') {
+        dashHtml += `<button class="rd-btn" style="background:#ef4444; color:white; padding:12px; border:none; border-radius:8px; font-weight:bold;" onclick="closeRoomDetail(); openCheckOut('${r.id}')"><i class="fas fa-sign-out-alt"></i> Finalizar Estadia</button>`;
+        // Extension
+        if (activeRes) {
+            dashHtml += `<button class="rd-btn" style="background:#3b82f6; color:white; padding:12px; border:none; border-radius:8px; font-weight:bold;" onclick="closeRoomDetail(); openReservation('${r.id}', '${r.numero}', '', '', 'extend', '${activeRes.id}', '${activeRes.fechaSalida}')"><i class="fas fa-clock"></i> Extender</button>`;
         }
-    } else if (status === 'ocupado') {
-        // Check Out & Extend
-        btns += `<button class="rd-btn btn-checkout" style="background:#ef4444; color:white;" onclick="closeRoomDetail(); openCheckOut('${r.id}')"><i class="fas fa-sign-out-alt"></i> Finalizar</button>`;
-
-        // Green Extend Button, passing isExtension=true
-        btns += `<button class="rd-btn btn-reserve" style="background:#22c55e; color:white;" onclick="closeRoomDetail(); openReservation('${r.id}', '${r.numero}', '', '${clientName}', true)"><i class="fas fa-calendar-plus"></i> Extender</button>`;
-    } else if (status === 'reservado') {
-        // Check In & Edit
-        btns += `<button class="rd-btn btn-checkin" style="background:#22c55e; color:white;" onclick="closeRoomDetail(); openCheckIn('${r.id}', '${r.numero}')"><i class="fas fa-check"></i> Llegada</button>`;
-        btns += `<button class="rd-btn btn-reserve" style="background:#eab308; color:white;" onclick="closeRoomDetail(); openReservation('${r.id}', '${r.numero}')"><i class="fas fa-edit"></i> Modificar</button>`;
-    } else {
-        btns += `<div style="text-align:center; color:#64748B;">No hay acciones disponibles.</div>`;
+    }
+    else if (status === 'sucio') {
+        dashHtml += `<button class="rd-btn" style="background:#64748B; color:white; padding:12px; border:none; border-radius:8px; font-weight:bold;" onclick="closeRoomDetail(); markRoomClean('${r.id}')"><i class="fas fa-broom"></i> Marcar Limpio</button>`;
+        // Allow Check-In Override
+        dashHtml += `<button class="rd-btn" style="background:#cbd5e1; color:#475569; padding:12px; border:none; border-radius:8px; font-weight:bold;" onclick="if(confirm('¿Hacer Check-In en habitación sucia?')) { closeRoomDetail(); openCheckIn('${r.id}', '${r.numero}'); }"><i class="fas fa-check"></i> Check-In Rápido</button>`;
+    }
+    else if (status === 'reservado') {
+        // Actions for Reserved but not yet Occupied (physically)
+        // Usually handled by pendingRes block above which gives "Ver Reserva"
+        dashHtml += `<button class="rd-btn" style="background:#22c55e; color:white; padding:12px; border:none; border-radius:8px; font-weight:bold;" onclick="closeRoomDetail(); openCheckIn('${r.id}', '${r.numero}')"><i class="fas fa-check"></i> Check-In Directo</button>`;
     }
 
-    // Always Edit
-    btns += `<button class="rd-btn" style="background:#f1f5f9; color:#64748B;" onclick="closeRoomDetail(); editRoom('${r.id}')"><i class="fas fa-cog"></i> Editar Propiedades</button>`;
+    dashHtml += '</div>'; // End grid
 
-    actions.innerHTML = btns;
+    // Inject
+    const actionsContainer = document.getElementById('rdActions');
+    actionsContainer.innerHTML = dashHtml;
+    actionsContainer.style.display = 'block'; // Ensure visible
 
-    document.getElementById('modalRoomDetail').style.display = 'flex';
+    // Show Modal
+    const modal = document.getElementById('modalRoomDetail');
+    modal.style.display = 'flex';
 }
+
+
 
 function closeRoomDetail() {
     document.getElementById('modalRoomDetail').style.display = 'none';
