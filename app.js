@@ -1850,18 +1850,35 @@ function renderProducts(products) {
         if (p.categoria === 'Bebidas') catColor = '#3b82f6';
         if (p.categoria === 'Snacks') catColor = '#eab308';
 
-        let imgTag = p.imagen_url ? `<img src="${p.imagen_url}" style="width:40px; height:40px; border-radius:4px; object-fit:cover;">` : '<div style="width:40px; height:40px; background:#f1f5f9; border-radius:4px;"></div>';
+        // Robust Image Logic
+        let imgDisplay = '<div style="width:40px; height:40px; background:#f1f5f9; border-radius:4px; display:flex; align-items:center; justify-content:center;"><i class="fas fa-image" style="color:#cbd5e1;"></i></div>';
+
+        if (p.imagen_url && p.imagen_url.length > 5) {
+            // Handle Google Drive links specifically if needed, but standard <img> usually works if public
+            imgDisplay = `<img src="${p.imagen_url}" 
+                style="width:40px; height:40px; border-radius:4px; object-fit:cover;" 
+                onerror="this.onerror=null; this.parentNode.innerHTML='<div style=\'width:40px; height:40px; background:#fee2e2; border-radius:4px; display:flex; align-items:center; justify-content:center;\'><i class=\'fas fa-exclamation-triangle\' style=\'color:#f87171;\'></i></div>'">`;
+        }
+
+        // Robust Price Logic
+        let displayPrice = 'S/ 0.00';
+        const priceNum = Number(p.precio);
+        if (!isNaN(priceNum)) {
+            displayPrice = 'S/ ' + priceNum.toFixed(2);
+        } else {
+            displayPrice = '<span style="color:red;">Error (' + p.precio + ')</span>';
+        }
 
         html += `
         <tr style="border-bottom:1px solid #f1f5f9;">
-            <td style="padding:15px;">${imgTag}</td>
+            <td style="padding:15px;">${imgDisplay}</td>
             <td style="padding:15px;">
                 <div style="font-weight:600;">${p.nombre}</div>
                 <div style="font-size:0.8rem; color:#94a3b8;">${p.descripcion || ''}</div>
             </td>
             <td style="padding:15px;"><span style="color:${catColor}; font-weight:bold;">${p.categoria}</span></td>
             
-            <td style="padding:15px;">S/ ${Number(p.precio).toFixed(2)}</td>
+            <td style="padding:15px;">${displayPrice}</td>
             <td style="padding:15px; font-weight:bold;">${p.stock}</td>
             <td style="padding:15px;">${p.activo}</td>
 
