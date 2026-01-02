@@ -1105,95 +1105,66 @@
             </div>
 
             <div class="form-group">
-                <label>Notas</label>
-                <textarea id="resNotes" class="form-input" placeholder="Detalles, adelantos, etc..."></textarea>
-            </div>
+                <label>Adelanto / Pago Inicial (S/)</label>
+                <div style="display:flex; gap:10px;">
+                    <input type="number" id="resAdelanto" class="form-input" placeholder="0.00" min="0" step="0.10"
+                        style="flex:1;">
+                    <select id="resMetodo" class="form-input" style="flex:1;">
+                        <option value="Efectivo">Efectivo 💵</option>
+                        <option value="Yape">Yape 🟣</option>
+                        <option value="Plin">Plin 🔵</option>
+                        <option value="Transferencia">Transferencia</option>
+                        <option value="Tarjeta">Tarjeta 💳</option>
+                    </select>
+                </div>
 
-            <div class="modal-footer">
-                <button onclick="document.getElementById('modalReservation').style.display='none'"
-                    class="btn-cancel">Cancelar</button>
-                <button onclick="submitReservation()" class="btn-submit">Guardar Reserva</button>
-            </div>
-        </div>
-    </div>
+                <div class="form-group">
+                    <label>Notas</label>
+                    <textarea id="resNotes" class="form-input" placeholder="Detalles, adelantos, etc..."></textarea>
+                </div>
 
-    <!-- MODAL: CHECK-IN (WALK-IN) -->
-    <div id="modalCheckIn" class="modal-overlay">
-        <div class="modal-card">
-            <div class="modal-header">
-                <h2 style="color:#22c55e;"><i class="fas fa-check-circle"></i> Check-In Inmediato</h2>
-                <button onclick="document.getElementById('modalCheckIn').style.display='none'"
-                    class="close-btn">&times;</button>
-            </div>
-
-            <input type="hidden" id="ciRoomId">
-
-            <div
-                style="background:#f0fdf4; padding:15px; border-radius:8px; border:1px solid #bbf7d0; margin-bottom:15px;">
-                <h3 id="ciRoomDisplay" style="margin:0; color:#166534;">Habitación 101</h3>
-                <select id="ciRoomSelect" class="form-input"
-                    style="display:none; margin-bottom:5px; border:1px solid #166534; color:#166534; font-weight:bold;"></select>
-                <p style="margin:5px 0 0 0; font-size:0.9rem; color:#15803d;">Entrada inmediata. El estado cambiará a
-                    <strong>OCUPADO</strong>.
-                </p>
-            </div>
-
-            <div class="form-group">
-                <label>Nombre del Huésped</label>
-                <input type="text" id="ciClient" class="form-input" placeholder="Nombre completo">
-            </div>
-
-            <div class="form-group">
-                <label>Fecha Salida Prevista</label>
-                <input type="date" id="ciOutDate" class="form-input">
-            </div>
-
-            <div class="form-group">
-                <label>Notas</label>
-                <textarea id="ciNotes" class="form-input" placeholder="Opcional"></textarea>
-            </div>
-
-            <div class="modal-footer">
-                <button onclick="document.getElementById('modalCheckIn').style.display='none'"
-                    class="btn-cancel">Cancelar</button>
-                <button onclick="submitCheckIn()" class="btn-submit" style="background:#22c55e;">Confirmar
-                    Ingreso</button>
+                <div class="modal-footer">
+                    <button onclick="document.getElementById('modalReservation').style.display='none'"
+                        class="btn-cancel">Cancelar</button>
+                    <button onclick="submitReservation()" class="btn-submit">Guardar Reserva</button>
+                </div>
             </div>
         </div>
-    </div>
 
-    <!-- MODAL: CHECK-OUT -->
-    <div id="modalCheckOut" class="modal-overlay">
-        <div class="modal-card">
-            <div class="modal-header">
-                <h2 style="color:#ef4444;"><i class="fas fa-sign-out-alt"></i> Salida / Check-Out</h2>
-                <button onclick="document.getElementById('modalCheckOut').style.display='none'"
-                    class="close-btn">&times;</button>
-            </div>
+        <!-- MODAL: CHECK-IN (WALK-IN) REMOVED DUPLICATE -->
 
-            <input type="hidden" id="coRoomId">
+        <!-- MODAL: CHECK-OUT -->
+        <div id="modalCheckOut" class="modal-overlay">
+            <div class="modal-card">
+                <div class="modal-header">
+                    <h2 style="color:#ef4444;"><i class="fas fa-sign-out-alt"></i> Salida / Check-Out</h2>
+                    <button onclick="document.getElementById('modalCheckOut').style.display='none'"
+                        class="close-btn">&times;</button>
+                </div>
 
-            <div style="text-align:center; padding:20px;">
-                <i class="fas fa-concierge-bell" style="font-size:3rem; color:#cbd5e1; margin-bottom:15px;"></i>
-                <p style="font-size:1.1rem; color:#334155;">¿Confirmar salida de la habitación?</p>
-                <p style="color:#64748B; font-size:0.9rem;">El estado cambiará a <strong>LIMPIEZA</strong>.</p>
-            </div>
+                <input type="hidden" id="coRoomId">
 
-            <div class="modal-footer">
-                <button onclick="document.getElementById('modalCheckOut').style.display='none'"
-                    class="btn-cancel">Cancelar</button>
-                <button onclick="submitCheckOut()" class="btn-submit" style="background:#ef4444;">Confirmar
-                    Salida</button>
+                <div style="text-align:center; padding:20px;">
+                    <i class="fas fa-concierge-bell" style="font-size:3rem; color:#cbd5e1; margin-bottom:15px;"></i>
+                    <p style="font-size:1.1rem; color:#334155;">¿Confirmar salida de la habitación?</p>
+                    <p style="color:#64748B; font-size:0.9rem;">El estado cambiará a <strong>LIMPIEZA</strong>.</p>
+                </div>
+
+                <div class="modal-footer">
+                    <button onclick="document.getElementById('modalCheckOut').style.display='none'"
+                        class="btn-cancel">Cancelar</button>
+                    <button onclick="submitCheckOut()" class="btn-submit" style="background:#ef4444;">Confirmar
+                        Salida</button>
+                </div>
             </div>
         </div>
-    </div>
-    <div id="toast-container">
-        <div class="toast-body">
-            <i class="fas fa-check-circle" style="color:#4ade80; font-size:1.2rem;"></i>
-            <span id="toast-message">Cambios guardados correctamente</span>
+        <div id="toast-container">
+            <div class="toast-body">
+                <i class="fas fa-check-circle" style="color:#4ade80; font-size:1.2rem;"></i>
+                <span id="toast-message">Cambios guardados correctamente</span>
+            </div>
         </div>
-    </div>
-    <script src="app.js?v=20260101_1546"></script>
+        <script src="app.js?v=20260101_1546"></script>
 </body>
 
 </html>
