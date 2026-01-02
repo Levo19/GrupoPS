@@ -2777,6 +2777,7 @@ function renderCalendarTimeline(rooms, reservations) {
                                          onmouseleave="hideTooltip()"
                                          data-tooltip-data="${tooltipJson}">
                                          ${label1}
+                                         ${pending > 0.5 ? `<span style="position:absolute; right:2px; top:2px; height:6px; width:6px; background:red; border-radius:50%;"></span>` : ''}
                                     </div>
                                     <div class="res-bar-base" 
                                          style="background:${col2}; flex:1; height:28px; border-radius:4px 0 0 4px; margin-left:1px; padding-left:4px; font-size:0.7rem;" 
@@ -2785,6 +2786,7 @@ function renderCalendarTimeline(rooms, reservations) {
                                          onmouseleave="hideTooltip()"
                                          data-tooltip-data="${tooltipJson2}">
                                          ${label2}
+                                         ${pending2 > 0.5 ? `<span style="position:absolute; right:2px; top:2px; height:6px; width:6px; background:red; border-radius:50%;"></span>` : ''}
                                     </div>
                                 </div>
                              </td>`;
@@ -2803,6 +2805,7 @@ function renderCalendarTimeline(rooms, reservations) {
                                          onmouseleave="hideTooltip()"
                                          data-tooltip-data="${tooltipJson}">
                                          ${label}
+                                         ${debtHtml}
                                     </div>
                                     <div style="flex:1; height:100%; cursor:pointer;" 
                                          onclick="openNewReservation('${r.id}', '${r.numero}', '${isoDate}')"
@@ -2829,6 +2832,7 @@ function renderCalendarTimeline(rooms, reservations) {
                                          onmouseleave="hideTooltip()"
                                          data-tooltip-data="${tooltipJson}">
                                          ${label}
+                                         ${debtHtml}
                                     </div>
                                 </div>
                              </td>`;
@@ -2847,6 +2851,7 @@ function renderCalendarTimeline(rooms, reservations) {
                                          onmouseleave="hideTooltip()"
                                          data-tooltip-data="${tooltipJson}">
                                          ${label}
+                                         ${debtHtml}
                                     </div>
                                 </div>
                              </td>`;
@@ -2863,6 +2868,7 @@ function renderCalendarTimeline(rooms, reservations) {
                                          onmouseleave="hideTooltip()"
                                          data-tooltip-data="${tooltipJson}">
                                          ${barLabel}
+                                         ${debtHtml}
                                     </div>
                                 </div>
                              </td>`;
