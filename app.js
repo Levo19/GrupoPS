@@ -2493,7 +2493,7 @@ function renderCalendarTimeline(rooms, reservations) {
             </div>
         </div>
 
-        <table style="width:100%; border-collapse:collapse; min-width:800px;">
+        <table style="width:100%; border-collapse:collapse; min-width:800px; table-layout: fixed;">
             <thead>
                 <tr>
                     <th class="sticky-header sticky-col" style="padding:10px; text-align:left; border-bottom:2px solid #e2e8f0; width:100px; background:white; z-index:41;">Hab.</th>
@@ -2677,31 +2677,47 @@ function renderCalendarTimeline(rooms, reservations) {
                     if (barId) targetResForLabel = res; // Standard case
                 }
 
-                // Helper to determine if we show label
+                // Helper to determine if we show label based on VISIBLE overlap
                 const shouldShowLabel = (reservation) => {
                     if (!reservation) return false;
 
-                    const d1 = new Date(reservation.fechaEntrada);
-                    const d2 = new Date(reservation.fechaSalida);
-                    const totalDays = Math.max(1, Math.ceil((d2 - d1) / (1000 * 60 * 60 * 24)));
+                    // 1. Get Visible Range Boundaries
+                    // dates[] is sorted.
+                    const visibleStart = dates[0];
+                    const visibleEnd = dates[dates.length - 1];
 
-                    // Current Date is 'date'.
-                    // dayIndex = floor((date - start) / 1 day)
-                    // If isStartOfSplit (Check-In on split), effective date is 'date'.
-                    // If isEndOfSplit (Check-Out on split), effective date is 'date' (but it's the last partial day).
+                    // 2. Get Reservation Range
+                    const rStart = new Date(reservation.fechaEntrada);
+                    const rEnd = new Date(reservation.fechaSalida);
 
-                    const current = new Date(date); // 'date' from outer loop
-                    const diffTime = current - d1;
-                    const dayIndex = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+                    // 3. Normalize to Noon to avoid time boundary issues for comparison
+                    const vStartNorm = new Date(visibleStart); vStartNorm.setHours(12, 0, 0, 0);
+                    const vEndNorm = new Date(visibleEnd); vEndNorm.setHours(12, 0, 0, 0);
+                    const rStartNorm = new Date(rStart); rStartNorm.setHours(12, 0, 0, 0);
+                    const rEndNorm = new Date(rEnd); rEndNorm.setHours(12, 0, 0, 0);
 
-                    // Middle Day Index
-                    // 1 Day (0): Mid=0. Show.
-                    // 2 Days (0,1): Mid=1. Show on End.
-                    // 3 Days (0,1,2): Mid=1. Show on Mid.
-                    // 4 Days (0,1,2,3): Mid=2. Show on 3rd.
-                    const midPoint = Math.floor(totalDays / 2);
+                    // 4. Calculate Overlap
+                    // Overlap Start is max(visibleStart, resStart)
+                    // Overlap End is min(visibleEnd, resEnd)
+                    const overlapStart = rStartNorm > vStartNorm ? rStartNorm : vStartNorm;
+                    const overlapEnd = rEndNorm < vEndNorm ? rEndNorm : vEndNorm;
 
-                    return dayIndex === midPoint;
+                    // If no overlap, return false
+                    if (overlapStart > overlapEnd) return false;
+
+                    // 5. Calculate Visible Duration
+                    // What is the index of the CURRENT `date` within the overlap range?
+                    const currentNorm = new Date(date); currentNorm.setHours(12, 0, 0, 0);
+
+                    if (currentNorm < overlapStart || currentNorm > overlapEnd) return false;
+
+                    const daysFromOverlapStart = Math.round((currentNorm - overlapStart) / (1000 * 60 * 60 * 24));
+                    const visibleDays = Math.round((overlapEnd - overlapStart) / (1000 * 60 * 60 * 24)) + 1;
+
+                    // 6. Midpoint of visible range
+                    const midPoint = Math.floor((visibleDays - 1) / 2); // 0-based index
+
+                    return daysFromOverlapStart === midPoint;
                 };
 
                 // Logic inside HTML generation:
@@ -2928,11 +2944,32 @@ function openRoomDetail(roomId) {
     let statusText = 'DISPONIBLE';
     let badgeColor = '#10b981'; // green
 
-    // Find Active Reservation Context
-    let activeRes = currentReservationsList.find(res =>
+    // Find Active Reservation Context (Corrected for Today)
+    let activeRes = null;
+    const todayNum = new Date().setHours(0, 0, 0, 0);
+
+    // Filter relevant reservations
+    const candidateRes = currentReservationsList.filter(res =>
         (String(res.habitacionId) === String(r.id) || String(res.habitacionNumero) === String(r.numero)) &&
         (res.estado === 'Activa' || res.estado === 'Ocupada')
     );
+
+    // Find one that actually overlaps today
+    activeRes = candidateRes.find(res => {
+        const s = new Date(res.fechaEntrada).setHours(0, 0, 0, 0);
+        const e = new Date(res.fechaSalida).setHours(0, 0, 0, 0);
+        return todayNum >= s && todayNum <= e; // strictly strictly inside or on edge
+        // Note: Often check-out day is technically "occupied" in morning, but "free" in afternoon.
+        // If we want "Current Guest", usually it's someone who checked in <= today and checks out >= today.
+    });
+
+    // Fallback: If no date overlap (maybe bad dates?), take the most recently created one
+    if (!activeRes && candidateRes.length > 0) {
+        // Sort by ID descending (assuming numeric or time-based ID) or simply take last
+        // If IDs are RES-timestamp, we can string compare
+        candidateRes.sort((a, b) => (b.id > a.id) ? 1 : -1);
+        activeRes = candidateRes[0];
+    }
 
     // Fallback for "Dirty" but physically occupied? Or "Reserved" pending?
     let pendingRes = currentReservationsList.find(res =>
@@ -3793,6 +3830,49 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
 // ===== PHASE 6: CALENDAR INTERACTION LOGIC =====
+
+// [NEW] SMART FULL CHECK-IN LOGIC
+function openCheckIn(roomId, roomNum) {
+    // 1. Global Call (No Room Selected)
+    if (!roomId) {
+        const modal = document.getElementById('modalCheckIn');
+        if (modal) {
+            modal.style.display = 'flex';
+            if (typeof setupCheckInModal === 'function') setupCheckInModal();
+        } else {
+            alert("Seleccione una habitación para hacer Check-In.");
+        }
+        return;
+    }
+
+    // 2. Room Specific Logic
+    const todayStr = new Date().toDateString();
+
+    // Find SCHEDULED Reservation (Yellow) for Today
+    const scheduledRes = currentReservationsList.find(r =>
+        (String(r.habitacionId) === String(roomId) || String(r.habitacionNumero) === String(roomNum)) &&
+        r.estado === 'Reserva' &&
+        new Date(r.fechaEntrada).toDateString() === todayStr
+    );
+
+    if (scheduledRes) {
+        // Found a match!
+        if (confirm(`📅 Existe una reserva programada para HOY de: ${scheduledRes.cliente}.\n\n[ACEPTAR] = Hacer Check-In a ${scheduledRes.cliente}\n[CANCELAR] = Ignorar y registrar otro cliente (Walk-in)`)) {
+            // Open Detail to Process Check-In
+            openReservationDetail(scheduledRes.id);
+            return;
+        }
+    }
+
+    // 3. Fallback: Direct Walk-In (New Reservation starting NOW)
+    openNewReservation(roomId, roomNum, new Date().toISOString());
+
+    // Optional: Change title to "Nuevo Check-In"
+    setTimeout(() => {
+        const title = document.getElementById('resModalTitle');
+        if (title) title.innerHTML = '<i class="fas fa-user-check"></i> Nuevo Check-In (Walk-in)';
+    }, 50);
+}
 
 // 0. NEW RESERVATION (Empty Cell)
 function openNewReservation(roomId, roomNum, date) {
