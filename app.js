@@ -2660,9 +2660,12 @@ function renderCalendarTimeline(rooms, reservations) {
                 }
 
                 // [NEW] OVERLAPPING RESERVATIONS: Render both if they exist
+                // Overlap Handling
                 if (hasOverlap) {
-                    // Calculate data for check-in reservation
                     const res2 = checkInRes;
+                    const tooltipJson = JSON.stringify(tooltipData).replace(/"/g, '&quot;');
+
+                    // Tooltip 2
                     const total2 = Number(res2.total) || 0;
                     const paid2 = Number(res2.pagado) || 0;
                     let realPaid2 = paid2;
@@ -2675,123 +2678,128 @@ function renderCalendarTimeline(rooms, reservations) {
                     const nights2 = Math.max(1, Math.ceil((d2_2 - d1_2) / (1000 * 60 * 60 * 24)));
 
                     const tooltipData2 = {
-                        cliente: res2.cliente || '',
-                        estado: res2.estado,
-                        nights: nights2,
-                        total: total2.toFixed(2),
-                        paid: realPaid2.toFixed(2),
-                        pending: pending2.toFixed(2),
-                        pendingColor: pending2 > 0 ? '#f87171' : '#4ade80',
-                        paidColor: pending2 <= 0 ? '#4ade80' : '#fff',
+                        cliente: res2.cliente || '', estado: res2.estado, nights: nights2,
+                        total: total2.toFixed(2), paid: realPaid2.toFixed(2), pending: pending2.toFixed(2),
+                        pendingColor: pending2 > 0 ? '#ef4444' : '#22c55e',
+                        paidColor: pending2 <= 0 ? '#22c55e' : '#fff',
                         notas: res2.notas || ''
                     };
                     const tooltipJson2 = JSON.stringify(tooltipData2).replace(/"/g, '&quot;');
 
-                    let debtHtml2 = '';
-                    if (pending2 > 0.5) {
-                        debtHtml2 = `<span style="position:absolute; right:2px; top:2px; height:6px; width:6px; background:red; border-radius:50%;"></span>`;
-                    }
-
-                    // Color for check-in
-                    let col2 = colorFuture;
+                    // Colors
+                    let col2 = colorFuture; // Yellow
                     if (res2.estado === 'Activa' || res2.estado === 'Ocupada') col2 = colorActive;
                     if (res2.estado === 'Finalizada') col2 = colorPast;
 
-                    const label2 = (res2.cliente || '').split(' ')[0];
+                    // Labels
+                    const label1 = (checkOutRes.cliente || '').split(' ')[0].substring(0, 8);
+                    const label2 = (res2.cliente || '').split(' ')[0].substring(0, 8);
 
-                    html += `<td class="${tdClass}" style="padding:0; position:relative; height:40px;"> <!-- PADDING 0 -->
-                                <div style="display:flex; height:100%; width:100%; position:relative; align-items:stretch; gap:1px;">
-                                    <!-- Left: Check-out ending -->
-                                    <div class="res-bar-base" style="background:${barColor}; flex:1; border-radius:4px 2px 2px 4px; position:relative;" 
-                                         onclick="openReservationDetail('${checkOutRes.id}')" 
+                    // Split Cell (50% / 50%)
+                    html += `<td class="${tdClass}" style="padding:0; height:36px; border-bottom:1px solid #f1f5f9; border-right:1px solid #f1f5f9;">
+                                <div style="display:flex; width:100%; height:100%;">
+                                    <!-- End Part -->
+                                    <div class="res-bar-base" 
+                                         style="background:${barColor}; flex:1; border-radius:0 12px 12px 0; margin-right:2px; justify-content:center; font-size:0.7rem;" 
+                                         onclick="openReservationDetail('${checkOutRes.id}')"
                                          onmouseenter="showTooltipFromData(event, this)" 
                                          onmouseleave="hideTooltip()"
                                          data-tooltip-data="${tooltipJson}">
-                                        ${debtHtml}
+                                         ${label1}
                                     </div>
-                                    <!-- Right: Check-in starting -->
-                                    <div class="res-bar-base" style="background:${col2}; flex:1; border-radius:2px 4px 4px 2px; position:relative;" 
-                                         onclick="openReservationDetail('${checkInRes.id}')" 
+                                    <!-- Start Part -->
+                                    <div class="res-bar-base" 
+                                         style="background:${col2}; flex:1; border-radius:12px 0 0 12px; margin-left:2px; justify-content:center; font-size:0.7rem;" 
+                                         onclick="openReservationDetail('${checkInRes.id}')"
                                          onmouseenter="showTooltipFromData(event, this)" 
                                          onmouseleave="hideTooltip()"
                                          data-tooltip-data="${tooltipJson2}">
-                                        <span style="font-size:0.75rem; padding-left:2px;">${label2}</span>
-                                        ${debtHtml2}
+                                         ${label2}
                                     </div>
                                 </div>
                              </td>`;
+
                 } else if (barType === 'res-bar-end') {
-                    // Single check-out: split cell with clickable right half
-                    html += `<td class="${tdClass}" style="padding:0; position:relative; height:40px;"> <!-- PADDING 0 -->
-                                <div style="display:flex; height:100%; width:100%; position:relative; align-items:stretch;">
-                                    <!-- Left Half: Existing reservation ending -->
-                                    <div class="res-bar-base res-bar-end" style="background:${barColor}; position:relative; margin-left:0; border-radius:0 4px 4px 0;" 
-                                         onclick="openReservationDetail('${barId}')" 
+                    // Ends today
+                    html += `<td class="${tdClass}" style="padding:0; height:36px; border-bottom:1px solid #f1f5f9; border-right:1px solid #f1f5f9;">
+                                <div style="display:flex; width:100%; height:100%; align-items:center;">
+                                     <div class="res-bar-base" 
+                                         style="background:${barColor}; width:50%; height:80%; border-radius:0 4px 4px 0; margin:0; padding-left:5px;" 
+                                         onclick="openReservationDetail('${barId}')"
                                          onmouseenter="showTooltipFromData(event, this)" 
                                          onmouseleave="hideTooltip()"
                                          data-tooltip-data="${tooltipJson}">
-                                        ${debtHtml}
                                     </div>
-                                    <!-- Right Half: Clickable for new reservation -->
-                                    <div onclick="openNewReservation('${r.id}', '${r.numero}', '${isoDate}')"
-                                         style="flex:1; height:100%; cursor:pointer; border-left:1px dashed #cbd5e1; background:transparent;"
-                                         class="cell-hover"
-                                         title="Nueva Reserva (Check-In ${isoDate})"></div>
+                                    <!-- Empty space for new res -->
+                                    <div style="flex:1; height:100%; cursor:pointer;" 
+                                         onclick="openNewReservation('${r.id}', '${r.numero}', '${isoDate}')"
+                                         class="cell-hover" title="Disponible para Check-In">
+                                    </div>
                                 </div>
                              </td>`;
+
+                } else if (barType === 'res-bar-start') {
+                    // Starts today
+                    html += `<td class="${tdClass}" style="padding:0; height:36px; border-bottom:1px solid #f1f5f9; border-right:1px solid #f1f5f9;">
+                                <div style="display:flex; width:100%; height:100%; align-items:center;">
+                                    <!-- Empty space before check-in -->
+                                    <div style="flex:1; height:100%; cursor:pointer;" 
+                                         onclick="openNewReservation('${r.id}', '${r.numero}', '${isoDate}')"
+                                         class="cell-hover" title="Disponible antes de Check-In">
+                                    </div>
+                                     <div class="res-bar-base" 
+                                         style="background:${barColor}; width:50%; height:80%; border-radius:4px 0 0 4px; margin:0; justify-content:flex-start; padding-left:5px;" 
+                                         onclick="openReservationDetail('${barId}')"
+                                         onmouseenter="showTooltipFromData(event, this)" 
+                                         onmouseleave="hideTooltip()"
+                                         data-tooltip-data="${tooltipJson}">
+                                         ${barLabel}
+                                    </div>
+                                </div>
+                             </td>`;
+
                 } else {
-                    // Normal reservation cell (start, mid, single)
-                    // Adjust border radius based on type for continuity
+                    // Middle or Single
+                    // Continuous flow: Full width, reduced height to look "floating" or full fill?
+                    // User wants "Proportionate". Usually means full cell fill or nicely centered bar.
+                    // Let's try "Floating Bar" aesthetics: 80% height, centered vertical.
+
                     let radius = '0';
-                    let margin = '0';
+                    let width = '100%';
 
-                    if (barType === 'res-bar-start') { radius = '4px 0 0 4px'; margin = '2px 0 0 0'; /* Start with small offset left? No, 0 padding. */ }
-                    else if (barType === 'res-bar-single') { radius = '4px'; margin = '2px'; }
-                    else { radius = '0'; margin = '0'; /* Mid - completely flush */ }
-
-                    // Only apply margin if single to separate a bit? 
-                    // User wants NO gaps. So margin 0 for mid.
-                    // For single, maybe small margin.
-
-                    let style = `background:${barColor}; width:100%; height:100%; position:relative; border-radius:${radius};`;
                     if (barType === 'res-bar-single') {
-                        // Keep it slightly smaller? Or full? 
-                        // Let's do Full Height but add a tiny border? 
-                        // User complained about spaces. Let's fill it.
-                        style += `border:1px solid white; box-sizing:border-box;`; // Separator
-                    } else {
-                        // Mid or Ends have implicit 1px separator from table or explicitly none.
-                        // Let's add 1px right white border for days?
-                        style += `border-right:1px solid white; box-sizing:border-box;`;
+                        radius = '6px';
+                        width = '90%'; // slight inset
                     }
 
-                    html += `<td class="${tdClass}" style="padding:0; height:40px;"> <!-- PADDING 0 -->
-                                <div class="res-bar-base ${barType}" style="${style}" 
-                                     onclick="openReservationDetail('${barId}')" 
-                                     onmouseenter="showTooltipFromData(event, this)" 
-                                     onmouseleave="hideTooltip()"
-                                     data-tooltip-data="${tooltipJson}">
-                                    <span style="padding-left:4px;">${barLabel}</span>
-                                    ${debtHtml}
+                    html += `<td class="${tdClass}" style="padding:0; height:36px; border-bottom:1px solid #f1f5f9; border-right:1px solid #f1f5f9; vertical-align:middle;">
+                                <div style="display:flex; justify-content:center; align-items:center; width:100%; height:100%;">
+                                    <div class="res-bar-base" 
+                                         style="background:${barColor}; width:${width}; height:80%; border-radius:${radius}; padding-left:5px;" 
+                                         onclick="openReservationDetail('${barId}')"
+                                         onmouseenter="showTooltipFromData(event, this)" 
+                                         onmouseleave="hideTooltip()"
+                                         data-tooltip-data="${tooltipJson}">
+                                         ${barType === 'res-bar-single' ? barLabel : ''}
+                                    </div>
                                 </div>
                              </td>`;
                 }
-            } else {
-                // Empty - Click to add new
-                let cellInnerClass = "cell-hover";
-                let dirtyAttr = "";
 
+            } else {
+                // Empty Cell
+                let cellInnerClass = "cell-hover";
+                let dirtyMarker = "";
                 if (isDirty && !isPast) {
-                    cellInnerClass += " cell-dirty-pattern";
-                    dirtyAttr = `data-dirty="true"`;
+                    dirtyMarker = `<i class="fas fa-broom" style="color:#cbd5e1; font-size:0.7rem;"></i>`;
                 }
 
-                html += `<td class="${tdClass}" style="padding:0; text-align:center; height:40px;"> <!-- PADDING 0 -->
+                html += `<td class="${tdClass}" style="padding:0; height:36px; border-bottom:1px solid #f1f5f9; border-right:1px solid #f1f5f9; text-align:center;">
                             <div onclick="openNewReservation('${r.id}', '${r.numero}', '${isoDate}')" 
-                                 style="height:100%; width:100%; cursor:pointer; border:1px solid #f1f5f9; box-sizing:border-box;" 
-                                 class="${cellInnerClass}" 
-                                 title="${isDirty && !isPast ? '⚠️ Limpieza Requerida' : 'Nueva Reserva'}"
-                                 ${dirtyAttr}></div>
+                                 style="height:100%; width:100%; cursor:pointer; display:flex; justify-content:center; align-items:center;" 
+                                 class="${cellInnerClass}">
+                                 ${dirtyMarker}
+                            </div>
                         </td>`;
             }
         });
@@ -2800,23 +2808,25 @@ function renderCalendarTimeline(rooms, reservations) {
 
     html += `</tbody></table></div>
     <style>
-        .cell-hover:hover{background:#bfdbfe !important;}
+        .cell-hover:hover { background-color: #f8fafc; }
         .res-bar-base {
             display: flex; 
             align-items: center; 
             color: white; 
             font-size: 0.75rem; 
-            font-weight: bold; 
+            font-weight: 600; 
             overflow: hidden; 
             white-space: nowrap; 
             cursor: pointer;
-            transition: opacity 0.2s;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.1); 
+            transition: all 0.2s ease;
         }
         .res-bar-base:hover {
             opacity: 0.9;
+            transform: translateY(-1px);
+            z-index: 10;
         }
-    </style>
-    `;
+    </style>`;
 
     container.innerHTML = html;
 }
