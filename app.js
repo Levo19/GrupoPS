@@ -2172,10 +2172,14 @@ function renderProducts(products) {
         // Robust Price Logic
         let displayPrice = 'S/ 0.00';
         const priceNum = Number(p.precio);
-        if (!isNaN(priceNum)) {
+
+        if (!isNaN(priceNum) && p.precio !== '' && p.precio !== null) {
             displayPrice = 'S/ ' + priceNum.toFixed(2);
         } else {
-            displayPrice = '<span style="color:red;">Error (' + p.precio + ')</span>';
+            // Graceful error: Show warning but allow editing to fix it
+            displayPrice = `<span style="color:#ef4444; font-weight:bold; cursor:help;" title="Valor inválido: ${p.precio}">
+                                <i class="fas fa-exclamation-circle"></i> Revisar
+                            </span>`;
         }
 
         html += `
@@ -2310,6 +2314,20 @@ async function saveProduct(e) {
         imagen_url: document.getElementById('editProdImg').value,
         activo: document.getElementById('editProdActivo').value,
     };
+
+    // VALIDATION
+    if (!prodData.nombre || prodData.nombre.trim() === '') {
+        alert("El nombre del producto es obligatorio");
+        btn.innerText = originalText;
+        btn.disabled = false;
+        return;
+    }
+    if (isNaN(Number(prodData.precio)) || Number(prodData.precio) < 0) {
+        alert("El precio debe ser un número válido mayor o igual a 0");
+        btn.innerText = originalText;
+        btn.disabled = false;
+        return;
+    }
 
     try {
         // 1.5 Handle Image Upload
