@@ -3880,12 +3880,21 @@ function openCheckIn(roomId, roomNum) {
     }
 
     // 3. Fallback: Direct Walk-In (New Reservation starting NOW)
-    openNewReservation(roomId, roomNum, new Date().toISOString());
+    // Use local YYYY-MM-DD to ensure input[type=date] works
+    const todayIso = new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD local
+    openNewReservation(roomId, roomNum, todayIso);
 
-    // Optional: Change title to "Nuevo Check-In"
+    // Customize for Walk-In
     setTimeout(() => {
         const title = document.getElementById('resModalTitle');
         if (title) title.innerHTML = '<i class="fas fa-user-check"></i> Nuevo Check-In (Walk-in)';
+
+        // LOCK DATE for Walk-in (Must be Today)
+        const inDate = document.getElementById('resInDate');
+        if (inDate) {
+            inDate.value = todayIso;
+            inDate.disabled = true;
+        }
     }, 50);
 }
 
