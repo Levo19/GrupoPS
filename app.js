@@ -1203,22 +1203,54 @@ async function setupCheckInModal(roomId, roomNum, preSelectedDate) {
             // Set Out Date
             if (outInput && linkedRes.fechaSalida) {
                 try { outInput.value = linkedRes.fechaSalida.substring(0, 10); } catch (e) { }
+                outInput.disabled = true; // Lock date
+                outInput.title = "Fecha fijada por reserva. Use 'Liberar' para cambiar.";
             }
 
             hRes.value = linkedRes.id;
 
-            // Show Alert
+            // Show Alert with Release Button
             if (balanceDiv) {
                 const paid = Number(linkedRes.pagado) || 0;
                 balanceDiv.setAttribute('data-pre-paid', paid);
+
+                // Release Button ID: btnReleaseLinkedRes
                 balanceDiv.innerHTML = `
                     <div style="background:#dbeafe; color:#1e40af; padding:10px; border-radius:6px; margin-bottom:10px; font-size:0.9rem; border:1px solid #93c5fd;">
-                        <i class="fas fa-bookmark"></i> <strong>Reserva Encontrada</strong><br>
-                        Huésped: <strong>${linkedRes.cliente}</strong><br>
-                        <span style="font-size:0.85rem">Abono registrado: S/ ${paid.toFixed(2)}</span>
+                        <div style="display:flex; justify-content:space-between; align-items:start;">
+                            <div>
+                                <i class="fas fa-bookmark"></i> <strong>Reserva Detectada</strong><br>
+                                Huésped: <strong>${linkedRes.cliente}</strong><br>
+                                <span style="font-size:0.85rem">Abono: S/ ${paid.toFixed(2)}</span>
+                            </div>
+                            <button type="button" id="btnReleaseLinkedRes" style="background:#fff; border:1px solid #1e40af; color:#1e40af; border-radius:4px; padding:2px 6px; font-size:0.75rem; cursor:pointer;" title="Permitir ingreso a otro cliente">
+                                <i class="fas fa-unlink"></i> Liberar
+                            </button>
+                        </div>
                     </div>
                 `;
                 balanceDiv.style.display = 'block';
+
+                // Attach Listener manually (as innerHTML kills previous bindings inside, but here safe)
+                setTimeout(() => {
+                    const btn = document.getElementById('btnReleaseLinkedRes');
+                    if (btn) {
+                        btn.onclick = function () {
+                            if (!confirm('¿Desea desvincular la reserva de este Check-In? (La reserva original se mantendrá pendiente)')) return;
+                            // Reset Form
+                            document.getElementById('checkInLinkedResId').value = '';
+                            if (clientInput) clientInput.value = '';
+                            if (outInput) {
+                                outInput.disabled = false;
+                                outInput.title = "";
+                            }
+                            document.getElementById('checkInBalanceInfo').innerHTML = '';
+                            document.getElementById('checkInBalanceInfo').style.display = 'none';
+                            document.getElementById('checkInBalanceInfo').removeAttribute('data-pre-paid');
+                            calculateCheckInBalance();
+                        };
+                    }
+                }, 100);
             }
             // Trigger balance calc
             setTimeout(calculateCheckInBalance, 300);
@@ -2615,6 +2647,20 @@ function renderCalendarTimeline(rooms, reservations) {
 function openRoomDetail(roomId) {
     const r = currentRoomsList.find(x => x.id == roomId);
     if (!r) return;
+
+    // [NEW] Smart Redirection: If there is a Pending Reservation for TODAY, open it directly.
+    // This unifies the UX with the "Reservation Bar" click.
+    const todayIso = new Date().toLocaleDateString('sv').split('T')[0];
+    const pendingResForToday = currentReservationsList.find(res =>
+        (String(res.habitacionId) === String(roomId) || String(res.habitacionNumero) === String(r.numero)) &&
+        res.estado === 'Reserva' &&
+        new Date(res.fechaEntrada).toLocaleDateString('sv').split('T')[0] <= todayIso
+    );
+
+    if (pendingResForToday && typeof openReservationDetail === 'function') {
+        openReservationDetail(pendingResForToday.id);
+        return;
+    }
 
     // Elements
     const img = document.getElementById('rdImg');
