@@ -2660,9 +2660,55 @@ function renderCalendarTimeline(rooms, reservations) {
                 }
 
                 // [NEW] OVERLAPPING RESERVATIONS: Render both if they exist
+                // CENTER LABEL LOGIC
+                // Calculate which day index (0-based) this is relative to the reservation start
+                // We need to know the Total Duration of the reservation this bar belongs to.
+
+                let targetResForLabel = null;
+                let isCheckInLabel = false; // If true, we are labeling the Right Side of a Split
+
+                // Identify which reservation we are currently rendering a segment for
+                if (hasOverlap) {
+                    // Split Cell: We have TWO reservations here.
+                    // The LEFT half is the End of Res 1.
+                    // The RIGHT half is the Start of Res 2.
+                    // We must handle labels for BOTH independently.
+                } else {
+                    if (barId) targetResForLabel = res; // Standard case
+                }
+
+                // Helper to determine if we show label
+                const shouldShowLabel = (reservation) => {
+                    if (!reservation) return false;
+
+                    const d1 = new Date(reservation.fechaEntrada);
+                    const d2 = new Date(reservation.fechaSalida);
+                    const totalDays = Math.max(1, Math.ceil((d2 - d1) / (1000 * 60 * 60 * 24)));
+
+                    // Current Date is 'date'.
+                    // dayIndex = floor((date - start) / 1 day)
+                    // If isStartOfSplit (Check-In on split), effective date is 'date'.
+                    // If isEndOfSplit (Check-Out on split), effective date is 'date' (but it's the last partial day).
+
+                    const current = new Date(date); // 'date' from outer loop
+                    const diffTime = current - d1;
+                    const dayIndex = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+
+                    // Middle Day Index
+                    // 1 Day (0): Mid=0. Show.
+                    // 2 Days (0,1): Mid=1. Show on End.
+                    // 3 Days (0,1,2): Mid=1. Show on Mid.
+                    // 4 Days (0,1,2,3): Mid=2. Show on 3rd.
+                    const midPoint = Math.floor(totalDays / 2);
+
+                    return dayIndex === midPoint;
+                };
+
+                // Logic inside HTML generation:
+
                 if (hasOverlap) {
                     const res2 = checkInRes;
-                    const tooltipJson = JSON.stringify(tooltipData).replace(/"/g, '&quot;');
+                    // tooltipJson for checkOutRes is already calculated as 'tooltipJson'
 
                     const total2 = Number(res2.total) || 0;
                     const paid2 = Number(res2.pagado) || 0;
@@ -2688,11 +2734,15 @@ function renderCalendarTimeline(rooms, reservations) {
                     if (res2.estado === 'Activa' || res2.estado === 'Ocupada') col2 = colorActive;
                     if (res2.estado === 'Finalizada') col2 = colorPast;
 
-                    const label1 = (checkOutRes.cliente || '').split(' ')[0].substring(0, 8);
-                    const label2 = (res2.cliente || '').split(' ')[0].substring(0, 8);
+                    // Calc Labels
+                    // Res 1 (Left/End): current 'res' (which is checkOutRes)
+                    const showLabel1 = shouldShowLabel(checkOutRes);
+                    const label1 = showLabel1 ? (checkOutRes.cliente || '').split(' ')[0].substring(0, 8) : '';
 
-                    // SPLIT CELL: 50/50 with 2px gap
-                    // To look professional, bars should align vertically with the rest of the strip (height 28px centered in 40px cell)
+                    // Res 2 (Right/Start): 'res2' (which is checkInRes)
+                    const showLabel2 = shouldShowLabel(res2);
+                    const label2 = showLabel2 ? (res2.cliente || '').split(' ')[0].substring(0, 8) : '';
+
                     html += `<td class="${tdClass}" style="padding:0; height:40px; border-bottom:1px solid #f1f5f9; border-right:1px solid #f1f5f9; vertical-align:middle;">
                                 <div style="display:flex; width:100%; height:100%; align-items:center;">
                                     <div class="res-bar-base" 
@@ -2715,7 +2765,10 @@ function renderCalendarTimeline(rooms, reservations) {
                              </td>`;
 
                 } else if (barType === 'res-bar-end') {
-                    // END OF STRIP
+                    // Ends today
+                    const showLabel = shouldShowLabel(res);
+                    const label = showLabel ? barLabel : '';
+
                     html += `<td class="${tdClass}" style="padding:0; height:40px; border-bottom:1px solid #f1f5f9; border-right:1px solid #f1f5f9; vertical-align:middle;">
                                 <div style="display:flex; width:100%; height:100%; align-items:center;">
                                      <div class="res-bar-base" 
@@ -2724,6 +2777,7 @@ function renderCalendarTimeline(rooms, reservations) {
                                          onmouseenter="showTooltipFromData(event, this)" 
                                          onmouseleave="hideTooltip()"
                                          data-tooltip-data="${tooltipJson}">
+                                         ${label}
                                     </div>
                                     <div style="flex:1; height:100%; cursor:pointer;" 
                                          onclick="openNewReservation('${r.id}', '${r.numero}', '${isoDate}')"
@@ -2733,7 +2787,10 @@ function renderCalendarTimeline(rooms, reservations) {
                              </td>`;
 
                 } else if (barType === 'res-bar-start') {
-                    // START OF STRIP
+                    // Starts today
+                    const showLabel = shouldShowLabel(res);
+                    const label = showLabel ? barLabel : '';
+
                     html += `<td class="${tdClass}" style="padding:0; height:40px; border-bottom:1px solid #f1f5f9; border-right:1px solid #f1f5f9; vertical-align:middle;">
                                 <div style="display:flex; width:100%; height:100%; align-items:center;">
                                     <div style="flex:1; height:100%; cursor:pointer;" 
@@ -2746,16 +2803,15 @@ function renderCalendarTimeline(rooms, reservations) {
                                          onmouseenter="showTooltipFromData(event, this)" 
                                          onmouseleave="hideTooltip()"
                                          data-tooltip-data="${tooltipJson}">
-                                         ${barLabel}
+                                         ${label}
                                     </div>
                                 </div>
                              </td>`;
 
                 } else if (barType === 'res-bar-mid') {
-                    // MIDDLE OF STRIP - CONTINUOUS
-                    // Important: Width 100%, No Radius, No Margin.
-                    // To ensure it touches the borders perfectly, we might need negative margin or specific handling?
-                    // Actually, width 100% inside a padding:0 cell should touch boundaries.
+                    // MIDDLE
+                    const showLabel = shouldShowLabel(res);
+                    const label = showLabel ? barLabel : '';
 
                     html += `<td class="${tdClass}" style="padding:0; height:40px; border-bottom:1px solid #f1f5f9; border-right:1px solid #f1f5f9; vertical-align:middle;">
                                 <div style="display:flex; width:100%; height:100%; align-items:center;">
@@ -2765,13 +2821,14 @@ function renderCalendarTimeline(rooms, reservations) {
                                          onmouseenter="showTooltipFromData(event, this)" 
                                          onmouseleave="hideTooltip()"
                                          data-tooltip-data="${tooltipJson}">
-                                         ${barLabel}
+                                         ${label}
                                     </div>
                                 </div>
                              </td>`;
 
                 } else {
                     // SINGLE DAY (Isolated)
+                    // Always show label for single day
                     html += `<td class="${tdClass}" style="padding:0; height:40px; border-bottom:1px solid #f1f5f9; border-right:1px solid #f1f5f9; vertical-align:middle;">
                                 <div style="display:flex; justify-content:center; align-items:center; width:100%; height:100%;">
                                     <div class="res-bar-base" 
