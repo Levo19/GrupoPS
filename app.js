@@ -1438,6 +1438,24 @@ async function processCheckIn(e) {
         return;
     }
 
+    // Initial Load
+    checkSession();
+
+    // [NEW] Background Auto-Refresh (60s)
+    setInterval(() => {
+        // Only refresh if user is logged in and page is visible
+        if (!document.hidden && localStorage.getItem('erp_token')) {
+            console.log("🔄 Auto-refreshing data...");
+            // Silent Refresh based on current view
+            if (document.getElementById('view-calendar').style.display !== 'none') {
+                loadCalendarView(); // This might be too heavy? Ideally partial refresh.
+                // For now, full reload is safe to ensure consistency.
+            } else if (document.getElementById('view-rooms').style.display !== 'none') {
+                loadRooms();
+            }
+        }
+    }, 60000); // 60 seconds
+
     // Modal close
     closeCheckIn();
     document.getElementById('modalCheckIn').classList.remove('active');
@@ -1873,6 +1891,10 @@ async function finalizeCheckOut() {
             alert('✅ Checkout Completado.');
             closeLiquidation();
             loadRooms(); // Refresh main view to show 'Sucio'
+            // [FIX] Also refresh calendar if we are looking at it
+            if (document.getElementById('view-calendar').style.display !== 'none') {
+                loadCalendarView();
+            }
         } else {
             alert('Error: ' + r.error);
         }
