@@ -1113,6 +1113,8 @@ async function setupCheckInModal(roomId, roomNum, preSelectedDate) {
         }
 
         // 1. Setup Room Selection
+        let linkedRes = null;
+
         if (roomId) {
             if (roomIdInput) roomIdInput.value = roomId;
             if (roomLabel) {
@@ -1120,6 +1122,16 @@ async function setupCheckInModal(roomId, roomNum, preSelectedDate) {
                 roomLabel.style.display = 'inline-block';
             }
             if (roomSelect) roomSelect.style.setProperty('display', 'none', 'important');
+
+            // DETECT RESERVATION FOR TODAY
+            if (checkInMode !== 'reservation' && currentReservationsList) {
+                const today = new Date().toISOString().split('T')[0];
+                linkedRes = currentReservationsList.find(r =>
+                    r.habitacionId == roomId &&
+                    r.estado === 'Reserva' &&
+                    r.fechaEntrada.substring(0, 10) <= today // Start date is today or past due
+                );
+            }
 
             // Init Picker for Room
             initDatePicker(roomId, preSelectedDate);
@@ -1168,6 +1180,59 @@ async function setupCheckInModal(roomId, roomNum, preSelectedDate) {
         if (adelantoInput) adelantoInput.oninput = calculateCheckInBalance;
 
 
+        // PRE-FILL FROM RESERVATION
+        const clientInput = document.getElementById('checkInCliente');
+        const outInput = document.getElementById('checkInSalida');
+
+        // Hidden input for reservation ID
+        let hRes = document.getElementById('checkInLinkedResId');
+        if (!hRes) {
+            hRes = document.createElement('input');
+            hRes.type = 'hidden';
+            hRes.id = 'checkInLinkedResId';
+            const f = document.getElementById('formCheckIn');
+            if (f) f.appendChild(hRes);
+        }
+        hRes.value = '';
+
+        const balanceDiv = document.getElementById('checkInBalanceInfo');
+
+        if (linkedRes) {
+            if (clientInput) clientInput.value = linkedRes.cliente;
+
+            // Set Out Date
+            if (outInput && linkedRes.fechaSalida) {
+                try { outInput.value = linkedRes.fechaSalida.substring(0, 10); } catch (e) { }
+            }
+
+            hRes.value = linkedRes.id;
+
+            // Show Alert
+            if (balanceDiv) {
+                const paid = Number(linkedRes.pagado) || 0;
+                balanceDiv.setAttribute('data-pre-paid', paid);
+                balanceDiv.innerHTML = `
+                    <div style="background:#dbeafe; color:#1e40af; padding:10px; border-radius:6px; margin-bottom:10px; font-size:0.9rem; border:1px solid #93c5fd;">
+                        <i class="fas fa-bookmark"></i> <strong>Reserva Encontrada</strong><br>
+                        Huésped: <strong>${linkedRes.cliente}</strong><br>
+                        <span style="font-size:0.85rem">Abono registrado: S/ ${paid.toFixed(2)}</span>
+                    </div>
+                `;
+                balanceDiv.style.display = 'block';
+            }
+            // Trigger balance calc
+            setTimeout(calculateCheckInBalance, 300);
+        } else {
+            if (balanceDiv) {
+                balanceDiv.removeAttribute('data-pre-paid');
+                // Only clear if it contains our specific alert, to avoid clearing other potential info
+                if (balanceDiv.innerHTML.includes('Reserva Encontrada')) {
+                    balanceDiv.innerHTML = '';
+                    balanceDiv.style.display = 'none';
+                }
+            }
+        }
+
         // Ensure modal is visible
         document.getElementById('modalCheckIn').style.display = 'flex';
 
@@ -1209,10 +1274,18 @@ function calculateCheckInBalance() {
 
         const total = days * price;
         const adelanto = Number(document.getElementById('checkInAdelanto') ? document.getElementById('checkInAdelanto').value : 0) || 0;
-        const restante = total - adelanto;
+
+        // Check for Pre-Paid (Reservation)
+        let infoDiv = document.getElementById('checkInBalanceInfo');
+        let prePaid = 0;
+        if (infoDiv && infoDiv.hasAttribute('data-pre-paid')) {
+            prePaid = Number(infoDiv.getAttribute('data-pre-paid')) || 0;
+        }
+
+        const totalPaid = adelanto + prePaid;
+        const restante = total - totalPaid;
 
         // Find or Create Display Info
-        let infoDiv = document.getElementById('checkInBalanceInfo');
         if (!infoDiv) {
             const notes = document.getElementById('checkInNotas');
             if (notes) {
@@ -1232,12 +1305,37 @@ function calculateCheckInBalance() {
             let text = restante > 0 ? 'Falta Pagar' : 'Pagado';
             if (price === 0) text = 'Precio no disp.';
 
+            // Keep existing alert if any (Reservation Found)
+            let existingAlert = '';
+            // We need to parse existing alert carefully or re-inject it based on data-pre-paid
+            // Simpler: if data-pre-paid exists, re-generate the alert HTML part
+            if (prePaid > 0) {
+                const clientName = document.getElementById('checkInCliente').value || 'Cliente';
+                existingAlert = `
+                    <div style="background:#dbeafe; color:#1e40af; padding:10px; border-radius:6px; margin-bottom:10px; font-size:0.9rem; border:1px solid #93c5fd;">
+                        <i class="fas fa-bookmark"></i> <strong>Reserva Encontrada</strong><br>
+                        Huésped: <strong>${clientName}</strong><br>
+                        <span style="font-size:0.85rem">Abono registrado: S/ ${prePaid.toFixed(2)}</span>
+                    </div>`;
+            }
+
             infoDiv.innerHTML = `
+                ${existingAlert}
                 <div style="display:flex; justify-content:space-between; font-weight:bold; color:#475569;">
                     <span>Total (${days} noches):</span>
                     <span>S/ ${total.toFixed(2)}</span>
                 </div>
-                <div style="display:flex; justify-content:space-between; color:${color}; margin-top:5px;">
+                ${prePaid > 0 ? `
+                <div style="display:flex; justify-content:space-between; color:#3b82f6; font-size:0.85rem;">
+                    <span>Abono Reserva:</span>
+                    <span>- S/ ${prePaid.toFixed(2)}</span>
+                </div>` : ''}
+                ${adelanto > 0 ? `
+                <div style="display:flex; justify-content:space-between; color:#22c55e; font-size:0.85rem;">
+                    <span>Pago Ahora:</span>
+                    <span>- S/ ${adelanto.toFixed(2)}</span>
+                </div>` : ''}
+                <div style="display:flex; justify-content:space-between; color:${color}; margin-top:5px; border-top:1px dashed #cbd5e1; padding-top:5px;">
                     <span>${text}:</span>
                     <span>S/ ${restante.toFixed(2)}</span>
                 </div>
@@ -1278,23 +1376,17 @@ async function processCheckIn(e) {
         data.action = 'extendReservation';
         data.newCheckOutDate = data.fechaSalida;
     } else {
-        // [NEW] Smart Check-In: Detect if we are keeping a Reservation
-        // If there is a 'Reserva' (Yellow) for this Room starting TODAY, we should CONFIRM it, not create a new one.
-        // Unless the user explicitly wants a new one (unlikely for same room).
+        // [NEW] Smart Check-In: Use detected Linked Reservation
+        const hRes = document.getElementById('checkInLinkedResId');
+        const linkedId = hRes ? hRes.value : null;
 
-        const todayIso = new Date().toLocaleDateString('sv').split('T')[0];
-        const startIso = new Date(data.fechaEntrada).toLocaleDateString('sv').split('T')[0]; // Assuming input is YYYY-MM-DD
+        if (linkedId) {
+            console.log("Using linked reservation for Check-In:", linkedId);
+            // We treat this as a confirmation of an existing reservation
+            data.action = 'checkIn'; // We keep action 'checkIn' but pass id to update
+            data.isReservation = true; // Flag to tell backend this is confirming a res
+            data.reservationId = linkedId; // Explicit ID
 
-        const existingRes = currentReservationsList.find(r =>
-            (String(r.habitacionId) === String(data.habitacionId) || String(r.habitacionNumero) === String(data.habitacionId)) &&
-            r.estado === 'Reserva' &&
-            new Date(r.fechaEntrada).toLocaleDateString('sv').split('T')[0] === startIso
-        );
-
-        if (existingRes) {
-            console.log("Found existing reservation for Check-In:", existingRes);
-            data.action = 'confirmReservation';
-            data.id = existingRes.id;
             // Also pass adelanto if any, to be added as payment
             data.adelanto = document.getElementById('checkInAdelanto') ? document.getElementById('checkInAdelanto').value : 0;
             data.metodo = document.getElementById('checkInMetodo') ? document.getElementById('checkInMetodo').value : 'Efectivo';
