@@ -4103,6 +4103,21 @@ async function submitReservation() {
             const newEnd = document.getElementById('resOutDate').value;
             if (!newEnd) throw new Error('Selecciona nueva fecha de salida');
 
+            // [OPTIMISTIC UI] Close modal immediately
+            document.getElementById('modalReservation').style.display = 'none';
+
+            // [OPTIMISTIC UI] Update local reservation
+            const resIndex = currentReservationsList.findIndex(r => r.id === resId);
+            if (resIndex !== -1) {
+                currentReservationsList[resIndex].fechaSalida = newEnd + ' 11:00';
+                currentReservationsList[resIndex].notas = notes;
+            }
+
+            // [OPTIMISTIC UI] Re-render calendar
+            renderCalendarTimeline(currentRoomsList, currentReservationsList);
+            showToast('Extendiendo estadía...');
+
+            // [BACKGROUND SYNC] Send to backend
             const res = await fetch(CONFIG.API_URL, {
                 method: 'POST',
                 body: JSON.stringify({
@@ -4113,8 +4128,13 @@ async function submitReservation() {
                 })
             });
             const d = await res.json();
-            if (!d.success) throw new Error(d.error);
-            showToast('✅ Estadía Extendida');
+            if (!d.success) {
+                alert('Error al extender: ' + d.error);
+                loadCalendarView(); // Revert to backend state
+            } else {
+                showToast('✅ Estadía Extendida');
+                loadCalendarView(); // Refresh from backend
+            }
 
         } else if (mode === 'edit') {
             const client = document.getElementById('resClient').value;
@@ -4123,6 +4143,23 @@ async function submitReservation() {
 
             if (!client || !start || !end) throw new Error('Completa todos los campos');
 
+            // [OPTIMISTIC UI] Close modal immediately
+            document.getElementById('modalReservation').style.display = 'none';
+
+            // [OPTIMISTIC UI] Update local reservation
+            const resIndex = currentReservationsList.findIndex(r => r.id === resId);
+            if (resIndex !== -1) {
+                currentReservationsList[resIndex].cliente = client;
+                currentReservationsList[resIndex].fechaEntrada = start + ' 14:00';
+                currentReservationsList[resIndex].fechaSalida = end + ' 11:00';
+                currentReservationsList[resIndex].notas = notes;
+            }
+
+            // [OPTIMISTIC UI] Re-render calendar
+            renderCalendarTimeline(currentRoomsList, currentReservationsList);
+            showToast('Actualizando reserva...');
+
+            // [BACKGROUND SYNC] Send to backend
             const res = await fetch(CONFIG.API_URL, {
                 method: 'POST',
                 body: JSON.stringify({
@@ -4136,8 +4173,13 @@ async function submitReservation() {
                 })
             });
             const d = await res.json();
-            if (!d.success) throw new Error(d.error);
-            showToast('✅ Reserva Actualizada');
+            if (!d.success) {
+                alert('Error al actualizar: ' + d.error);
+                loadCalendarView(); // Revert to backend state
+            } else {
+                showToast('✅ Reserva Actualizada');
+                loadCalendarView(); // Refresh from backend
+            }
 
         } else {
             // New Reservation
