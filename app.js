@@ -418,7 +418,27 @@ function renderRooms(rooms) {
         // Normalize status
         const normStatus = statusText.toLowerCase();
 
-        if (normStatus === 'ocupado') {
+        // [NEW] Check for "Reservado" Today (Imminent Check-in)
+        // If room is 'Disponible' but has a reservation starting TODAY, we show RESERVADO.
+        if (normStatus === 'disponible') {
+            const todayIso = new Date().toLocaleDateString('sv').split('T')[0]; // Local YYYY-MM-DD
+            const hasResToday = currentReservationsList && currentReservationsList.some(res => {
+                // Check Room Match
+                if (String(res.habitacionId) !== String(r.id) && String(res.habitacionId) !== String(r.numero)) return false;
+                // Check Date Match (Start Date)
+                const resStart = new Date(res.fechaEntrada).toLocaleDateString('sv').split('T')[0];
+                return resStart === todayIso && (res.estado === 'Reserva' || res.estado === 'Activa');
+            });
+
+            if (hasResToday) {
+                statusClass = 'status-warning'; // Yellow/Orange
+                statusLabel = 'RESERVADO (HOY)';
+            } else {
+                statusClass = 'status-disponible';
+                statusLabel = 'DISPONIBLE';
+            }
+        }
+        else if (normStatus === 'ocupado') {
             statusClass = 'status-ocupado';
             statusLabel = 'OCUPADO';
         }
@@ -429,14 +449,9 @@ function renderRooms(rooms) {
         else if (normStatus === 'sucio') {
             statusClass = 'status-sucio';
             statusLabel = 'LIMPIEZA';
-            // User requested that 'Cleaning' means 'Available but Dirty'
-            // We can add a quick 'Clean' action later if needed
         }
-        else if (normStatus === 'disponible') {
-            statusClass = 'status-disponible';
-            statusLabel = 'DISPONIBLE';
-        } else if (normStatus === 'reservado') {
-            statusClass = 'status-mantenimiento'; // Use warning color/orange
+        else if (normStatus === 'reservado') {
+            statusClass = 'status-warning';
             statusLabel = 'RESERVADO';
         }
 
@@ -2289,14 +2304,23 @@ function renderCalendarTimeline(rooms, reservations) {
 
                 if (!barLabel && barType === 'res-bar-single') barLabel = (res.cliente || '').split(' ')[0];
 
-                const tooltipHtml = `<strong>${res.cliente}</strong>Status: ${res.estado}<br>${res.notas || ''}`;
+                const tooltipHtml = `<strong>${res.cliente}</strong><br>Status: ${res.estado}<br>${res.notas || ''}`;
+
+                // [NEW] Debt Indicator
+                let debtHtml = '';
+                const total = Number(res.total) || 0;
+                const paid = Number(res.pagado) || 0;
+                if (total > paid) {
+                    debtHtml = `<span style="position:absolute; right:2px; top:2px; font-size:0.6rem; background:red; color:white; padding:0 3px; border-radius:3px;">S/</span>`;
+                }
 
                 html += `<td class="${tdClass}" style="padding:5px;">
-                            <div class="res-bar-base ${barType}" style="background:${barColor};" 
+                            <div class="res-bar-base ${barType}" style="background:${barColor}; position:relative;" 
                                  onclick="openReservationDetail('${barId}')" 
                                  onmouseenter="showTooltip(event, '${tooltipHtml}')" 
                                  onmouseleave="hideTooltip()">
                                 ${barLabel}
+                                ${debtHtml}
                             </div>
                          </td>`;
             } else {
