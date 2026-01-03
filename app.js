@@ -1,4 +1,4 @@
-console.log("APP JS VERSION: 20260101_1435 - HARD RELOAD");
+console.log("APP JS VERSION: 20260103_0817 - DEBUG CAJA");
 // ===== STATE =====
 let currentUser = null;
 let currentView = 'dashboard';
@@ -25,6 +25,7 @@ document.addEventListener('DOMContentLoaded', () => {
         currentUser = JSON.parse(user);
         preloadAppSession(); // Preload data in background
         initDashboard();
+        initCajaSession(); // [NEW] Ensure Caja State is loaded
     } else {
         showLogin();
         // Phase 11: Dynamic Greeting
@@ -4718,19 +4719,22 @@ function updateCajaWidget() {
 }
 
 function toggleCajaAction() {
+    console.log('toggleCajaAction Called!', currentCaja); // Debug
     if (currentCaja) {
         // Open Close Modal
+        const closeMod = document.getElementById('modalCloseCaja');
+        if (!closeMod) { console.error('Close Modal not found'); return; }
+
         document.getElementById('lblCloseInicial').innerText = 'S/ ' + parseFloat(currentCaja.montoInicial || 0).toFixed(2);
-
-        // TODO: Calculate totals from transactions (Phase 2 enhancement)
-        // For now, we rely on manual input or basic stats if available
-
-        document.getElementById('modalCloseCaja').style.display = 'flex';
+        closeMod.style.display = 'flex';
     } else {
         // Open Open Modal
-        const userName = currentUser ? currentUser.nombre : 'Usuario';
+        const openMod = document.getElementById('modalOpenCaja');
+        if (!openMod) { console.error('Open Modal not found'); return; }
+
+        const userName = currentUser ? currentUser.nombre : (document.getElementById('userDisplay') ? document.getElementById('userDisplay').innerText : 'Usuario');
         document.getElementById('txtOpenCajaResponsable').value = userName;
-        document.getElementById('modalOpenCaja').style.display = 'flex';
+        openMod.style.display = 'flex';
     }
 }
 
