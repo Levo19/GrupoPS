@@ -120,7 +120,7 @@
                         <!-- Stat 1 -->
                         <div class="stat-card">
                             <div>
-                                <div class="stat-value">85%</div>
+                                <div id="statOccupancy" class="stat-value">--%</div>
                                 <div class="stat-label">Ocupación Hoy</div>
                             </div>
                             <div class="icon-box" style="background: #ccfbf1; color: var(--primary);">
@@ -130,7 +130,7 @@
                         <!-- Stat 2 -->
                         <div class="stat-card">
                             <div>
-                                <div class="stat-value">12</div>
+                                <div id="statCheckIns" class="stat-value">--</div>
                                 <div class="stat-label">Check-ins Pendientes</div>
                             </div>
                             <div class="icon-box" style="background: #ffedd5; color: var(--accent);">
@@ -140,7 +140,7 @@
                         <!-- Stat 3 -->
                         <div class="stat-card">
                             <div>
-                                <div class="stat-value">03</div>
+                                <div id="statCleaning" class="stat-value">--</div>
                                 <div class="stat-label">Limpieza Requerida</div>
                             </div>
                             <div class="icon-box" style="background: #fee2e2; color: #ef4444;">
@@ -162,16 +162,10 @@
                                     <th style="padding: 10px;">Acción</th>
                                 </tr>
                             </thead>
-                            <tbody>
-                                <tr style="border-bottom: 1px solid #f1f5f9;">
-                                    <td style="padding: 15px 10px;">Juan Perez</td>
-                                    <td style="padding: 15px 10px;"><span
-                                            style="background: #e0f2fe; color: #0284c7; padding: 4px 8px; border-radius: 6px; font-size: 0.85rem; font-weight: 600;">101</span>
-                                    </td>
-                                    <td style="padding: 15px 10px; color: #f59e0b; font-weight: 600;">Pendiente</td>
-                                    <td style="padding: 15px 10px;"><button
-                                            style="border:none; background: var(--primary); color: white; padding: 6px 12px; border-radius: 6px; cursor: pointer;">Check-In</button>
-                                    </td>
+                            <tbody id="dashArrivalsBody">
+                                <tr>
+                                    <td colspan="4" style="text-align:center; padding:15px; color:#94a3b8;">Cargando
+                                        llegadas...</td>
                                 </tr>
                             </tbody>
                         </table>
