@@ -1189,9 +1189,9 @@
 
         <!-- MODALS RELOCATED -->
         <!-- MODAL: OPEN CAJA -->
-        <div id="modalOpenCaja" class="modal-overlay"
-            onclick="if(event.target === this) document.getElementById('modalOpenCaja').style.display='none'">
-            <div class="login-card fade-in"
+        <div id="modalOpenCaja" class="modal-overlay" style="z-index: 99999;"
+            onclick="console.log('Backdrop Clicked'); if(event.target === this) document.getElementById('modalOpenCaja').style.display='none'">
+            <div class="login-card"
                 style="width: 400px; max-width: 95%; background: white; color: var(--text-main); margin: auto; text-align: left;">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
                     <h2 style="color:var(--primary);">🔓 Abrir Caja (Turno)</h2>
@@ -1220,9 +1220,9 @@
         </div>
 
         <!-- MODAL: CLOSE CAJA -->
-        <div id="modalCloseCaja" class="modal-overlay"
-            onclick="if(event.target === this) document.getElementById('modalCloseCaja').style.display='none'">
-            <div class="login-card fade-in"
+        <div id="modalCloseCaja" class="modal-overlay" style="z-index: 99999;"
+            onclick="console.log('Backdrop Clicked Close'); if(event.target === this) document.getElementById('modalCloseCaja').style.display='none'">
+            <div class="login-card"
                 style="width: 500px; max-width: 95%; background: white; color: var(--text-main); margin: auto; text-align: left;">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
                     <h2 style="color:var(--primary);">🔒 Cerrar Caja (Turno)</h2>
