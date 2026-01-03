@@ -616,7 +616,7 @@ thead tr th.sticky-col {
 }
 
 .room-img-box {
-    height: 160px;
+    height: 220px;
     background: #cbd5e1;
     position: relative;
     overflow: hidden;
@@ -698,9 +698,9 @@ thead tr th.sticky-col {
 }
 
 .room-actions {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
     border-top: 1px solid #f1f5f9;
     padding-top: 15px;
     margin-top: 5px;
