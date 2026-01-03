@@ -100,6 +100,7 @@ async function preloadAppSession() {
         // [OPTIMIZED] Preload Finance Data Silently
         loadFinanceData(true);
         loadShiftHistory(true);
+        updateDashboardStats(); // [FIX] Refresh Dashboard if active
 
         console.log('✅ Data Preloaded!');
     } catch (e) {
@@ -236,6 +237,7 @@ function navigate(viewId) {
     if (viewId === 'dashboard') {
         document.getElementById('view-dashboard').style.display = 'block';
         title.innerText = 'Dashboard Principal';
+        updateDashboardStats(); // [FIX] Trigger load
     } else if (viewId === 'rooms') {
         document.getElementById('view-rooms').style.display = 'block';
         title.innerText = 'Gestión de Habitaciones';
