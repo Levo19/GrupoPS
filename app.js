@@ -2185,10 +2185,10 @@ function renderProducts(products) {
         let imgDisplay = '<div style="width:40px; height:40px; background:#f1f5f9; border-radius:4px; display:flex; align-items:center; justify-content:center;"><i class="fas fa-image" style="color:#cbd5e1;"></i></div>';
 
         if (p.imagen_url && p.imagen_url.length > 5) {
-            // Handle Google Drive links specifically if needed, but standard <img> usually works if public
+            // FIXED: Safer onerror handling
             imgDisplay = `<img src="${p.imagen_url}" 
                 style="width:40px; height:40px; border-radius:4px; object-fit:cover;" 
-                onerror="this.onerror=null; this.parentNode.innerHTML='<div style=\'width:40px; height:40px; background:#fee2e2; border-radius:4px; display:flex; align-items:center; justify-content:center;\'><i class=\'fas fa-exclamation-triangle\' style=\'color:#f87171;\'></i></div>'">`;
+                onerror="this.onerror=null; this.src='https://via.placeholder.com/40?text=Error';">`;
         }
 
         // Robust Price Logic
@@ -2280,7 +2280,6 @@ function editProduct(id) {
     // Reset File Input
     document.getElementById('editProdFile').value = '';
 
-    // Show Preview if URL exists
     // Show Preview if URL exists
     if (p.imagen_url) {
         document.getElementById('imgPreview').src = p.imagen_url;
@@ -2408,14 +2407,7 @@ async function saveProduct(e) {
             currentProductsList.push({ ...prodData, id: 'temp-' + Date.now() });
         }
         renderProducts(currentProductsList);
-        closeProductEditor(); // We close it optimistically. 
-        // IF we want to block until finish, we should NOT close here.
-        // User request: "que no se pueda usar hasta que termine". 
-        // Maybe keeping it open until success is safer? 
-        // The user complained: "luego el formulario queda abierto y nose si esta guardandose".
-        // So keeping it open WITH "Guardando..." is good. 
-        // Optimistic close might be confusing if error happens.
-        // Let's NOT close immediately. Let's wait for success.
+        // keep modal open until sync success
 
         // 3. Background Sync (Now Foreground for UX safety)
         const res = await fetch(CONFIG.API_URL, {
@@ -2430,10 +2422,6 @@ async function saveProduct(e) {
             // Success
             loadProductsView();
             // Now close
-            // But if we didn't close earlier, the list was not updated?
-            // Wait, previous code closed optimistically.
-            // If I wait, I should NOT do optimistic render, or do it but kept modal open?
-            // Best UX: "Guardando..." -> Success -> Modal Close.
             closeProductEditor();
             showToast('✅ Producto Guardado');
         }
@@ -2444,8 +2432,6 @@ async function saveProduct(e) {
         btn.disabled = false;
         // Don't close modal on error
     } finally {
-        // If success, modal is closed. If error, button is reset.
-        // Check if modal still open to reset button just in case?
         if (document.getElementById('modalProductEditor').style.display !== 'none') {
             btn.innerText = originalText;
             btn.disabled = false;
@@ -2453,15 +2439,91 @@ async function saveProduct(e) {
     }
 }
 
+// ===== REAL DASHBOARD IMPLEMENTATION (PHASE 3) =====
+function updateDashboardStats() {
+    // 1. Occupancy
+    const totalRooms = currentRoomsList.length;
+    const occupied = currentRoomsList.filter(r => r.estado && r.estado.toLowerCase() === 'ocupado').length;
+    const occPct = totalRooms > 0 ? Math.round((occupied / totalRooms) * 100) : 0;
+
+    const elOcc = document.getElementById('statOccupancy');
+    if (elOcc) elOcc.innerText = occPct + '%';
+
+    // 2. Check-ins Pending (Today)
+    const todayStr = new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD
+    const checkIns = currentReservationsList.filter(r => {
+        if (r.estado !== 'Reserva') return false;
+        try {
+            // Convert Zulu/ISO to Local YYYY-MM-DD
+            // r.fechaEntrada might be "2024-01-01T14:00:00.000Z"
+            const d = new Date(r.fechaEntrada);
+            // We want LOCAL comparison
+            const localIso = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+            return localIso === todayStr;
+        } catch (e) { return false; }
+    }).length;
+
+    const elCheck = document.getElementById('statCheckIns');
+    if (elCheck) elCheck.innerText = checkIns;
+
+    // 3. Cleaning Required
+    const cleaning = currentRoomsList.filter(r => r.estado && r.estado.toLowerCase() === 'sucio').length;
+    const elClean = document.getElementById('statCleaning');
+    if (elClean) elClean.innerText = cleaning > 9 ? cleaning : '0' + cleaning;
+
+    // 4. Arrivals Table
+    // Get ALL relevant reservations for today (Arriving or just waiting)
+    const arrivals = currentReservationsList.filter(r => {
+        if (r.estado !== 'Reserva' && r.estado !== 'Pendiente') return false;
+        try {
+            const d = new Date(r.fechaEntrada);
+            const localIso = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+            return localIso === todayStr;
+        } catch (e) { return false; }
+    });
+
+    const tbody = document.getElementById('dashArrivalsBody');
+    if (tbody) {
+        if (arrivals.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; padding:20px; color:#94a3b8;">No hay llegadas programadas para hoy.</td></tr>';
+        } else {
+            tbody.innerHTML = '';
+            arrivals.forEach(r => {
+                // Find room number
+                const room = currentRoomsList.find(rm => String(rm.id) === String(r.habitacionId));
+                const roomNum = room ? room.numero : r.habitacionId;
+
+                const tr = document.createElement('tr');
+                tr.style.borderBottom = '1px solid #f1f5f9';
+                tr.innerHTML = `
+                    <td style="padding: 15px 10px; font-weight:600;">${r.cliente}</td>
+                    <td style="padding: 15px 10px;"><span
+                            style="background: #e0f2fe; color: #0284c7; padding: 4px 8px; border-radius: 6px; font-size: 0.85rem; font-weight: 600;">${roomNum}</span>
+                    </td>
+                    <td style="padding: 15px 10px; color: #f59e0b; font-weight: 600;">${r.estado}</td>
+                    <td style="padding: 15px 10px;">
+                        <button onclick="openCheckIn('${r.habitacionId}', '${roomNum}')" style="border:none; background: var(--primary); color: white; padding: 6px 12px; border-radius: 6px; cursor: pointer;">
+                            <i class="fas fa-check"></i> Check-In
+                        </button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+    }
+}
+
+
 // ===== CALENDAR MODULE (PHASE 6) =====
 let calendarStartDate = new Date();
 
 async function loadCalendarView() {
     const container = document.getElementById('view-calendar');
 
-    // 1. Optimistic Render
+    // 1. Optimistic Render or Loading
     if ((currentRoomsList && currentRoomsList.length > 0) && (currentReservationsList && currentReservationsList.length > 0)) {
         renderCalendarTimeline(currentRoomsList, currentReservationsList);
+        updateDashboardStats(); // [NEW] Sync Dashboard
     } else {
         container.innerHTML = `
             <div style="text-align:center; padding: 50px;">
@@ -2482,6 +2544,7 @@ async function loadCalendarView() {
             currentRoomsList = resRooms.habitaciones;
             currentReservationsList = resRes.reservas; // Ensure sync
             renderCalendarTimeline(currentRoomsList, currentReservationsList);
+            updateDashboardStats(); // [NEW] Sync Dashboard Data when fetching is done
         } else if (currentRoomsList.length === 0) {
             throw new Error('Error cargando datos');
         }
