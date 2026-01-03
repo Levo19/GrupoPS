@@ -643,13 +643,24 @@ function toggleRoomFlip(id) {
 async function ensureReservationsLoaded() {
     if (typeof currentReservationsList !== 'undefined' && currentReservationsList.length > 0) return;
     try {
-        const res = await fetch(CONFIG.API_URL, {
-            method: 'POST',
-            body: JSON.stringify({ action: 'getReservas' })
-        });
-        const result = await res.json();
-        if (result.success) {
-            currentReservationsList = result.reservas; // Fix mismatch (was result.data)
+        // Check Preload for Reservations
+        let dataRes;
+        if (PRELOAD_DATA.reservations) {
+            console.log("✅ Usando Reservas Pre-cargadas");
+            dataRes = await PRELOAD_DATA.reservations;
+            // Do not consume null, keep it if reused? No, safe to consume or keep. Cache logic better.
+            // Actually, for calendar we might reload often, so consume only if fresh. 
+            // Let's consume to avoid stale data on re-opens.
+            PRELOAD_DATA.reservations = null;
+        } else {
+            const res2 = await fetch(CONFIG.API_URL, {
+                method: 'POST',
+                body: JSON.stringify({ action: 'getReservas' })
+            });
+            dataRes = await res2.json();
+        }
+        if (dataRes.success) {
+            currentReservationsList = dataRes.reservas; // Fix mismatch (was result.data)
             if (pickerState.roomId) initDatePicker(pickerState.roomId);
         }
     } catch (e) { console.error('Error loading reservations for picker', e); }
@@ -1908,19 +1919,51 @@ async function finalizeCheckOut() {
 
 // ===== ROOMS MODULE =====
 
+let PRELOAD_DATA = {
+    rooms: null,
+    reservations: null
+};
+
+function startPreload() {
+    console.log("🚀 Iniciando Precarga de Datos...");
+    // Preload Rooms
+    PRELOAD_DATA.rooms = fetch(CONFIG.API_URL, {
+        method: 'POST',
+        body: JSON.stringify({ action: 'getHabitaciones' })
+    }).then(r => r.json()).catch(e => null);
+
+    // Preload Reservations (Heavy)
+    PRELOAD_DATA.reservations = fetch(CONFIG.API_URL, {
+        method: 'POST',
+        body: JSON.stringify({ action: 'getReservas' })
+    }).then(r => r.json()).catch(e => null);
+}
+
+// Auto-Start Preload on Load
+document.addEventListener('DOMContentLoaded', startPreload);
+
 async function loadRooms() {
     try {
-        const res = await fetch(CONFIG.API_URL, {
-            method: 'POST',
-            body: JSON.stringify({ action: 'getHabitaciones' })
-        });
-        const data = await res.json();
-        if (data.success) {
+        let data;
+        // Check Preload
+        if (PRELOAD_DATA.rooms) {
+            console.log("✅ Usando Habitaciones Pre-cargadas");
+            data = await PRELOAD_DATA.rooms;
+            PRELOAD_DATA.rooms = null; // Consume
+        } else {
+            const res = await fetch(CONFIG.API_URL, {
+                method: 'POST',
+                body: JSON.stringify({ action: 'getHabitaciones' })
+            });
+            data = await res.json();
+        }
+
+        if (data && data.success) {
             currentRoomsList = data.habitaciones;
             renderRooms(currentRoomsList);
             updateDashboardStats(); // Phase 3 Hook
         } else {
-            console.error('Error cargando habitaciones:', data.error);
+            console.error('Error cargando habitaciones:', data ? data.error : 'No data');
         }
     } catch (e) {
         console.error('Error red:', e);
@@ -2017,7 +2060,7 @@ function renderRooms(rooms) {
 
             html += `
             <div class="room-card fade-in">
-                <div class="room-image-box" onclick="openRoomDetail('${r.id}')">
+                <div class="room-img-box" onclick="openRoomDetail('${r.id}')">
                     <img src="${mainImg}" alt="Room ${r.numero}" onerror="this.src='https://via.placeholder.com/300?text=Sin+Imagen'">
                     <div class="room-badges">
                         <span class="room-badge" style="background:${badgeColor}">${computedStatus.toUpperCase()}</span>
