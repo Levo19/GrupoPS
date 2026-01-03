@@ -4735,6 +4735,8 @@ function toggleCajaAction() {
         const userName = currentUser ? currentUser.nombre : (document.getElementById('userDisplay') ? document.getElementById('userDisplay').innerText : 'Usuario');
         document.getElementById('txtOpenCajaResponsable').value = userName;
         openMod.style.display = 'flex';
+        console.log('Set display flex. Computed:', window.getComputedStyle(openMod).display);
+        console.log('Z-Index:', window.getComputedStyle(openMod).zIndex);
     }
 }
 
