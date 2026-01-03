@@ -3974,6 +3974,8 @@ function openCheckIn(roomId, roomNum) {
             inDate.value = todayIso;
             inDate.disabled = true;
         }
+        // [NEW] Set Check-In Flag
+        document.getElementById('resIsCheckIn').value = 'true';
     }, 50);
 }
 
@@ -4160,6 +4162,8 @@ async function addPaymentToReservation(resId) {
     const method = prompt("Medio de pago (Efectivo, Yape, Plin, Tarjeta):", "Efectivo");
     if (!method) return;
 
+    if (!currentCaja) { alert('⚠️ Caja Cerrada. Abra caja para registrar pagos.'); toggleCajaAction(); return; }
+
     // [OPTIMISTIC UI UPDATE]
     const res = currentReservationsList.find(r => String(r.id) === String(resId));
     if (res) {
@@ -4186,7 +4190,8 @@ async function addPaymentToReservation(resId) {
             monto: amount,
             metodo: method,
             notas: 'Pago manual desde Detalle Reserva',
-            fecha: new Date()
+            fecha: new Date(),
+            cajaId: currentCaja.id
         };
 
         // Just send, don't block
@@ -4202,10 +4207,12 @@ async function addPaymentToReservation(resId) {
 
 
 async function confirmReservation(resId) {
+    if (!currentCaja) { alert('⚠️ Caja Cerrada. Abra caja para procesar ingresos.'); toggleCajaAction(); return; }
+
     if (!confirm('¿Confirmar ingreso del huésped? Estado pasará a Activa.')) return;
     try {
         const res = await fetch(CONFIG.API_URL, {
-            method: 'POST', body: JSON.stringify({ action: 'confirmReservation', id: resId })
+            method: 'POST', body: JSON.stringify({ action: 'confirmReservation', id: resId, cajaId: currentCaja.id })
         });
         const d = await res.json();
         if (d.success) { showToast('✅ Ingreso Confirmado'); loadCalendarView(); }
@@ -4239,6 +4246,9 @@ function openReservation(roomId, roomNum, date, existingClient, mode = 'new', ex
 
     // [FIX] Reset Adelanto to avoid persistence
     if (document.getElementById('resAdelanto')) document.getElementById('resAdelanto').value = '';
+
+    // Reset Check-In Flag (Default to Reservation)
+    document.getElementById('resIsCheckIn').value = 'false';
 
     const title = document.getElementById('resModalTitle');
     const btn = document.querySelector('#modalReservation .btn-submit');
@@ -4484,6 +4494,18 @@ async function submitReservation() {
 
             if (!client || !start || !end) throw new Error('Completa todos los campos');
 
+            // [NEW] Check-In vs Reservation Logic
+            const isCheckIn = document.getElementById('resIsCheckIn').value === 'true';
+
+            // [Enforce Caja] If Check-In OR Payment involved
+            if (isCheckIn || Number(adelanto) > 0) {
+                if (!currentCaja) {
+                    alert('⚠️ Caja Cerrada. Abra caja para realizar Check-Ins o recibir Pagos.');
+                    toggleCajaAction();
+                    throw new Error('Caja Cerrada');
+                }
+            }
+
             // OPTIMISTIC UI: Render immediately
             const tempId = 'OPT-' + new Date().getTime();
             const tempRes = {
@@ -4492,7 +4514,7 @@ async function submitReservation() {
                 cliente: client,
                 fechaEntrada: start + ' 14:00', // Mock time
                 fechaSalida: end + ' 11:00',
-                estado: 'Reserva', // Assuming New Reservation
+                estado: isCheckIn ? 'Ocupada' : 'Reserva', // [FIX] Dynamic Status
                 notas: notes,
                 pagado: Number(adelanto) || 0 // Optimistic Payment
             };
@@ -4508,10 +4530,12 @@ async function submitReservation() {
                     cliente: client,
                     fechaEntrada: start,
                     fechaSalida: end,
+                    fechaSalida: end,
                     notas: notes,
-                    isReservation: true,
-                    adelanto: adelanto, // [NEW] Pass Advance Payment
-                    metodo: metodo      // [NEW] Pass Payment Method
+                    isReservation: !isCheckIn, // [FIX] False if Check-In
+                    adelanto: adelanto,
+                    metodo: metodo,
+                    cajaId: currentCaja ? currentCaja.id : null // [NEW] Attach Caja ID
                 })
             });
             const d = await res.json();
