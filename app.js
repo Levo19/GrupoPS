@@ -4939,6 +4939,7 @@ async function loadShiftHistory() {
             <th style="padding:10px; text-align:right;">Monto Inicial</th>
             <th style="padding:10px; text-align:right;">Monto Final</th>
             <th style="padding:10px; text-align:center;">Estado</th>
+            <th style="padding:10px; text-align:center;">Acciones</th>
         </tr>
     `;
 
@@ -4954,14 +4955,13 @@ async function loadShiftHistory() {
         const history = data.history || [];
 
         if (history.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:20px;">No hay turnos registrados.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:20px;">No hay turnos registrados.</td></tr>';
             return;
         }
 
         let html = '';
         history.forEach(h => {
-            const start = new Date(h.fechaInicio).toLocaleString();
-            // const end = h.fechaFin ? new Date(h.fechaFin).toLocaleString() : '-';
+            const hSafe = JSON.stringify(h).replace(/"/g, '&quot;');
             const statusColor = h.estado === 'Abierta' ? '#22c55e' : '#ef4444';
 
             html += `
@@ -4971,12 +4971,20 @@ async function loadShiftHistory() {
                         <div style="font-size:0.8rem; color:#64748B;">${new Date(h.fechaInicio).toLocaleTimeString()}</div>
                     </td>
                     <td style="padding:12px;">${h.responsable}</td>
-                    <td style="padding:12px; text-align:right;">S/ ${parseFloat(h.montoInicial).toFixed(2)}</td>
+                    <td style="padding:12px; text-align:right;">S/ ${parseFloat(h.montoInicial || 0).toFixed(2)}</td>
                     <td style="padding:12px; text-align:right;">${h.montoFinal ? 'S/ ' + parseFloat(h.montoFinal).toFixed(2) : '-'}</td>
                     <td style="padding:12px; text-align:center;">
                         <span style="background:${statusColor}20; color:${statusColor}; padding:4px 8px; border-radius:12px; font-weight:bold; font-size:0.8rem;">
                             ${h.estado}
                         </span>
+                    </td>
+                    <td style="padding:12px; text-align:center;">
+                        <button onclick="reprintShiftTicketWithData(${hSafe})" title="Re-imprimir Voucher" style="border:none; background:#f1f5f9; padding:6px 10px; border-radius:6px; cursor:pointer; margin-right:5px; color:#334155;">
+                            <i class="fas fa-print"></i>
+                        </button>
+                         <button onclick="openShiftDetails('${h.id}')" title="Ver Detalles" style="border:none; background:#e0f2fe; padding:6px 10px; border-radius:6px; cursor:pointer; color:#0284c7;">
+                            <i class="fas fa-eye"></i>
+                        </button>
                     </td>
                 </tr>
             `;
@@ -4985,9 +4993,106 @@ async function loadShiftHistory() {
 
     } catch (e) {
         console.error(e);
-        tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; color:red; padding:20px;">Error: ${e.message}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:red; padding:20px;">Error: ${e.message}</td></tr>`;
     }
 }
+
+function reprintShiftTicketWithData(cajaData) {
+    if (typeof cajaData === 'string') cajaData = JSON.parse(cajaData);
+    cajaData.montoInicial = parseFloat(cajaData.montoInicial || 0);
+    cajaData.montoFinal = parseFloat(cajaData.montoFinal || 0);
+
+    // Fetch details to calculate specific Sales/Expenses
+    const btn = event.target.closest('button');
+    const originalContent = btn.innerHTML;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+
+    fetch(CONFIG.API_URL, {
+        method: 'POST',
+        body: JSON.stringify({ action: 'getCajaDetails', cajaId: cajaData.id })
+    })
+        .then(r => r.json())
+        .then(data => {
+            btn.innerHTML = originalContent;
+            if (data.success) {
+                // Calculate Totals
+                let sales = 0;
+                if (data.pagos) data.pagos.forEach(p => {
+                    // Assuming all payments in this list are Sales because savePago is for Reservations?
+                    // Or we check 'metodo' == 'Efectivo'?
+                    // Ticket usually shows 'Ventas (Efectivo)'.
+                    if (p.metodo === 'Efectivo') sales += parseFloat(p.monto || 0);
+                });
+
+                let expenses = 0;
+                if (data.gastos) data.gastos.forEach(g => expenses += parseFloat(g.monto || 0));
+
+                // Attach to cajaData so printShiftTicket can use them
+                cajaData.calculatedSales = sales;
+                cajaData.calculatedExpenses = expenses;
+                cajaData.isReprint = true;
+
+                printShiftTicket(cajaData);
+            } else {
+                alert('Error al obtener datos para impresión.');
+            }
+        })
+        .catch(e => {
+            btn.innerHTML = originalContent;
+            console.error(e);
+            alert('Error de conexión');
+        });
+}
+
+function openShiftDetails(cajaId) {
+    if (!cajaId) return;
+    // Call backend to get details
+    // For now, simple alert or we can inject a modal.
+    // Let's use a temporary native confirm/alert to show we have data until we build UI.
+    const btn = event.target;
+    const originalText = btn.innerHTML;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+
+    fetch(CONFIG.API_URL, {
+        method: 'POST',
+        body: JSON.stringify({ action: 'getCajaDetails', cajaId: cajaId })
+    })
+        .then(r => r.json())
+        .then(data => {
+            btn.innerHTML = originalText;
+            if (data.success) {
+                let msg = `DETALLE TURNOS (ID: ${cajaId})\n\n`;
+                msg += `--- PAGOS (Ingresos) ---\n`;
+                if (data.pagos && data.pagos.length > 0) {
+                    data.pagos.forEach(p => {
+                        msg += `[${new Date(p.fecha).toLocaleTimeString()}] ${p.metodo}: S/ ${p.monto} (${p.notas})\n`;
+                    });
+                } else {
+                    msg += `(Ninguno)\n`;
+                }
+
+                msg += `\n--- GASTOS (Egresos) ---\n`;
+                if (data.gastos && data.gastos.length > 0) {
+                    data.gastos.forEach(g => {
+                        msg += `[${new Date(g.fecha).toLocaleTimeString()}] ${g.categoria}: S/ ${g.monto} - ${g.descripcion}\n`;
+                    });
+                } else {
+                    msg += `(Ninguno)\n`;
+                }
+                alert(msg);
+            } else {
+                alert('Error al cargar detalles.');
+            }
+        })
+        .catch(e => {
+            console.error(e);
+            btn.innerHTML = originalText;
+            alert('Error de conexión');
+        });
+}
+
+
+
 
 function printShiftTicket(caja) {
     // Determine context
@@ -5000,23 +5105,41 @@ function printShiftTicket(caja) {
     // Ideally we recalculate or pass full stats. 
     // Let's grab DOM values from the Close Modal for accuracy of what user saw.
 
-    // NOTE: The values in modal are just text. We should re-calc to be safe or parse text.
-    // For simplicity and immediate feedback, we parse the ID values if they exist, else 0.
+    // Use calculated data if available (Reprint), else DOM (Live Close)
+    let ventasCash, ventasDig, gastos;
 
-    const txtVentasCash = document.getElementById('lblCloseVentasCash') ? document.getElementById('lblCloseVentasCash').innerText.replace(/[^\d.-]/g, '') : '0';
-    const txtVentasDig = document.getElementById('lblCloseVentasDigital') ? document.getElementById('lblCloseVentasDigital').innerText.replace(/[^\d.-]/g, '') : '0';
-    const txtGastos = document.getElementById('lblCloseGastos') ? document.getElementById('lblCloseGastos').innerText.replace(/[^\d.-]/g, '') : '0';
+    if (caja.isReprint) {
+        ventasCash = caja.calculatedSales || 0;
+        ventasDig = 0; // Not calculated yet
+        gastos = caja.calculatedExpenses || 0;
+    } else {
+        const txtVentasCash = document.getElementById('lblCloseVentasCash') ? document.getElementById('lblCloseVentasCash').innerText.replace(/[^\d.-]/g, '') : '0';
+        // const txtVentasDig = ...
+        const txtGastos = document.getElementById('lblCloseGastos') ? document.getElementById('lblCloseGastos').innerText.replace(/[^\d.-]/g, '') : '0';
 
-    const ventasCash = parseFloat(txtVentasCash);
-    // const ventasDig = parseFloat(txtVentasDig); // Not cash, usually not in cash count but good for report
-    const gastos = parseFloat(txtGastos); // Negative number usually
+        ventasCash = parseFloat(txtVentasCash);
+        gastos = parseFloat(txtGastos); // This usually comes as negative string? e.g "- S/ 50" -> -50
+        // But lblCloseGastos usually shows "- S/ 50". parseFloat("- S/ 50") might fail if not cleaned.
+        // The replace regex `[^\d.-]` removes ' S/ ' but keeps '-'. So "-50.00". Correct.
+        // Wait, if it is "- S/ 50", replace gives "-50". Correct.
+        // But Expenses should be subtracted? 
+        // In "Esperado" calc: Initial + Sales - Expenses.
+        // If 'gastos' is negative (-50), we should Add it? Or is it positive value displayed with negative sign?
+        // App logic says: `estimatedExpenses` (positive number). 
+        // `lblCloseGastos.innerText = '- S/ ' + estimatedExpenses`.
+        // So DOM text is "- S/ 50". 
+        // parseFloat("-50") = -50.
+        // So `gastos` is negative.
+    }
+
+    // Ensure Gastos is positive for display (if we want "Gastos: 50.00")
+    // If we want to math it: Esperado = Initial + Sales - Abs(Gastos).
+    // Let's normalize.
+    const gastosAbs = Math.abs(gastos);
 
     const inicial = parseFloat(caja.montoInicial || 0);
     const finalReal = parseFloat(caja.montoFinal || 0);
-    const esperado = inicial + ventasCash + gastos; // Gastos is negative? Let's assume arithmetic sum
-    // Actually in modal logic: Total = Inicial + VentasCash - Gastos. 
-    // If 'txtGastos' came from text like "- S/ 50.00", parseFloat might be -50.
-    // Let's rely on simple math: 
+    const esperado = inicial + ventasCash - gastosAbs;
 
     const diff = finalReal - esperado;
 
