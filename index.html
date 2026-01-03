@@ -285,6 +285,7 @@
                             style="color:black; background:#f1f5f9; border:1px solid #cbd5e1;">
                             <option value="Matrimonial">Matrimonial</option>
                             <option value="Doble">Doble</option>
+                            <option value="Triple">Triple</option>
                             <option value="Suite">Suite</option>
                             <option value="Familiar">Familiar</option>
                         </select>
@@ -298,21 +299,78 @@
                             style="color:black; background:#f1f5f9; border:1px solid #cbd5e1;" required>
                     </div>
                     <div class="form-group">
-                        <label class="form-label" style="color:#64748B;">Estado</label>
-                        <select id="editEstado" class="form-input"
+                        <label class="form-label" style="color:#64748B;">Personas Máx.</label>
+                        <input type="number" id="editCapacidad" class="form-input" value="2" min="1"
                             style="color:black; background:#f1f5f9; border:1px solid #cbd5e1;">
-                            <option value="Disponible">Disponible</option>
-                            <option value="Ocupado">Ocupado</option>
-                            <option value="Mantenimiento">Mantenimiento</option>
-                            <option value="Sucio">Sucio</option>
-                        </select>
                     </div>
                 </div>
 
                 <div class="form-group">
-                    <label class="form-label" style="color:#64748B;">URL Foto Principal</label>
-                    <input type="url" id="editFoto" class="form-input"
-                        style="color:black; background:#f1f5f9; border:1px solid #cbd5e1;" placeholder="https://...">
+                    <label class="form-label" style="color:#64748B;">Detalle Camas</label>
+                    <input type="text" id="editCamas" class="form-input" placeholder="Ej: 1 Cama King, 2 de 1.5 plz"
+                        style="color:black; background:#f1f5f9; border:1px solid #cbd5e1;">
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" style="color:#64748B;">Estado</label>
+                    <select id="editEstado" class="form-input"
+                        style="color:black; background:#f1f5f9; border:1px solid #cbd5e1;">
+                        <option value="Disponible">Disponible</option>
+                        <option value="Ocupado">Ocupado</option>
+                        <option value="Mantenimiento">Mantenimiento</option>
+                        <option value="Sucio">Sucio</option>
+                    </select>
+                </div>
+
+                <!-- MEDIA MANAGER -->
+                <div class="media-manager" style="margin-top:20px; border-top:1px solid #e2e8f0; padding-top:15px;">
+                    <label class="form-label"
+                        style="color:#0f172a; font-weight:bold; margin-bottom:10px; display:block;">Galería Multimedia
+                        (Máx 4 Fotos + 1 Video)</label>
+
+                    <!-- Hidden Inputs for Sync -->
+                    <input type="hidden" id="editFotosJSON">
+                    <input type="hidden" id="editVideoURL">
+
+                    <div style="display:grid; grid-template-columns: repeat(5, 1fr); gap:10px;">
+                        <!-- Slots 1-4: Images -->
+                        <div class="media-slot" id="slot-img-0" onclick="triggerMediaUpload('img', 0)">
+                            <i class="fas fa-plus"></i> <span style="font-size:0.7rem;">Foto 1</span>
+                            <img src="" class="media-preview" style="display:none;">
+                            <button type="button" class="media-del"
+                                onclick="removeMedia(event, 'img', 0)">&times;</button>
+                        </div>
+                        <div class="media-slot" id="slot-img-1" onclick="triggerMediaUpload('img', 1)">
+                            <i class="fas fa-plus"></i> <span style="font-size:0.7rem;">Foto 2</span>
+                            <img src="" class="media-preview" style="display:none;">
+                            <button type="button" class="media-del"
+                                onclick="removeMedia(event, 'img', 1)">&times;</button>
+                        </div>
+                        <div class="media-slot" id="slot-img-2" onclick="triggerMediaUpload('img', 2)">
+                            <i class="fas fa-plus"></i> <span style="font-size:0.7rem;">Foto 3</span>
+                            <img src="" class="media-preview" style="display:none;">
+                            <button type="button" class="media-del"
+                                onclick="removeMedia(event, 'img', 2)">&times;</button>
+                        </div>
+                        <div class="media-slot" id="slot-img-3" onclick="triggerMediaUpload('img', 3)">
+                            <i class="fas fa-plus"></i> <span style="font-size:0.7rem;">Foto 4</span>
+                            <img src="" class="media-preview" style="display:none;">
+                            <button type="button" class="media-del"
+                                onclick="removeMedia(event, 'img', 3)">&times;</button>
+                        </div>
+
+                        <!-- Slot 5: Video -->
+                        <div class="media-slot video-slot" id="slot-video" onclick="triggerMediaUpload('video', 0)"
+                            style="border-color:#f472b6; background:#fdf2f8;">
+                            <i class="fas fa-video" style="color:#db2777;"></i> <span
+                                style="font-size:0.7rem; color:#be185d;">Video</span>
+                            <div class="media-preview-video" style="display:none; font-size:2rem;">🎥</div>
+                            <button type="button" class="media-del"
+                                onclick="removeMedia(event, 'video', 0)">&times;</button>
+                        </div>
+                    </div>
+                    <input type="file" id="mediaUploadInput" style="display:none;"
+                        onchange="handleMediaFileSelect(this)">
                 </div>
 
                 <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px;">
