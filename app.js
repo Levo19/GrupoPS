@@ -4731,7 +4731,46 @@ function toggleCajaAction() {
         }
 
         document.getElementById('lblCloseInicial').innerText = 'S/ ' + parseFloat(currentCaja.montoInicial || 0).toFixed(2);
+
+        // [FIX] Calculate Totals (Local Estimation)
+        // Note: This only counts loaded reservations. For full accuracy, backend should provide this.
+        // For now, calculating from Initial + 0 to ensure at least Initial is shown.
+        let estimatedSales = 0;
+        let estimatedExpenses = 0;
+
+        // Try to sum loads from currentReservationsList if available
+        if (typeof currentReservationsList !== 'undefined') {
+            const start = new Date(currentCaja.fechaInicio);
+            currentReservationsList.forEach(r => {
+                if (r.pagos) {
+                    r.pagos.forEach(p => {
+                        const pDate = new Date(p.fecha);
+                        if (pDate >= start && (!p.cajaId || p.cajaId === currentCaja.id)) {
+                            // Only sum CASH for "Esperado" if we strictly mean Cash Drawer
+                            // But usually Esperado implies Total or Cash? 
+                            // User UI separates Cash vs Digital.
+                            // Let's assume strict Cash for the drawer check.
+                            if (p.metodo === 'Efectivo') {
+                                estimatedSales += (Number(p.monto) || 0);
+                            }
+                        }
+                    });
+                }
+            });
+        }
+
+        const inicial = parseFloat(currentCaja.montoInicial || 0);
+        const esperado = inicial + estimatedSales - estimatedExpenses;
+
+        document.getElementById('lblCloseVentasCash').innerText = '+ S/ ' + estimatedSales.toFixed(2);
+        document.getElementById('lblCloseGastos').innerText = '- S/ ' + estimatedExpenses.toFixed(2);
+        document.getElementById('lblCloseEsperado').innerText = 'S/ ' + esperado.toFixed(2);
+
         closeMod.style.display = 'flex';
+
+        // DEBUG: VISIBILITY CHECK
+        const rect = closeMod.getBoundingClientRect();
+        console.log('Close Modal Rect:', rect);
     } else {
         // OPEN MODAL
         const openMod = document.getElementById('modalOpenCaja');
