@@ -1,4 +1,4 @@
-console.log("APP JS VERSION: 20260103_1002 - DEBUG CAJA V3");
+console.log("APP JS VERSION: 20260103_1030 - DEBUG CAJA V4 (REPARENT)");
 // ===== STATE =====
 let currentUser = null;
 let currentView = 'dashboard';
@@ -4725,12 +4725,23 @@ function toggleCajaAction() {
         const closeMod = document.getElementById('modalCloseCaja');
         if (!closeMod) { console.error('Close Modal not found'); return; }
 
+        // [FIX] Force Move to Body
+        if (closeMod.parentNode !== document.body) {
+            document.body.appendChild(closeMod);
+        }
+
         document.getElementById('lblCloseInicial').innerText = 'S/ ' + parseFloat(currentCaja.montoInicial || 0).toFixed(2);
         closeMod.style.display = 'flex';
     } else {
-        // Open Open Modal
+        // OPEN MODAL
         const openMod = document.getElementById('modalOpenCaja');
         if (!openMod) { console.error('Open Modal not found'); return; }
+
+        // [FIX] Force Move to Body to avoid container issues
+        if (openMod.parentNode !== document.body) {
+            document.body.appendChild(openMod);
+            console.log('Moved modalOpenCaja to body');
+        }
 
         const userName = currentUser ? currentUser.nombre : (document.getElementById('userDisplay') ? document.getElementById('userDisplay').innerText : 'Usuario');
         document.getElementById('txtOpenCajaResponsable').value = userName;
