@@ -97,31 +97,18 @@ async function preloadAppSession() {
         if (currentId === 'users') renderUsers(currentUsersList);
         // Calendar is complex, leave it for now or refresh if visible
 
+        // [OPTIMIZED] Preload Finance Data Silently
+        loadFinanceData(true);
+        loadShiftHistory(true);
+
+        console.log('✅ Data Preloaded!');
     } catch (e) {
         console.error('⚠️ Error preloading data', e);
     }
 }
 
 // ===== DATA REFRESH HELPERS =====
-async function loadRooms() {
-    try {
-        const response = await fetch(CONFIG.API_URL, {
-            method: 'POST',
-            body: JSON.stringify({ action: 'getHabitaciones' })
-        });
-        const data = await response.json();
-        if (data.success) {
-            currentRoomsList = data.habitaciones;
-            // Optionally update views if they are active?
-            // renderRooms(currentRoomsList); // Only if needed based on view
-            console.log('Habitaciones recargadas:', currentRoomsList.length);
-        } else {
-            console.error('Error cargando habitaciones:', data.error);
-        }
-    } catch (e) {
-        console.error('Error de red al cargar habitaciones:', e);
-    }
-}
+
 async function loadReservations() {
     try {
         const res = await fetch(CONFIG.API_URL, { method: 'POST', body: JSON.stringify({ action: 'getReservas' }) });
@@ -3176,6 +3163,15 @@ function closeRoomDetail() {
 
 // ===== FINANCE MODULE (PHASE 8) =====
 
+// [OPTIMIZATION] caching
+window.FINANCE_CACHE = {
+    report: null,
+    history: null,
+    lastFetchReport: 0,
+    lastFetchHistory: 0,
+    TTL: 5 * 60 * 1000 // 5 minutes (optional, but we do background refresh anyway)
+};
+
 let currentFinanceReport = null; // Stores data
 
 function renderFinanceView() {
@@ -3184,11 +3180,22 @@ function renderFinanceView() {
     loadFinanceData();
 }
 
-async function loadFinanceData() {
-    document.getElementById('financeTbody').innerHTML = '<tr><td colspan="4" style="text-align:center; padding:20px;">Cargando datos financieros...</td></tr>';
+// isBackground = true means don't show loading spinner, just update silently
+async function loadFinanceData(isBackground = false) {
+    const tbody = document.getElementById('financeTbody');
+
+    // 1. Instant Render from Cache
+    if (window.FINANCE_CACHE.report) {
+        currentFinanceReport = window.FINANCE_CACHE.report;
+        // Only update UI if we are physically viewing the Finance Tab
+        // If preloading in background, we might not want to touch DOM unless active.
+        if (!isBackground) updateFinanceUI();
+    } else {
+        if (!isBackground && tbody) tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; padding:20px;">Cargando datos financieros...</td></tr>';
+    }
 
     // Month Filter
-    const filter = document.getElementById('financeMonthSelector').value;
+    const filter = document.getElementById('financeMonthSelector') ? document.getElementById('financeMonthSelector').value : '0';
     const now = new Date();
     let start, end;
 
@@ -3215,11 +3222,24 @@ async function loadFinanceData() {
 
         if (data.success) {
             currentFinanceReport = data.report;
-            updateFinanceUI();
+            // Update Cache
+            window.FINANCE_CACHE.report = data.report;
+            window.FINANCE_CACHE.lastFetchReport = Date.now();
+
+            // If we are active tab or called explicitly, render
+            // (If background preload, we just updated cache, ensuring next click is fast)
+            // But if user is already looking at it, we should refresh UI to show latest.
+            if (document.getElementById('view-finances').style.display === 'block' || !isBackground) {
+                updateFinanceUI();
+            }
         } else {
-            alert('Error cargando finanzas: ' + data.error);
+            console.warn('Error loading finance background:', data.error);
+            if (!isBackground) alert('Error cargando finanzas: ' + data.error);
         }
-    } catch (e) { console.error(e); alert('Error de conexión'); }
+    } catch (e) {
+        console.error(e);
+        if (!isBackground) alert('Error de conexión');
+    }
 }
 
 function updateFinanceUI() {
@@ -3244,24 +3264,7 @@ function updateFinanceUI() {
     }
 }
 
-function switchFinanceTab(tab) {
-    const btnIn = document.getElementById('tabIngresos');
-    const btnEx = document.getElementById('tabGastos');
 
-    if (tab === 'ingresos') {
-        btnIn.style.color = 'var(--primary)';
-        btnIn.style.borderBottom = '3px solid var(--primary)';
-        btnEx.style.color = '#94a3b8';
-        btnEx.style.borderBottom = 'none';
-        renderFinanceTable('ingresos');
-    } else {
-        btnEx.style.color = 'var(--primary)';
-        btnEx.style.borderBottom = '3px solid var(--primary)';
-        btnIn.style.color = '#94a3b8';
-        btnIn.style.borderBottom = 'none';
-        renderFinanceTable('gastos');
-    }
-}
 
 function renderFinanceTable(type) {
     const thead = document.getElementById('financeThead');
@@ -4925,13 +4928,12 @@ function switchFinanceTab(tab) {
     }
 }
 
-async function loadShiftHistory() {
+// isBackground = true means don't show loading spinner or error alerts (silent update)
+async function loadShiftHistory(isBackground = false) {
     const tbody = document.getElementById('financeTbody');
     const thead = document.getElementById('financeThead');
 
-    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:20px;">Cargando historial...</td></tr>';
-
-    // Setup Headers
+    // Setup Headers (Always render this if we are going to show data)
     thead.innerHTML = `
         <tr style="color:#64748B; border-bottom:1px solid #cbd5e1;">
             <th style="padding:10px; text-align:left;">Inicio</th>
@@ -4942,6 +4944,13 @@ async function loadShiftHistory() {
             <th style="padding:10px; text-align:center;">Acciones</th>
         </tr>
     `;
+
+    // 1. Instant Render from Cache
+    if (window.FINANCE_CACHE.history) {
+        if (!isBackground) renderShiftHistoryTable(window.FINANCE_CACHE.history);
+    } else {
+        if (!isBackground && tbody) tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:20px;">Cargando historial...</td></tr>';
+    }
 
     try {
         const res = await fetch(CONFIG.API_URL, {
@@ -4954,47 +4963,68 @@ async function loadShiftHistory() {
 
         const history = data.history || [];
 
-        if (history.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:20px;">No hay turnos registrados.</td></tr>';
-            return;
+        // Update Cache
+        window.FINANCE_CACHE.history = history;
+        window.FINANCE_CACHE.lastFetchHistory = Date.now();
+
+        // Render if active or explicitly requested
+        // If isBackground is true, we usually don't want to re-render unless needed, 
+        // but for "Preload" purposes, updating the DOM if user is watching is fine.
+        // But main use case is: User opens app -> Background fetch updates cache -> User clicks tab -> Instant Render.
+        // If user is ALREADY on tab, we should refresh.
+        if (document.getElementById('view-finances').style.display === 'block' && document.getElementById('tabShifts') && document.getElementById('tabShifts').style.color.includes('var(--primary)')) {
+            renderShiftHistoryTable(history);
+        } else if (!isBackground) {
+            // If we called this explicitly (not background), render it.
+            renderShiftHistoryTable(history);
         }
-
-        let html = '';
-        history.forEach(h => {
-            const hSafe = JSON.stringify(h).replace(/"/g, '&quot;');
-            const statusColor = h.estado === 'Abierta' ? '#22c55e' : '#ef4444';
-
-            html += `
-                <tr style="border-bottom:1px solid #f1f5f9;">
-                    <td style="padding:12px;">
-                        <div style="font-weight:bold; color:#1e293b;">${new Date(h.fechaInicio).toLocaleDateString()}</div>
-                        <div style="font-size:0.8rem; color:#64748B;">${new Date(h.fechaInicio).toLocaleTimeString()}</div>
-                    </td>
-                    <td style="padding:12px;">${h.responsable}</td>
-                    <td style="padding:12px; text-align:right;">S/ ${parseFloat(h.montoInicial || 0).toFixed(2)}</td>
-                    <td style="padding:12px; text-align:right;">${h.montoFinal ? 'S/ ' + parseFloat(h.montoFinal).toFixed(2) : '-'}</td>
-                    <td style="padding:12px; text-align:center;">
-                        <span style="background:${statusColor}20; color:${statusColor}; padding:4px 8px; border-radius:12px; font-weight:bold; font-size:0.8rem;">
-                            ${h.estado}
-                        </span>
-                    </td>
-                    <td style="padding:12px; text-align:center;">
-                        <button onclick="reprintShiftTicketWithData(${hSafe})" title="Re-imprimir Voucher" style="border:none; background:#f1f5f9; padding:6px 10px; border-radius:6px; cursor:pointer; margin-right:5px; color:#334155;">
-                            <i class="fas fa-print"></i>
-                        </button>
-                         <button onclick="openShiftDetails('${h.id}')" title="Ver Detalles" style="border:none; background:#e0f2fe; padding:6px 10px; border-radius:6px; cursor:pointer; color:#0284c7;">
-                            <i class="fas fa-eye"></i>
-                        </button>
-                    </td>
-                </tr>
-            `;
-        });
-        tbody.innerHTML = html;
 
     } catch (e) {
         console.error(e);
-        tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:red; padding:20px;">Error: ${e.message}</td></tr>`;
+        if (!isBackground) tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:red; padding:20px;">Error: ${e.message}</td></tr>`;
     }
+}
+
+function renderShiftHistoryTable(history) {
+    const tbody = document.getElementById('financeTbody');
+    if (!tbody) return;
+
+    if (history.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:20px;">No hay turnos registrados.</td></tr>';
+        return;
+    }
+
+    let html = '';
+    history.forEach(h => {
+        const hSafe = JSON.stringify(h).replace(/"/g, '&quot;');
+        const statusColor = h.estado === 'Abierta' ? '#22c55e' : '#ef4444';
+
+        html += `
+            <tr style="border-bottom:1px solid #f1f5f9;">
+                <td style="padding:12px;">
+                    <div style="font-weight:bold; color:#1e293b;">${new Date(h.fechaInicio).toLocaleDateString()}</div>
+                    <div style="font-size:0.8rem; color:#64748B;">${new Date(h.fechaInicio).toLocaleTimeString()}</div>
+                </td>
+                <td style="padding:12px;">${h.responsable}</td>
+                <td style="padding:12px; text-align:right;">S/ ${parseFloat(h.montoInicial || 0).toFixed(2)}</td>
+                <td style="padding:12px; text-align:right;">${h.montoFinal ? 'S/ ' + parseFloat(h.montoFinal).toFixed(2) : '-'}</td>
+                <td style="padding:12px; text-align:center;">
+                    <span style="background:${statusColor}20; color:${statusColor}; padding:4px 8px; border-radius:12px; font-weight:bold; font-size:0.8rem;">
+                        ${h.estado}
+                    </span>
+                </td>
+                <td style="padding:12px; text-align:center;">
+                    <button onclick="reprintShiftTicketWithData(${hSafe})" title="Re-imprimir Voucher" style="border:none; background:#f1f5f9; padding:6px 10px; border-radius:6px; cursor:pointer; margin-right:5px; color:#334155;">
+                        <i class="fas fa-print"></i>
+                    </button>
+                        <button onclick="openShiftDetails('${h.id}')" title="Ver Detalles" style="border:none; background:#e0f2fe; padding:6px 10px; border-radius:6px; cursor:pointer; color:#0284c7;">
+                        <i class="fas fa-eye"></i>
+                    </button>
+                </td>
+            </tr>
+        `;
+    });
+    tbody.innerHTML = html;
 }
 
 function reprintShiftTicketWithData(cajaData) {
