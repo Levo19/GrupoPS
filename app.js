@@ -1906,6 +1906,371 @@ async function finalizeCheckOut() {
     }
 }
 
+// ===== ROOMS MODULE =====
+
+async function loadRooms() {
+    try {
+        const res = await fetch(CONFIG.API_URL, {
+            method: 'POST',
+            body: JSON.stringify({ action: 'getHabitaciones' })
+        });
+        const data = await res.json();
+        if (data.success) {
+            currentRoomsList = data.habitaciones;
+            renderRooms(currentRoomsList);
+            updateDashboardStats(); // Phase 3 Hook
+        } else {
+            console.error('Error cargando habitaciones:', data.error);
+        }
+    } catch (e) {
+        console.error('Error red:', e);
+    }
+}
+
+function loadRoomsView() {
+    const container = document.getElementById('view-rooms');
+    if (!container) return; // Not in view
+
+    // trigger fetch if empty
+    if (currentRoomsList.length === 0) {
+        container.innerHTML = '<div style="text-align:center; padding:40px;"><i class="fas fa-spinner fa-spin"></i> Cargando habitaciones...</div>';
+        loadRooms();
+    } else {
+        renderRooms(currentRoomsList);
+    }
+}
+
+function renderRooms(rooms) {
+    const container = document.getElementById('view-rooms');
+    if (!container) return; // Safety
+
+    const role = currentUser ? currentUser.rol : 'Admin';
+    const isAdmin = (role === 'Admin');
+
+    let html = `
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+        <div>
+            <h2 style="color: var(--text-main);">Gestión de Habitaciones</h2>
+            <p style="color: #64748B; font-size: 0.9rem;">Empresa: Casa Munay</p>
+        </div>
+        ${isAdmin ? '<button class="btn-login" onclick="openNewRoom()" style="width: auto;">+ Nueva Habitación</button>' : ''}
+    </div>
+    
+    <div class="rooms-grid">
+    `;
+
+    if (rooms.length === 0) {
+        html += '<p>No hay habitaciones registradas.</p>';
+    } else {
+        // Sort by number
+        rooms.sort((a, b) => Number(a.numero) - Number(b.numero));
+
+        rooms.forEach(r => {
+            // --- COMPUTED STATUS LOGIC (Fix for "Not Updating") ---
+            // Trust DB status first, BUT check active reservations for today to force "Ocupado"
+            let computedStatus = r.estado;
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+
+            // Find if there's an ACTIVE reservation for this room TODAY
+            if (currentReservationsList) {
+                const activeRes = currentReservationsList.find(res => {
+                    if (String(res.habitacionId) !== String(r.id)) return false;
+                    if (res.estado !== 'Activa' && res.estado !== 'Ocupada') return false;
+
+                    const start = new Date(res.fechaEntrada);
+                    const end = new Date(res.fechaSalida);
+                    start.setHours(0, 0, 0, 0);
+                    end.setHours(0, 0, 0, 0);
+
+                    // Active if Today is within [Start, End) or [Start, End] depending on logic
+                    // Usually [Start, End). If Today == End, content guest is leaving (Checkout-AM).
+                    // If Today < End, guest is staying.
+                    return (today >= start && today < end);
+                });
+
+                if (activeRes) {
+                    computedStatus = 'Ocupado'; // Force occupied visually
+                }
+            }
+
+            let badgeColor = '#22c55e'; // Disponible (Green)
+            if (computedStatus.toLowerCase() === 'ocupado') badgeColor = '#ef4444'; // Red
+            if (computedStatus.toLowerCase() === 'mantenimiento') badgeColor = '#f59e0b'; // Amber
+            if (computedStatus.toLowerCase() === 'sucio') badgeColor = '#ea580c'; // Orange
+
+            // Parse Media for Display
+            let mainImg = 'https://images.unsplash.com/photo-1631049307264-da0ec9d70304?auto=format&fit=crop&q=80&w=1000';
+            let mediaFiles = [];
+            try {
+                if (r.fotos && r.fotos.startsWith('[')) {
+                    mediaFiles = JSON.parse(r.fotos);
+                    if (mediaFiles.length > 0 && mediaFiles[0].length > 5) mainImg = mediaFiles[0];
+                } else if (r.fotos && r.fotos.length > 5) {
+                    mainImg = r.fotos; // Legacy single URL
+                }
+            } catch (e) { if (r.fotos.length > 5) mainImg = r.fotos; }
+
+            // WhatsApp Share Link
+            const shareText = `*${CONFIG.APP_NAME || 'Casa Munay'}*\n\nHabitación ${r.numero} (${r.tipo})\n💰 Precio: S/ ${r.precio}\n👥 Capacidad: ${r.capacidad || 2} Personas\n🛏️ Camas: ${r.camas || 'No especificado'}\n\nVer Fotos: ${mainImg}`;
+            const waLink = `https://wa.me/?text=${encodeURIComponent(shareText)}`;
+
+            html += `
+            <div class="room-card fade-in">
+                <div class="room-image-box" onclick="openRoomDetail('${r.id}')">
+                    <img src="${mainImg}" alt="Room ${r.numero}" onerror="this.src='https://via.placeholder.com/300?text=Sin+Imagen'">
+                    <div class="room-badges">
+                        <span class="room-badge" style="background:${badgeColor}">${computedStatus.toUpperCase()}</span>
+                        <span class="room-badge" style="background:rgba(0,0,0,0.6); backdrop-filter:blur(4px);"><i class="fas fa-user-friends"></i> ${r.capacidad || 2}</span>
+                    </div>
+                </div>
+                <div class="room-info">
+                    <div style="display:flex; justify-content:space-between; align-items:start;">
+                        <div>
+                            <div class="room-title">Hab. ${r.numero}</div>
+                            <div class="room-type">${r.tipo.toUpperCase()}</div>
+                        </div>
+                        <div class="room-price">S/ ${r.precio}</div>
+                    </div>
+                    
+                    <div style="margin-top:10px; font-size:0.85rem; color:#64748B;">
+                       <i class="fas fa-bed"></i> ${r.camas || 'Estándar'}
+                    </div>
+
+                    <div class="room-actions" style="margin-top:15px; display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
+                        ${computedStatus.toLowerCase() === 'ocupado' ?
+                    `<button class="btn-room-action secondary" onclick="openCheckIn('${r.id}', '${r.numero}')">Ver Info</button>` :
+                    `<button class="btn-room-action primary" onclick="openCheckIn('${r.id}', '${r.numero}')"><i class="fas fa-key"></i> Check-In</button>`
+                }
+                    <button class="btn-room-action secondary" style="background:#25D366; color:white; border:none;" onclick="window.open('${waLink}', '_blank')"><i class="fab fa-whatsapp"></i> Compartir</button>
+                    ${isAdmin ? `<button class="btn-room-action secondary" onclick="openRoomEditor('${r.id}')" style="grid-column: span 2;"><i class="fas fa-cog"></i> Editar</button>` : ''}
+                    </div>
+                </div>
+            </div>
+            `;
+        });
+    }
+
+    html += '</div>';
+    container.innerHTML = html;
+}
+
+// Media Manager State
+let currentUploadSlot = null; // { type: 'img'|'video', index: 0-3 }
+
+function triggerMediaUpload(type, index) {
+    currentUploadSlot = { type, index };
+    const input = document.getElementById('mediaUploadInput');
+    input.accept = type === 'video' ? 'video/*' : 'image/*';
+    input.click();
+}
+
+async function handleMediaFileSelect(input) {
+    if (!input.files || !input.files[0]) return;
+    const file = input.files[0];
+
+    // UI Loading
+    const slotId = currentUploadSlot.type === 'video' ? 'slot-video' : `slot-img-${currentUploadSlot.index}`;
+    const slotEl = document.getElementById(slotId);
+    if (slotEl) slotEl.style.opacity = '0.5';
+
+    try {
+        const base64 = await fileToBase64(file);
+
+        // Upload
+        const res = await fetch(CONFIG.API_URL, {
+            method: 'POST',
+            body: JSON.stringify({
+                action: 'uploadImage',
+                base64: base64,
+                filename: file.name,
+                mimeType: file.type
+            })
+        });
+        const data = await res.json();
+
+        if (data.success) {
+            // Update UI & Hidden Inputs
+            if (currentUploadSlot.type === 'video') {
+                document.getElementById('editVideoURL').value = data.url;
+                slotEl.querySelector('.media-preview-video').style.display = 'block';
+            } else {
+                // Images
+                let urls = [];
+                try { urls = JSON.parse(document.getElementById('editFotosJSON').value || '[]'); } catch (e) { }
+
+                // Ensure array size
+                while (urls.length <= currentUploadSlot.index) urls.push('');
+                urls[currentUploadSlot.index] = data.url;
+
+                document.getElementById('editFotosJSON').value = JSON.stringify(urls);
+
+                const img = slotEl.querySelector('.media-preview');
+                img.src = data.url;
+                img.style.display = 'block';
+            }
+        } else {
+            alert('Error subiendo: ' + data.error);
+        }
+
+    } catch (e) {
+        console.error(e);
+        alert('Error subiendo archivo');
+    } finally {
+        if (slotEl) slotEl.style.opacity = '1';
+        input.value = ''; // Reset
+    }
+}
+
+function removeMedia(e, type, index) {
+    e.stopPropagation(); // Prevent trigger upload
+    if (!confirm('¿Eliminar este archivo?')) return;
+
+    if (type === 'video') {
+        document.getElementById('editVideoURL').value = '';
+        const slot = document.getElementById('slot-video');
+        slot.querySelector('.media-preview-video').style.display = 'none';
+        // slot.querySelector('span').innerText = 'Video';
+    } else {
+        let urls = [];
+        try { urls = JSON.parse(document.getElementById('editFotosJSON').value || '[]'); } catch (e) { }
+
+        if (urls[index]) {
+            urls[index] = ''; // Clear slot but keep index?
+            // empty string
+            urls[index] = '';
+        }
+        document.getElementById('editFotosJSON').value = JSON.stringify(urls);
+
+        const slot = document.getElementById(`slot-img-${index}`);
+        const img = slot.querySelector('.media-preview');
+        img.src = '';
+        img.style.display = 'none';
+    }
+}
+
+function openNewRoom() {
+    document.getElementById('editRoomId').value = '';
+    document.getElementById('editNum').value = '';
+    document.getElementById('editTipo').value = 'Matrimonial';
+    document.getElementById('editPrecio').value = '';
+    document.getElementById('editCapacidad').value = '2';
+    document.getElementById('editCamas').value = '';
+    document.getElementById('editEstado').value = 'Disponible';
+
+    // Clear Media
+    document.getElementById('editFotosJSON').value = '[]';
+    document.getElementById('editVideoURL').value = '';
+    document.querySelectorAll('.media-preview').forEach(el => { el.src = ''; el.style.display = 'none'; });
+    const vSlot = document.querySelector('.media-preview-video');
+    if (vSlot) vSlot.style.display = 'none';
+
+    document.getElementById('modalRoomEditor').style.display = 'flex';
+}
+
+function openRoomEditor(id) {
+    const r = currentRoomsList.find(x => x.id == id);
+    if (!r) return;
+
+    document.getElementById('editRoomId').value = r.id;
+    document.getElementById('editNum').value = r.numero;
+    document.getElementById('editTipo').value = r.tipo;
+    document.getElementById('editPrecio').value = r.precio;
+    document.getElementById('editCapacidad').value = r.capacidad || 2;
+    document.getElementById('editCamas').value = r.camas || '';
+    document.getElementById('editEstado').value = r.estado;
+
+    // MEDIA LOAD
+    let photos = [];
+    try {
+        if (r.fotos && r.fotos.startsWith('[')) photos = JSON.parse(r.fotos);
+        else if (r.fotos) photos = [r.fotos];
+    } catch (e) { photos = []; }
+
+    document.getElementById('editFotosJSON').value = JSON.stringify(photos);
+    document.getElementById('editVideoURL').value = r.video || '';
+
+    // Render Slots
+    for (let i = 0; i < 4; i++) {
+        const slot = document.getElementById(`slot-img-${i}`);
+        if (!slot) continue;
+        const img = slot.querySelector('.media-preview');
+        if (photos[i] && photos[i].length > 5) {
+            img.src = photos[i];
+            img.style.display = 'block';
+        } else {
+            img.style.display = 'none';
+        }
+    }
+
+    // Video Slot
+    const vSlot = document.querySelector('.media-preview-video');
+    if (vSlot) {
+        if (r.video && r.video.length > 5) vSlot.style.display = 'block';
+        else vSlot.style.display = 'none';
+    }
+
+    document.getElementById('modalRoomEditor').style.display = 'flex';
+}
+
+function closeRoomEditor() {
+    document.getElementById('modalRoomEditor').style.display = 'none';
+}
+
+async function saveRoom(e) {
+    e.preventDefault();
+    const btn = e.target.querySelector('button[type="submit"]');
+    btn.disabled = true;
+    btn.innerText = 'Guardando...';
+
+    // Filter empty photos
+    let photos = [];
+    try { photos = JSON.parse(document.getElementById('editFotosJSON').value || '[]'); } catch (e) { }
+    photos = photos.filter(p => p && p.length > 5);
+
+    const roomData = {
+        id: document.getElementById('editRoomId').value,
+        numero: document.getElementById('editNum').value,
+        tipo: document.getElementById('editTipo').value,
+        precio: document.getElementById('editPrecio').value,
+        capacidad: document.getElementById('editCapacidad').value,
+        camas: document.getElementById('editCamas').value,
+        estado: document.getElementById('editEstado').value,
+        fotos: JSON.stringify(photos), // Save as JSON string
+        video: document.getElementById('editVideoURL').value
+    };
+
+    try {
+        // Optimistic Update
+        if (roomData.id) {
+            const index = currentRoomsList.findIndex(r => r.id == roomData.id);
+            if (index !== -1) currentRoomsList[index] = { ...currentRoomsList[index], ...roomData };
+        }
+
+        const res = await fetch(CONFIG.API_URL, {
+            method: 'POST',
+            body: JSON.stringify({ action: 'saveHabitacion', habitacion: roomData })
+        });
+        const data = await res.json();
+
+        if (data.success) {
+            // refresh data
+            await loadRooms();
+            // Also refresh calendar if active
+            loadCalendarView();
+            closeRoomEditor();
+            showToast('✅ Habitación Guardada');
+        } else {
+            throw new Error(data.error);
+        }
+    } catch (err) {
+        alert('Error: ' + err.message);
+    } finally {
+        btn.disabled = false;
+        btn.innerText = 'Guardar Cambios';
+    }
+}
+
 // ===== USERS MODULE =====
 
 async function markRoomClean(roomId) {
