@@ -243,10 +243,14 @@
                             <button id="tabGastos" onclick="switchFinanceTab('gastos')"
                                 style="padding: 10px 20px; border:none; background:transparent; font-weight:bold; color:#94a3b8; cursor:pointer;">Gastos
                                 & Compras</button>
+                            <button id="tabShifts" onclick="switchFinanceTab('shifts')"
+                                style="padding: 10px 20px; border:none; background:transparent; font-weight:bold; color:#94a3b8; cursor:pointer;">Turnos
+                                (Historial)</button>
                         </div>
 
                         <div id="financeTableContainer" class="table-container"
                             style="max-height: 400px; overflow-y: auto;">
+                            <!-- Generic Table for Income/Expense/Shifts -->
                             <table class="data-table" style="width:100%;">
                                 <thead id="financeThead">
                                     <!-- JS Injected -->
@@ -1202,8 +1206,13 @@
 
                 <div class="form-group">
                     <label class="form-label" style="color:#64748B;">Responsable</label>
-                    <input type="text" id="txtOpenCajaResponsable" class="form-input"
-                        style="background:#f1f5f9; color:#334155; font-weight:bold;" readonly>
+                    <select id="txtOpenCajaResponsable" class="form-input" style="font-weight:bold; color:#1e293b;">
+                        <option value="" disabled selected>Seleccione Concierge...</option>
+                        <option value="Paty">Paty</option>
+                        <option value="Daphne">Daphne</option>
+                        <option value="Julio">Julio</option>
+                        <option value="Luis">Luis</option>
+                    </select>
                 </div>
 
                 <div class="form-group">
