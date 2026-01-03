@@ -6,6 +6,7 @@ let currentRoomsList = [];
 let currentProductsList = [];
 let currentUsersList = [];
 let currentReservationsList = [];
+let currentCaja = null; // [NEW] Shift Management State
 let checkInMode = 'checkin';
 let pickerState = {
     roomId: null,
@@ -223,6 +224,7 @@ function initDashboard() {
     document.getElementById('roleDisplay').innerText = currentUser.rol || 'Staff';
 
     navigate('dashboard');
+    initCajaSession(); // [NEW] Restore Caja State
 }
 
 // ===== NAVIGATION =====
@@ -1385,6 +1387,13 @@ function closeCheckIn() {
 async function processCheckIn(e) {
     e.preventDefault();
 
+    // [NEW] Shift Management Validation
+    if (!currentCaja) {
+        alert('⚠️ Debe ABRIR CAJA (Turno) antes de realizar ingresos o movimientos.');
+        toggleCajaAction(); // Open the modal for them
+        return;
+    }
+
     const submitBtn = e.target.querySelector('button[type="submit"]');
     // const originalText = submitBtn.innerText;
     submitBtn.innerText = 'Procesando...';
@@ -1430,6 +1439,9 @@ async function processCheckIn(e) {
             data.metodo = document.getElementById('checkInMetodo') ? document.getElementById('checkInMetodo').value : 'Efectivo';
         }
     }
+
+    // [NEW] Attach Caja ID
+    data.cajaId = currentCaja ? currentCaja.id : null;
 
     if ((!data.isExtension && !data.fechaEntrada) || !data.fechaSalida || !data.cliente) {
         alert('Por favor complete todos los campos.');
@@ -2833,7 +2845,7 @@ function renderCalendarTimeline(rooms, reservations) {
                                          onmouseleave="hideTooltip()"
                                          data-tooltip-data="${tooltipJson}">
                                          ${label1}
-                                         ${pending > 0.5 ? `<span style="position:absolute; right:2px; top:2px; height:6px; width:6px; background:red; border-radius:50%;"></span>` : ''}
+                                         ${pending > 0.5 ? `<span style='position:absolute; right:2px; top:2px; height:6px; width:6px; background:red; border-radius:50%;'></span>` : ''}
                                     </div>
                                     <div class="res-bar-base" 
                                          style="background:${col2}; flex:1; height:28px; border-radius:4px 0 0 4px; margin-left:1px; padding-left:4px; font-size:0.7rem;" 
@@ -2842,7 +2854,7 @@ function renderCalendarTimeline(rooms, reservations) {
                                          onmouseleave="hideTooltip()"
                                          data-tooltip-data="${tooltipJson2}">
                                          ${label2}
-                                         ${pending2 > 0.5 ? `<span style="position:absolute; right:2px; top:2px; height:6px; width:6px; background:red; border-radius:50%;"></span>` : ''}
+                                         ${pending2 > 0.5 ? `<span style='position:absolute; right:2px; top:2px; height:6px; width:6px; background:red; border-radius:50%;'></span>` : ''}
                                     </div>
                                 </div>
                              </td>`;
@@ -3333,6 +3345,8 @@ async function submitPurchase() {
     const cost = document.getElementById('purchCost').value;
     const notes = document.getElementById('purchNotes').value;
 
+    if (!currentCaja) { alert('⚠️ Caja Cerrada. Abra caja para registrar movimientos.'); toggleCajaAction(); return; }
+
     if (!pId || !qty || !cost) return alert('Datos incompletos');
 
     try {
@@ -3342,6 +3356,7 @@ async function submitPurchase() {
                 action: 'registerPurchase',
                 productoId: pId,
                 cantidad: qty,
+                cajaId: currentCaja.id,
                 costoTotal: cost,
                 notas: notes
             })
@@ -3372,6 +3387,8 @@ async function submitExpense() {
     const amt = document.getElementById('expAmount').value;
     const date = document.getElementById('expDate').value;
 
+    if (!currentCaja) { alert('⚠️ Caja Cerrada. Abra caja para registrar gastos.'); toggleCajaAction(); return; }
+
     if (!desc || !amt || !date) return alert('Datos incompletos');
 
     try {
@@ -3382,7 +3399,8 @@ async function submitExpense() {
                 descripcion: desc,
                 categoria: cat,
                 monto: amt,
-                fecha: date
+                fecha: date,
+                cajaId: currentCaja.id
             })
         });
         const d = await res.json();
@@ -3540,6 +3558,8 @@ function populateQCServices() {
 async function submitQuickCharge() {
     const resId = document.getElementById('qcResId').value;
 
+    if (!currentCaja) { alert('⚠️ Caja Cerrada. Abra caja para registrar consumos/pagos.'); toggleCajaAction(); return; }
+
     if (qcActiveTab === 'product') {
         const prodId = document.getElementById('qcProdSelect').value;
         const qty = document.getElementById('qcProdQty').value;
@@ -3563,7 +3583,8 @@ async function submitQuickCharge() {
             descripcion: `Consumo: ${prodName}`,
             monto: total,
             cantidad: qty,
-            productoId: prodId
+            productoId: prodId,
+            cajaId: currentCaja.id
         };
 
         if (!confirm(`¿Cargar S/ ${total} por ${qty} ${prodName}?`)) return;
@@ -3599,7 +3620,8 @@ async function submitQuickCharge() {
             monto: price,
             cantidad: 1,
             productoId: servId, // Now saving the Service ID for reference
-            fechaProgramada: date
+            fechaProgramada: date,
+            cajaId: currentCaja.id
         };
 
         if (!confirm(`¿Reservar ${servName} por S/ ${price}?`)) return;
@@ -4293,6 +4315,12 @@ function openReservation(roomId, roomNum, date, existingClient, mode = 'new', ex
 
     // Trigger initial
     calculateReservationBalance();
+
+    // FORCE BUTTON RESET (Fix "Stuck" Issue)
+    if (btn) {
+        btn.disabled = false;
+        // Text is already set above based on mode, just ensuring enabled.
+    }
 }
 
 function calculateReservationBalance() {
@@ -4633,3 +4661,136 @@ function hideTooltip() {
     }
 }
 
+
+// ===== SHIFT MANAGEMENT (CAJA) LOGIC (NEW) =====
+function initCajaSession() {
+    const saved = localStorage.getItem('gps_caja');
+    if (saved) {
+        try {
+            currentCaja = JSON.parse(saved);
+        } catch (e) {
+            console.error('Error parsing saved caja:', e);
+            currentCaja = null;
+        }
+    }
+    updateCajaWidget();
+}
+
+function updateCajaWidget() {
+    const w = document.getElementById('cajaStatusWidget');
+    if (!w) return;
+
+    if (currentCaja) {
+        w.innerHTML = '<span style="font-size: 0.6rem;">🟢</span> ' + currentCaja.responsable;
+        w.style.background = '#dcfce7'; // green-100
+        w.style.color = '#166534'; // green-800
+        w.style.borderColor = '#86efac';
+    } else {
+        w.innerHTML = '<span style="font-size: 0.6rem;">🔴</span> Caja Cerrada';
+        w.style.background = '#fee2e2';
+        w.style.color = '#ef4444';
+        w.style.borderColor = '#fca5a5';
+    }
+}
+
+function toggleCajaAction() {
+    if (currentCaja) {
+        // Open Close Modal
+        document.getElementById('lblCloseInicial').innerText = 'S/ ' + parseFloat(currentCaja.montoInicial || 0).toFixed(2);
+
+        // TODO: Calculate totals from transactions (Phase 2 enhancement)
+        // For now, we rely on manual input or basic stats if available
+
+        document.getElementById('modalCloseCaja').style.display = 'flex';
+    } else {
+        // Open Open Modal
+        const userName = currentUser ? currentUser.nombre : 'Usuario';
+        document.getElementById('txtOpenCajaResponsable').value = userName;
+        document.getElementById('modalOpenCaja').style.display = 'flex';
+    }
+}
+
+async function processOpenCaja() {
+    const btn = document.querySelector('#modalOpenCaja button');
+    const originalText = btn.innerText;
+    btn.disabled = true;
+    btn.innerText = 'Abriendo...';
+
+    const monto = parseFloat(document.getElementById('txtOpenCajaMonto').value) || 0;
+    const responsable = document.getElementById('txtOpenCajaResponsable').value;
+
+    const newCaja = {
+        id: 'CAJA-' + Date.now(),
+        responsable: responsable,
+        montoInicial: monto,
+        fechaInicio: new Date().toISOString(),
+        estado: 'Abierta'
+    };
+
+    // 1. Save Local
+    currentCaja = newCaja;
+    localStorage.setItem('gps_caja', JSON.stringify(currentCaja));
+    updateCajaWidget();
+
+    // 2. Sync Backend
+    try {
+        await fetch(CONFIG.API_URL, {
+            method: 'POST',
+            body: JSON.stringify({
+                action: 'openCaja',
+                caja: newCaja
+            })
+        });
+        document.getElementById('modalOpenCaja').style.display = 'none';
+    } catch (e) {
+        alert('⚠️ Caja abierta localmente, pero hubo error de sincronización: ' + e.message);
+        document.getElementById('modalOpenCaja').style.display = 'none';
+    } finally {
+        btn.disabled = false;
+        btn.innerText = originalText;
+    }
+}
+
+async function processCloseCaja() {
+    if (!currentCaja) return;
+
+    const btn = document.querySelector('#modalCloseCaja button');
+    const originalText = btn.innerText;
+    btn.disabled = true;
+    btn.innerText = 'Cerrando...';
+
+    const realCash = parseFloat(document.getElementById('txtCloseCajaReal').value) || 0;
+    const notas = document.getElementById('txtCloseCajaNotas').value;
+
+    const cierreData = {
+        ...currentCaja,
+        fechaFin: new Date().toISOString(),
+        montoFinal: realCash,
+        notas: notas,
+        estado: 'Cerrada'
+    };
+
+    // 1. Clear Local
+    currentCaja = null;
+    localStorage.removeItem('gps_caja');
+    updateCajaWidget();
+
+    // 2. Sync Backend
+    try {
+        await fetch(CONFIG.API_URL, {
+            method: 'POST',
+            body: JSON.stringify({
+                action: 'closeCaja',
+                caja: cierreData
+            })
+        });
+        document.getElementById('modalCloseCaja').style.display = 'none';
+        alert('✅ Turno cerrado correctamente.');
+    } catch (e) {
+        alert('⚠️ Turno cerrado localmente, pero error de red: ' + e.message);
+        document.getElementById('modalCloseCaja').style.display = 'none';
+    } finally {
+        btn.disabled = false;
+        btn.innerText = originalText;
+    }
+}
