@@ -1956,7 +1956,7 @@ function renderRooms(rooms) {
         ${isAdmin ? '<button class="btn-login" onclick="openNewRoom()" style="width: auto;">+ Nueva Habitación</button>' : ''}
     </div>
     
-    <div class="rooms-grid">
+    <div class="room-grid">
     `;
 
     if (rooms.length === 0) {
