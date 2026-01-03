@@ -27,7 +27,13 @@
     /* Spacing & Radius */
     --radius-xl: 24px;
     --radius-l: 16px;
+    --radius-l: 16px;
     --radius-m: 12px;
+
+    /* Semantic */
+    --success: #22c55e;
+    --danger: #ef4444;
+    --warning: #f59e0b;
 }
 
 * {
