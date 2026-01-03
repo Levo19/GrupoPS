@@ -1,4 +1,4 @@
-console.log("APP JS VERSION: 20260103_0817 - DEBUG CAJA");
+console.log("APP JS VERSION: 20260103_1002 - DEBUG CAJA V3");
 // ===== STATE =====
 let currentUser = null;
 let currentView = 'dashboard';
@@ -4735,8 +4735,17 @@ function toggleCajaAction() {
         const userName = currentUser ? currentUser.nombre : (document.getElementById('userDisplay') ? document.getElementById('userDisplay').innerText : 'Usuario');
         document.getElementById('txtOpenCajaResponsable').value = userName;
         openMod.style.display = 'flex';
-        console.log('Set display flex. Computed:', window.getComputedStyle(openMod).display);
-        console.log('Z-Index:', window.getComputedStyle(openMod).zIndex);
+
+        // DEBUG: VISIBILITY CHECK
+        const rect = openMod.getBoundingClientRect();
+        const style = window.getComputedStyle(openMod);
+        console.log('--- DEBUG CAJA MODAL ---');
+        console.log('Rect:', rect.width, 'x', rect.height, 'at', rect.top, ',', rect.left);
+        console.log('Visibility:', style.visibility);
+        console.log('Opacity:', style.opacity);
+        console.log('Position:', style.position);
+        console.log('Z-Index:', style.zIndex);
+        console.log('Background:', style.backgroundColor);
     }
 }
 
