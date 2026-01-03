@@ -643,27 +643,28 @@ function toggleRoomFlip(id) {
 async function ensureReservationsLoaded() {
     if (typeof currentReservationsList !== 'undefined' && currentReservationsList.length > 0) return;
     try {
-        // Check Preload for Reservations
         let dataRes;
         if (PRELOAD_DATA.reservations) {
-            console.log("✅ Usando Reservas Pre-cargadas");
+            // Check if it is a promise or data (it is a promise in startPreload)
+            // But if we consumed it, it is null.
+            console.log("✅ Usando Reservas Pre-cargadas (Picker)");
             dataRes = await PRELOAD_DATA.reservations;
-            // Do not consume null, keep it if reused? No, safe to consume or keep. Cache logic better.
-            // Actually, for calendar we might reload often, so consume only if fresh. 
-            // Let's consume to avoid stale data on re-opens.
-            PRELOAD_DATA.reservations = null;
+            // PRELOAD_DATA.reservations = null; // Do not consume, allow dashboard to use it too
         } else {
-            const res2 = await fetch(CONFIG.API_URL, {
+            const res = await fetch(CONFIG.API_URL, {
                 method: 'POST',
                 body: JSON.stringify({ action: 'getReservas' })
             });
-            dataRes = await res2.json();
+            dataRes = await res.json();
         }
-        if (dataRes.success) {
-            currentReservationsList = dataRes.reservas; // Fix mismatch (was result.data)
+
+        if (dataRes && dataRes.success) {
+            currentReservationsList = dataRes.reservas;
             if (pickerState.roomId) initDatePicker(pickerState.roomId);
         }
-    } catch (e) { console.error('Error loading reservations for picker', e); }
+    } catch (e) {
+        console.error('Error loading reservations', e);
+    }
 }
 
 // [NEW] Date Picker Implementation
@@ -2596,7 +2597,7 @@ function renderProducts(products) {
             // FIXED: Safer onerror handling
             imgDisplay = `<img src="${p.imagen_url}" 
                 style="width:40px; height:40px; border-radius:4px; object-fit:cover;" 
-                onerror="this.onerror=null; this.src='https://via.placeholder.com/40?text=Error';">`;
+                onerror="this.onerror=null; this.src='data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0MCIgaGVpZ2h0PSI0MCIgdmlld0JveD0iMCAwIDQwIDQwIj48cmVjdCB3aWR0aD0iNDAiIGhlaWdodD0iNDAiIGZpbGw9IiNjYmQ1ZTEiLz48dGV4dCB4PSI1MCUiIHk9IjUwJSIgZm9udC1zaXplPSIxMCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iIGZpbGw9IiM2NDc0OGIiPlNpbjwvdGV4dD48L3N2Zz4';">`;
         }
 
         // Robust Price Logic
@@ -5718,4 +5719,220 @@ function printShiftTicket(caja) {
         printFrame.contentWindow.print();
         setTimeout(() => document.body.removeChild(printFrame), 1000);
     }, 500);
+}
+
+// ===== DASHBOARD LOGIC (Appended) =====
+async function updateDashboardStats() {
+    try {
+        let resList = currentReservationsList;
+        // 1. Get Reservations (Preloaded or Fetch)
+        if (!resList || resList.length === 0) {
+            if (PRELOAD_DATA.reservations) {
+                console.log("📊 Dashboard usando Reservas Pre-cargadas");
+                const d = await PRELOAD_DATA.reservations;
+                if (d && d.success) {
+                    currentReservationsList = d.reservas;
+                    resList = d.reservas;
+                    PRELOAD_DATA.reservations = null;
+                }
+            } else {
+                const res = await fetch(CONFIG.API_URL, {
+                    method: 'POST',
+                    body: JSON.stringify({ action: 'getReservas' })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    currentReservationsList = data.reservas;
+                    resList = data.reservas;
+                }
+            }
+        }
+
+        if (!resList) resList = [];
+
+        // 2. Refresh KPI
+        const today = new Date().toISOString().split('T')[0];
+
+        // Arrivals
+        const arrivals = resList.filter(r => r.fechaEntrada && r.fechaEntrada.startsWith(today) && r.estado === 'Reserva');
+        if (document.getElementById('statCheckIns')) document.getElementById('statCheckIns').innerText = arrivals.length;
+
+        // Table
+        const tableBody = document.getElementById('dashArrivalsBody');
+        if (tableBody) {
+            tableBody.innerHTML = arrivals.length === 0
+                ? '<tr><td colspan="4" style="text-align:center; padding:15px; color:#94a3b8;">No hay llegadas programadas para hoy.</td></tr>'
+                : arrivals.map(r => {
+                    // Resolve Room Name
+                    const rm = (currentRoomsList || []).find(x => x.id == r.habitacionId);
+                    const rName = rm ? `Hab. ${rm.numero}` : (r.habitacionNombre || r.habitacionId);
+
+                    return `
+                    <tr>
+                        <td style="padding:10px;">${r.cliente}</td>
+                        <td style="padding:10px;">${rName}</td>
+                        <td style="padding:10px;"><span style="background:#fef08a; color:#854d0e; padding:2px 6px; border-radius:4px; font-size:0.8rem;">Pendiente</span></td>
+                        <td style="padding:10px;">
+                            <button class="btn-icon" onclick="openCheckIn('${r.habitacionId}', '${rName}')" title="Check-In"><i class="fas fa-sign-in-alt"></i></button>
+                        </td>
+                    </tr>`;
+                }).join('');
+        }
+
+        // Occupancy
+        if (currentRoomsList && currentRoomsList.length > 0) {
+            let occupiedCount = 0;
+            const now = new Date();
+            now.setHours(0, 0, 0, 0);
+
+            currentRoomsList.forEach(r => {
+                let isOcc = (r.estado === 'Ocupado');
+                const activeRes = resList.find(res => {
+                    if (String(res.habitacionId) !== String(r.id)) return false;
+                    if (res.estado !== 'Activa' && res.estado !== 'Ocupada') return false;
+                    const s = new Date(res.fechaEntrada); s.setHours(0, 0, 0, 0);
+                    const e = new Date(res.fechaSalida); e.setHours(0, 0, 0, 0);
+                    return (now >= s && now < e);
+                });
+                if (activeRes) isOcc = true;
+                if (isOcc) occupiedCount++;
+            });
+
+            const pct = Math.round((occupiedCount / currentRoomsList.length) * 100);
+            if (document.getElementById('statOccupancy')) document.getElementById('statOccupancy').innerText = `${pct}%`;
+
+            // Cleaning
+            const dirtyCount = currentRoomsList.filter(r => r.estado === 'Sucio').length;
+            if (document.getElementById('statCleaning')) document.getElementById('statCleaning').innerText = dirtyCount;
+        }
+
+    } catch (e) { console.error("Update Dashboard Error:", e); }
+}
+
+// ===== FINANCE TABS LOGIC (Restored) =====
+let currentFinanceTab = 'ingresos'; // 'ingresos' | 'gastos' | 'shifts'
+
+function switchFinanceTab(tab) {
+    currentFinanceTab = tab;
+
+    // 1. Update Buttons
+    document.getElementById('tabIngresos').style.borderBottom = 'none';
+    document.getElementById('tabIngresos').style.color = '#94a3b8';
+
+    document.getElementById('tabGastos').style.borderBottom = 'none';
+    document.getElementById('tabGastos').style.color = '#94a3b8';
+
+    document.getElementById('tabShifts').style.borderBottom = 'none';
+    document.getElementById('tabShifts').style.color = '#94a3b8';
+
+    const activeBtn = document.getElementById('tab' + tab.charAt(0).toUpperCase() + tab.slice(1));
+    if (activeBtn) {
+        activeBtn.style.borderBottom = '3px solid var(--primary)';
+        activeBtn.style.color = 'var(--primary)';
+    }
+
+    // 2. Refresh Table
+    renderFinanceTable();
+}
+
+function renderFinanceTable() {
+    const thead = document.getElementById('financeThead');
+    const tbody = document.getElementById('financeTableBody');
+    if (!thead || !tbody) return;
+
+    tbody.innerHTML = '';
+
+    // Filter Data by Month
+    // For now we assume currentFinanceList contains ALL data and we filter by 'currentFinanceMonth' if implemented
+    // Or we just rely on what 'loadFinanceData' fetched (which respects the month selector).
+    // Let's assume currentFinanceData has { ingresos:[], gastos:[], turnos:[] }
+
+    if (currentFinanceTab === 'ingresos') {
+        thead.innerHTML = `
+            <tr style="text-align:left; color:#64748B; border-bottom:2px solid #f1f5f9;">
+                <th style="padding:15px;">Fecha</th>
+                <th style="padding:15px;">Descripción</th>
+                <th style="padding:15px;">Método</th>
+                <th style="padding:15px; text-align:right;">Monto</th>
+            </tr>
+        `;
+
+        const list = currentFinanceData.ingresos || [];
+        if (list.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; padding:20px; color:#94a3b8;">No hay ingresos registrados</td></tr>';
+        } else {
+            list.forEach(i => {
+                tbody.innerHTML += `
+                <tr style="border-bottom:1px solid #f1f5f9;">
+                    <td style="padding:15px;">${new Date(i.fecha).toLocaleDateString()} ${new Date(i.fecha).toLocaleTimeString()}</td>
+                    <td style="padding:15px;">${i.descripcion}</td>
+                    <td style="padding:15px;">${i.metodo}</td>
+                    <td style="padding:15px; text-align:right; font-weight:bold; color:#166534;">S/ ${Number(i.monto).toFixed(2)}</td>
+                </tr>`;
+            });
+        }
+
+    } else if (currentFinanceTab === 'gastos') {
+        thead.innerHTML = `
+            <tr style="text-align:left; color:#64748B; border-bottom:2px solid #f1f5f9;">
+                <th style="padding:15px;">Fecha</th>
+                <th style="padding:15px;">Descripción</th>
+                <th style="padding:15px;">Categoría</th>
+                <th style="padding:15px; text-align:right;">Monto</th>
+            </tr>
+        `;
+
+        const list = currentFinanceData.gastos || [];
+        if (list.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; padding:20px; color:#94a3b8;">No hay gastos registrados</td></tr>';
+        } else {
+            list.forEach(g => {
+                tbody.innerHTML += `
+                <tr style="border-bottom:1px solid #f1f5f9;">
+                    <td style="padding:15px;">${new Date(g.fecha).toLocaleDateString()}</td>
+                    <td style="padding:15px;">${g.descripcion}</td>
+                    <td style="padding:15px;"><span style="background:#fee2e2; color:#ef4444; padding:2px 6px; border-radius:4px; font-size:0.8rem;">${g.categoria}</span></td>
+                    <td style="padding:15px; text-align:right; font-weight:bold; color:#ef4444;">- S/ ${Number(g.monto).toFixed(2)}</td>
+                </tr>`;
+            });
+        }
+    } else if (currentFinanceTab === 'shifts') {
+        thead.innerHTML = `
+            <tr style="text-align:left; color:#64748B; border-bottom:2px solid #f1f5f9;">
+                <th style="padding:15px;">Inicio</th>
+                <th style="padding:15px;">Responsable</th>
+                <th style="padding:15px; text-align:right;">Monto Inicial</th>
+                <th style="padding:15px; text-align:right;">Monto Final</th>
+                <th style="padding:15px;">Estado</th>
+                <th style="padding:15px;">Acciones</th>
+            </tr>
+        `;
+
+        const list = currentFinanceData.turnos || [];
+        if (list.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:20px; color:#94a3b8;">No hay historial de turnos</td></tr>';
+        } else {
+            list.forEach(t => {
+                let statusBadge = t.fechaFin
+                    ? `<span style="background:#fee2e2; color:#ef4444; padding:4px 8px; border-radius:12px; font-size:0.75rem; font-weight:bold;">Cerrada</span>`
+                    : `<span style="background:#dcfce7; color:#166534; padding:4px 8px; border-radius:12px; font-size:0.75rem; font-weight:bold;">Abierta</span>`;
+
+                tbody.innerHTML += `
+                <tr style="border-bottom:1px solid #f1f5f9;">
+                    <td style="padding:15px;">
+                        <div style="font-weight:bold;">${new Date(t.fechaInicio).toLocaleDateString()}</div>
+                        <div style="font-size:0.8rem; color:#94a3b8;">${new Date(t.fechaInicio).toLocaleTimeString()}</div>
+                    </td>
+                    <td style="padding:15px;">${t.responsable}</td>
+                    <td style="padding:15px; text-align:right;">S/ ${Number(t.montoInicial).toFixed(2)}</td>
+                    <td style="padding:15px; text-align:right;">${t.fechaFin ? 'S/ ' + Number(t.montoFinal).toFixed(2) : '-'}</td>
+                    <td style="padding:15px;">${statusBadge}</td>
+                    <td style="padding:15px; display:flex; gap:10px;">
+                        <button class="btn-icon" onclick='printShiftTicket(${JSON.stringify(t)})' title="Imprimir Ticket"><i class="fas fa-print"></i></button>
+                        <button class="btn-icon" onclick="openShiftDetails('${t.id}')" title="Ver Detalles"><i class="fas fa-eye"></i></button>
+                    </td>
+                </tr>`;
+            });
+        }
+    }
 }
