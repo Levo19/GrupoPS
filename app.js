@@ -2051,6 +2051,19 @@ function loadRoomsView() {
     }
 }
 
+// --- BED COUNTER LOGIC ---
+function adjustBedCount(type, delta) {
+    const span = type === '2plz' ? document.getElementById('count-2plz') : document.getElementById('count-15plz');
+    if (!span) return;
+
+    let current = parseInt(span.innerText, 10) || 0;
+    current += delta;
+    if (current < 0) current = 0;
+    span.innerText = current;
+
+    // Optional: Update hidden input if needed live, but saveRoom handles it final
+}
+
 function renderRooms(rooms) {
     const container = document.getElementById('view-rooms');
     if (!container) return; // Safety
@@ -2077,13 +2090,11 @@ function renderRooms(rooms) {
         rooms.sort((a, b) => Number(a.numero) - Number(b.numero));
 
         rooms.forEach(r => {
-            // --- COMPUTED STATUS LOGIC (Fix for "Not Updating") ---
-            // Trust DB status first, BUT check active reservations for today to force "Ocupado"
+            // --- COMPUTED STATUS LOGIC ---
             let computedStatus = r.estado;
             const today = new Date();
             today.setHours(0, 0, 0, 0);
 
-            // Find if there's an ACTIVE reservation for this room TODAY
             if (currentReservationsList) {
                 const activeRes = currentReservationsList.find(res => {
                     if (String(res.habitacionId) !== String(r.id)) return false;
@@ -2094,21 +2105,19 @@ function renderRooms(rooms) {
                     start.setHours(0, 0, 0, 0);
                     end.setHours(0, 0, 0, 0);
 
-                    // Active if Today is within [Start, End) or [Start, End] depending on logic
-                    // Usually [Start, End). If Today == End, content guest is leaving (Checkout-AM).
-                    // If Today < End, guest is staying.
                     return (today >= start && today < end);
                 });
 
                 if (activeRes) {
-                    computedStatus = 'Ocupado'; // Force occupied visually
+                    computedStatus = 'Ocupado';
                 }
             }
 
-            let badgeColor = '#22c55e'; // Disponible (Green)
-            if (computedStatus.toLowerCase() === 'ocupado') badgeColor = '#ef4444'; // Red
-            if (computedStatus.toLowerCase() === 'mantenimiento') badgeColor = '#f59e0b'; // Amber
-            if (computedStatus.toLowerCase() === 'sucio') badgeColor = '#ea580c'; // Orange
+            // Status Badge Classes
+            let badgeClass = 'status-disponible';
+            if (computedStatus.toLowerCase() === 'ocupado') badgeClass = 'status-ocupado';
+            else if (computedStatus.toLowerCase() === 'mantenimiento') badgeClass = 'status-mantenimiento';
+            else if (computedStatus.toLowerCase() === 'sucio') badgeClass = 'status-sucio';
 
             // Parse Media for Display
             let mainImg = 'https://images.unsplash.com/photo-1631049307264-da0ec9d70304?auto=format&fit=crop&q=80&w=1000';
@@ -2120,41 +2129,57 @@ function renderRooms(rooms) {
                 } else if (r.fotos && r.fotos.length > 5) {
                     mainImg = optimizeDriveUrl(r.fotos); // Legacy single URL
                 }
-            } catch (e) { if (r.fotos.length > 5) mainImg = optimizeDriveUrl(r.fotos); }
+            } catch (e) { if (r.fotos && r.fotos.length > 5) mainImg = optimizeDriveUrl(r.fotos); }
 
-            // WhatsApp Share Link
+            // WhatsApp Text
             const shareText = `*${CONFIG.APP_NAME || 'Casa Munay'}*\n\nHabitación ${r.numero} (${r.tipo})\n💰 Precio: S/ ${r.precio}\n👥 Capacidad: ${r.capacidad || 2} Personas\n🛏️ Camas: ${r.camas || 'No especificado'}\n\nVer Fotos: ${mainImg}`;
             const waLink = `https://wa.me/?text=${encodeURIComponent(shareText)}`;
 
+            // PREMIUM CARD HTML
             html += `
             <div class="room-card fade-in">
                 <div class="room-img-box" onclick="openRoomDetail('${r.id}')">
-                    <img src="${mainImg}" alt="Room ${r.numero}" onerror="this.onerror=null; this.src='data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0MCIgaGVpZ2h0PSI0MCIgdmlld0JveD0iMCAwIDQwIDQwIj48cmVjdCB3aWR0aD0iNDAiIGhlaWdodD0iNDAiIGZpbGw9IiNjYmQ1ZTEiLz48dGV4dCB4PSI1MCUiIHk9IjUwJSIgZm9udC1zaXplPSIxMCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iIGZpbGw9IiM2NDc0OGIiPlNpbjwvdGV4dD48L3N2Zz4';">
-                    <div class="room-badges">
-                        <span class="room-badge" style="background:${badgeColor}">${computedStatus.toUpperCase()}</span>
-                        <span class="room-badge" style="background:rgba(0,0,0,0.6); backdrop-filter:blur(4px);"><i class="fas fa-user-friends"></i> ${r.capacidad || 2}</span>
+                    <img src="${mainImg}" class="room-img" alt="Room ${r.numero}" onerror="this.onerror=null; this.src='data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0MCIgaGVpZ2h0PSI0MCIgdmlld0JveD0iMCAwIDQwIDQwIj48cmVjdCB3aWR0aD0iNDAiIGhlaWdodD0iNDAiIGZpbGw9IiNjYmQ1ZTEiLz48dGV4dCB4PSI1MCUiIHk9IjUwJSIgZm9udC1zaXplPSIxMCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iIGZpbGw9IiM2NDc0OGIiPlNpbjwvdGV4dD48L3N2Zz4';">
+                    
+                    <div class="room-img-overlay"></div>
+                    
+                    <div class="room-status-badge ${badgeClass}">
+                        ${computedStatus}
                     </div>
                 </div>
-                <div class="room-info">
-                    <div style="display:flex; justify-content:space-between; align-items:start;">
-                        <div>
-                            <div class="room-title">Hab. ${r.numero}</div>
-                            <div class="room-type">${r.tipo.toUpperCase()}</div>
-                        </div>
+
+                <div class="room-body">
+                    <div class="room-header-row">
+                        <div class="room-number">Hab. ${r.numero}</div>
                         <div class="room-price">S/ ${r.precio}</div>
                     </div>
-                    
-                    <div style="margin-top:10px; font-size:0.85rem; color:#64748B;">
-                       <i class="fas fa-bed"></i> ${r.camas || 'Estándar'}
+                    <div class="room-type">${r.tipo}</div>
+
+                    <div class="room-features">
+                        <div class="feature-item" title="Capacidad">
+                            <i class="fas fa-user-friends" style="color:var(--primary);"></i> ${r.capacidad || 2}
+                        </div>
+                        <div class="feature-item" title="Camas" style="flex:1; overflow:hidden; white-space:nowrap; text-overflow:ellipsis;">
+                            <i class="fas fa-bed" style="color:var(--primary);"></i> ${r.camas || 'Estándar'}
+                        </div>
                     </div>
 
-                    <div class="room-actions" style="margin-top:15px; display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
+                    <div class="room-actions">
                         ${computedStatus.toLowerCase() === 'ocupado' ?
-                    `<button class="btn-room-action secondary" onclick="openCheckIn('${r.id}', '${r.numero}')">Ver Info</button>` :
-                    `<button class="btn-room-action primary" onclick="openCheckIn('${r.id}', '${r.numero}')"><i class="fas fa-key"></i> Check-In</button>`
+                    `<button class="btn-room-action btn-secondary-ghost" onclick="openCheckIn('${r.id}', '${r.numero}')">Ver Info</button>` :
+                    `<button class="btn-room-action btn-primary-ghost" onclick="openCheckIn('${r.id}', '${r.numero}')">
+                                <i class="fas fa-key"></i> Check-In
+                             </button>`
                 }
-                    <button class="btn-room-action secondary" style="background:#25D366; color:white; border:none;" onclick="window.open('${waLink}', '_blank')"><i class="fab fa-whatsapp"></i> Compartir</button>
-                    ${isAdmin ? `<button class="btn-room-action secondary" onclick="openRoomEditor('${r.id}')"><i class="fas fa-cog"></i> Editar</button>` : ''}
+                        
+                        <button class="btn-room-action btn-secondary-ghost" onclick="window.open('${waLink}', '_blank')">
+                            <i class="fab fa-whatsapp" style="color:#25D366; font-size:1.1rem;"></i>
+                        </button>
+                        
+                        ${isAdmin ?
+                    `<button class="btn-room-action btn-secondary-ghost" onclick="openRoomEditor('${r.id}')">
+                                <i class="fas fa-cog"></i>
+                             </button>` : ''}
                     </div>
                 </div>
             </div>
@@ -2204,7 +2229,8 @@ async function handleMediaFileSelect(input) {
             // Update UI & Hidden Inputs
             if (currentUploadSlot.type === 'video') {
                 document.getElementById('editVideoURL').value = data.url;
-                slotEl.querySelector('.media-preview-video').style.display = 'block';
+                slotEl.querySelector('.media-preview-video-icon').style.display = 'block';
+                slotEl.classList.add('has-content');
             } else {
                 // Images
                 let urls = [];
@@ -2216,9 +2242,12 @@ async function handleMediaFileSelect(input) {
 
                 document.getElementById('editFotosJSON').value = JSON.stringify(urls);
 
-                const img = slotEl.querySelector('.media-preview');
+                const img = slotEl.querySelector('.media-preview-img');
                 img.src = optimizeDriveUrl(data.url);
                 img.style.display = 'block';
+
+                // Toggle remove btn handled by CSS hover mostly, but ensure class
+                slotEl.classList.add('has-content');
             }
         } else {
             alert('Error subiendo: ' + data.error);
@@ -2240,23 +2269,22 @@ function removeMedia(e, type, index) {
     if (type === 'video') {
         document.getElementById('editVideoURL').value = '';
         const slot = document.getElementById('slot-video');
-        slot.querySelector('.media-preview-video').style.display = 'none';
-        // slot.querySelector('span').innerText = 'Video';
+        slot.querySelector('.media-preview-video-icon').style.display = 'none';
+        slot.classList.remove('has-content');
     } else {
         let urls = [];
         try { urls = JSON.parse(document.getElementById('editFotosJSON').value || '[]'); } catch (e) { }
 
         if (urls[index]) {
-            urls[index] = ''; // Clear slot but keep index?
-            // empty string
             urls[index] = '';
         }
         document.getElementById('editFotosJSON').value = JSON.stringify(urls);
 
         const slot = document.getElementById(`slot-img-${index}`);
-        const img = slot.querySelector('.media-preview');
+        const img = slot.querySelector('.media-preview-img');
         img.src = '';
         img.style.display = 'none';
+        slot.classList.remove('has-content');
     }
 }
 
@@ -2266,14 +2294,26 @@ function openNewRoom() {
     document.getElementById('editTipo').value = 'Matrimonial';
     document.getElementById('editPrecio').value = '';
     document.getElementById('editCapacidad').value = '2';
-    document.getElementById('editCamas').value = '';
     document.getElementById('editEstado').value = 'Disponible';
+
+    // Reset Bed Counters
+    document.getElementById('count-2plz').innerText = '0';
+    document.getElementById('count-15plz').innerText = '0';
+    document.getElementById('editCamas').value = '';
 
     // Clear Media
     document.getElementById('editFotosJSON').value = '[]';
     document.getElementById('editVideoURL').value = '';
-    document.querySelectorAll('.media-preview').forEach(el => { el.src = ''; el.style.display = 'none'; });
-    const vSlot = document.querySelector('.media-preview-video');
+
+    // Reset all slots
+    for (let i = 0; i < 4; i++) {
+        const slot = document.getElementById(`slot-img-${i}`);
+        if (slot) {
+            slot.querySelector('.media-preview-img').style.display = 'none';
+            slot.classList.remove('has-content');
+        }
+    }
+    const vSlot = document.querySelector('.media-preview-video-icon');
     if (vSlot) vSlot.style.display = 'none';
 
     document.getElementById('modalRoomEditor').style.display = 'flex';
@@ -2288,8 +2328,24 @@ function openRoomEditor(id) {
     document.getElementById('editTipo').value = r.tipo;
     document.getElementById('editPrecio').value = r.precio;
     document.getElementById('editCapacidad').value = r.capacidad || 2;
-    document.getElementById('editCamas').value = r.camas || '';
     document.getElementById('editEstado').value = r.estado;
+
+    // --- PARSE BEDS (Regex Magic) ---
+    const beds = r.camas || '';
+    let c2 = 0, c15 = 0;
+
+    // Look for patterns like "1 de 2 Plazas" or "1 Cama King"
+    const match2 = beds.match(/(\d+)\s*(?:de)?\s*(?:cama)?\s*(?:2\s*plazas|king|matrimonial)/i);
+    if (match2) c2 = parseInt(match2[1]);
+
+    // Look for "2 de 1.5 Plazas" or "Single"
+    const match15 = beds.match(/(\d+)\s*(?:de)?\s*(?:cama)?\s*(?:1\.5\s*plazas|personal|twin|simple)/i);
+    if (match15) c15 = parseInt(match15[1]);
+
+    // Update Counters
+    document.getElementById('count-2plz').innerText = c2;
+    document.getElementById('count-15plz').innerText = c15;
+    document.getElementById('editCamas').value = beds; // Keep original just in case
 
     // MEDIA LOAD
     let photos = [];
@@ -2305,20 +2361,27 @@ function openRoomEditor(id) {
     for (let i = 0; i < 4; i++) {
         const slot = document.getElementById(`slot-img-${i}`);
         if (!slot) continue;
-        const img = slot.querySelector('.media-preview');
+        const img = slot.querySelector('.media-preview-img');
         if (photos[i] && photos[i].length > 5) {
             img.src = optimizeDriveUrl(photos[i]);
             img.style.display = 'block';
+            slot.classList.add('has-content');
         } else {
             img.style.display = 'none';
+            slot.classList.remove('has-content');
         }
     }
 
     // Video Slot
-    const vSlot = document.querySelector('.media-preview-video');
+    const vSlot = document.querySelector('.media-preview-video-icon');
     if (vSlot) {
-        if (r.video && r.video.length > 5) vSlot.style.display = 'block';
-        else vSlot.style.display = 'none';
+        if (r.video && r.video.length > 5) {
+            vSlot.style.display = 'block';
+            document.getElementById('slot-video').classList.add('has-content');
+        } else {
+            vSlot.style.display = 'none';
+            document.getElementById('slot-video').classList.remove('has-content');
+        }
     }
 
     document.getElementById('modalRoomEditor').style.display = 'flex';
@@ -2334,6 +2397,15 @@ async function saveRoom(e) {
     btn.disabled = true;
     btn.innerText = 'Guardando...';
 
+    // Construct Bed String
+    const c2 = parseInt(document.getElementById('count-2plz').innerText) || 0;
+    const c15 = parseInt(document.getElementById('count-15plz').innerText) || 0;
+    let bedStrParts = [];
+    if (c2 > 0) bedStrParts.push(`${c2} de 2 Plazas`);
+    if (c15 > 0) bedStrParts.push(`${c15} de 1.5 Plazas`);
+
+    const finalBedStr = bedStrParts.length > 0 ? bedStrParts.join(', ') : 'Estándar';
+
     // Filter empty photos
     let photos = [];
     try { photos = JSON.parse(document.getElementById('editFotosJSON').value || '[]'); } catch (e) { }
@@ -2345,7 +2417,7 @@ async function saveRoom(e) {
         tipo: document.getElementById('editTipo').value,
         precio: document.getElementById('editPrecio').value,
         capacidad: document.getElementById('editCapacidad').value,
-        camas: document.getElementById('editCamas').value,
+        camas: finalBedStr,
         estado: document.getElementById('editEstado').value,
         fotos: JSON.stringify(photos), // Save as JSON string
         video: document.getElementById('editVideoURL').value
@@ -2368,7 +2440,7 @@ async function saveRoom(e) {
             // refresh data
             await loadRooms();
             // Also refresh calendar if active
-            loadCalendarView();
+            if (typeof loadCalendarView === 'function') loadCalendarView();
             closeRoomEditor();
             showToast('✅ Habitación Guardada');
         } else {
