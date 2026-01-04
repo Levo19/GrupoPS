@@ -877,17 +877,28 @@ function getDateDetails(roomId, dateStr) {
 }
 
 // ===== CLEANING LOGIC =====
+// ===== CLEANING LOGIC (Optimized) =====
 async function markRoomClean(id) {
+    // 1. Confirm
     if (!confirm('¿Confirmar que la habitación está limpia y lista?')) return;
 
+    // 2. Optimistic Update (Instant Feedback)
     const r = currentRoomsList.find(r => r.id == id);
-    if (r) r.estado = 'Disponible';
+    if (r) {
+        r.previousState = r.estado; // Snapshot for rollback
+        r.estado = 'Disponible';
+    }
+
+    // Refresh UI Immediately
     renderRooms(currentRoomsList);
-    // Optimistic Calendar Update
-    if (document.getElementById('view-calendar').style.display !== 'none' && typeof renderCalendarTimeline === 'function') {
+    if (typeof renderCalendarTimeline === 'function') {
         renderCalendarTimeline(currentRoomsList, currentReservationsList || []);
     }
 
+    // Show Optimistic Success
+    showToast('🧹 Habitación marcada como Limpia (Sincronizando...)');
+
+    // 3. Background Sync
     try {
         const res = await fetch(CONFIG.API_URL, {
             method: 'POST',
@@ -899,17 +910,22 @@ async function markRoomClean(id) {
         const data = await res.json();
 
         if (data.success) {
-            // alert('✅ Habitación Limpia'); 
-            showToast('Habitación Limpia');
-            loadRoomsView(); // Refresh real state
+            // Confirm Sync (Optional: show green check or just silent)
+            console.log("Sync Clean Success");
         } else {
-            alert('❌ Error: ' + data.error);
-            loadRoomsView(); // Revert
+            throw new Error(data.error);
         }
     } catch (e) {
-        alert('❌ Error de conexión');
-        console.error(e);
-        loadRoomsView();
+        console.error("Clean Sync Error", e);
+        // Rollback on failure
+        if (r && r.previousState) r.estado = r.previousState;
+        alert('❌ Error de conexión: No se pudo guardar el estado. Reintentando visualización...');
+
+        // Re-render Reverted State
+        renderRooms(currentRoomsList);
+        if (typeof renderCalendarTimeline === 'function') {
+            loadCalendarView(); // Full reload to be safe
+        }
     }
 }
 
@@ -1924,6 +1940,17 @@ async function finalizeCheckOut() {
     btn.innerText = 'Procesando...';
     btn.disabled = true;
 
+    // OPTIMISTIC UI: Mark as Succio immediately
+    const room = currentRoomsList.find(x => x.id == roomId);
+    if (room) {
+        room.estado = 'Sucio';
+        renderRooms(currentRoomsList);
+        // Refresh Calendar if visible
+        if (typeof renderCalendarTimeline === 'function') {
+            renderCalendarTimeline(currentRoomsList, currentReservationsList || []);
+        }
+    }
+
     try {
         // Reuse legacy action but simplified
         const res = await fetch(CONFIG.API_URL, {
@@ -1937,10 +1964,13 @@ async function finalizeCheckOut() {
         });
         const r = await res.json();
         if (r.success) {
-            alert('✅ Checkout Completado.');
+            showToast('✅ Checkout Completado.'); // Use non-blocking
             closeLiquidation();
-            loadRooms(); // Refresh main view to show 'Sucio'
-            // [FIX] Also refresh calendar if we are looking at it
+
+            // Post-Success: Ensure data is consistent
+            // (Optimistic update already handled visibility, but let's fetch fresh)
+            loadRooms();
+            // Also refresh calendar if we are looking at it
             if (document.getElementById('view-calendar').style.display !== 'none') {
                 loadCalendarView();
             }
@@ -2354,36 +2384,7 @@ async function saveRoom(e) {
 
 // ===== USERS MODULE =====
 
-async function markRoomClean(roomId) {
-    if (!confirm('¿Marcar habitación como LIMPIA y DISPONIBLE?')) return;
 
-    // Optimistic Update
-    const rIdx = currentRoomsList.findIndex(r => r.id == roomId);
-    if (rIdx !== -1) {
-        currentRoomsList[rIdx].estado = 'Disponible';
-        renderRooms(currentRoomsList); // Refresh UI immediately (Fixed: passed arg)
-    }
-
-    try {
-        const res = await fetch(CONFIG.API_URL, {
-            method: 'POST',
-            body: JSON.stringify({
-                action: 'saveHabitacion',
-                habitacion: { id: roomId, estado: 'Disponible' }
-            })
-        });
-        const data = await res.json();
-        if (!data.success) {
-            alert('Error al guardar: ' + data.error);
-            loadRooms(); // Revert
-        } else {
-            // Success silent
-            loadRooms();
-        }
-    } catch (e) {
-        alert('Error de conexión');
-    }
-}
 
 async function loadUsersView() {
     const container = document.getElementById('view-users');
