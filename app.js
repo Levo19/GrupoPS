@@ -479,9 +479,9 @@ function renderRooms(rooms) {
         try {
             if (r.fotos && r.fotos.startsWith('[')) {
                 const photos = JSON.parse(r.fotos);
-                if (photos.length > 0) mainImg = photos[0];
+                if (photos.length > 0) mainImg = optimizeDriveUrl(photos[0]);
             } else if (r.fotos && r.fotos.startsWith('http')) {
-                mainImg = r.fotos;
+                mainImg = optimizeDriveUrl(r.fotos);
             }
         } catch (e) { }
 
@@ -634,6 +634,20 @@ function renderRooms(rooms) {
 function toggleRoomFlip(id) {
     const card = document.getElementById('card-' + id);
     if (card) card.classList.toggle('flipped');
+}
+
+// [NEW] Helper to Optimize Google Drive URLs for Embedding
+function optimizeDriveUrl(url) {
+    if (!url) return '';
+    if (typeof url !== 'string') return '';
+    url = url.trim();
+    // Check if it is a Drive ID link
+    const match = url.match(/id=([a-zA-Z0-9_-]+)/) || url.match(/\/d\/([a-zA-Z0-9_-]+)\//);
+    if (match && match[1]) {
+        // Use lh3.googleusercontent.com for robust embedding
+        return `https://lh3.googleusercontent.com/d/${match[1]}`;
+    }
+    return url;
 }
 
 // ===== CHECK-IN LOGIC (PHASE 5) =====
@@ -2072,11 +2086,11 @@ function renderRooms(rooms) {
             try {
                 if (r.fotos && r.fotos.startsWith('[')) {
                     mediaFiles = JSON.parse(r.fotos);
-                    if (mediaFiles.length > 0 && mediaFiles[0].length > 5) mainImg = mediaFiles[0];
+                    if (mediaFiles.length > 0 && mediaFiles[0].length > 5) mainImg = optimizeDriveUrl(mediaFiles[0]);
                 } else if (r.fotos && r.fotos.length > 5) {
-                    mainImg = r.fotos; // Legacy single URL
+                    mainImg = optimizeDriveUrl(r.fotos); // Legacy single URL
                 }
-            } catch (e) { if (r.fotos.length > 5) mainImg = r.fotos; }
+            } catch (e) { if (r.fotos.length > 5) mainImg = optimizeDriveUrl(r.fotos); }
 
             // WhatsApp Share Link
             const shareText = `*${CONFIG.APP_NAME || 'Casa Munay'}*\n\nHabitación ${r.numero} (${r.tipo})\n💰 Precio: S/ ${r.precio}\n👥 Capacidad: ${r.capacidad || 2} Personas\n🛏️ Camas: ${r.camas || 'No especificado'}\n\nVer Fotos: ${mainImg}`;
@@ -2173,7 +2187,7 @@ async function handleMediaFileSelect(input) {
                 document.getElementById('editFotosJSON').value = JSON.stringify(urls);
 
                 const img = slotEl.querySelector('.media-preview');
-                img.src = data.url;
+                img.src = optimizeDriveUrl(data.url);
                 img.style.display = 'block';
             }
         } else {
@@ -2263,7 +2277,7 @@ function openRoomEditor(id) {
         if (!slot) continue;
         const img = slot.querySelector('.media-preview');
         if (photos[i] && photos[i].length > 5) {
-            img.src = photos[i];
+            img.src = optimizeDriveUrl(photos[i]);
             img.style.display = 'block';
         } else {
             img.style.display = 'none';
@@ -2617,8 +2631,9 @@ function renderProducts(products) {
         let imgDisplay = '<div style="width:40px; height:40px; background:#f1f5f9; border-radius:4px; display:flex; align-items:center; justify-content:center;"><i class="fas fa-image" style="color:#cbd5e1;"></i></div>';
 
         if (p.imagen_url && p.imagen_url.length > 5) {
-            // FIXED: Safer onerror handling
-            imgDisplay = `<img src="${p.imagen_url}" referrerpolicy="no-referrer"
+            // FIXED: Safer onerror handling + Optimized URL
+            const finalUrl = optimizeDriveUrl(p.imagen_url);
+            imgDisplay = `<img src="${finalUrl}" referrerpolicy="no-referrer"
                 style="width:40px; height:40px; border-radius:4px; object-fit:cover;" 
                 onerror="this.onerror=null; this.src='data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0MCIgaGVpZ2h0PSI0MCIgdmlld0JveD0iMCAwIDQwIDQwIj48cmVjdCB3aWR0aD0iNDAiIGhlaWdodD0iNDAiIGZpbGw9IiNjYmQ1ZTEiLz48dGV4dCB4PSI1MCUiIHk9IjUwJSIgZm9udC1zaXplPSIxMCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iIGZpbGw9IiM2NDc0OGIiPlNpbjwvdGV4dD48L3N2Zz4';">`;
         }
@@ -2714,7 +2729,7 @@ function editProduct(id) {
 
     // Show Preview if URL exists
     if (p.imagen_url) {
-        document.getElementById('imgPreview').src = p.imagen_url;
+        document.getElementById('imgPreview').src = optimizeDriveUrl(p.imagen_url);
         document.getElementById('imagePreviewContainer').style.display = 'block';
     } else {
         document.getElementById('imagePreviewContainer').style.display = 'none';
