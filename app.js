@@ -3183,21 +3183,21 @@ function renderCalendarTimeline(rooms, reservations) {
                 // Determine Bar Shape (Proportional)
                 if (s === e) {
                     barType = 'res-bar-single';
-                    barLabel = (res.cliente || '').split(' ')[0];
+                    barLabel = String(res.cliente || '').split(' ')[0];
                 } else if (isoDate === s) {
                     barType = 'res-bar-start'; // Starts at 50%
-                    barLabel = (res.cliente || '').split(' ')[0];
+                    barLabel = String(res.cliente || '').split(' ')[0];
                 } else if (isoDate === e) {
                     barType = 'res-bar-end'; // Ends at 50%
                 } else {
                     barType = 'res-bar-mid';
                     // Repeat name if it's the first visible day of a long booking
                     if (isoDate === getLocalISODate(dates[0])) {
-                        barLabel = (res.cliente || '').split(' ')[0];
+                        barLabel = String(res.cliente || '').split(' ')[0];
                     }
                 }
 
-                if (!barLabel && barType === 'res-bar-single') barLabel = (res.cliente || '').split(' ')[0];
+                if (!barLabel && barType === 'res-bar-single') barLabel = String(res.cliente || '').split(' ')[0];
 
                 // Calculate tooltip data
                 const total = Number(res.total) || 0;
@@ -3328,11 +3328,11 @@ function renderCalendarTimeline(rooms, reservations) {
                     // Calc Labels
                     // Res 1 (Left/End): current 'res' (which is checkOutRes)
                     const showLabel1 = shouldShowLabel(checkOutRes);
-                    const label1 = showLabel1 ? (checkOutRes.cliente || '').split(' ')[0].substring(0, 8) : '';
+                    const label1 = showLabel1 ? String(checkOutRes.cliente || '').split(' ')[0].substring(0, 8) : '';
 
                     // Res 2 (Right/Start): 'res2' (which is checkInRes)
                     const showLabel2 = shouldShowLabel(res2);
-                    const label2 = showLabel2 ? (res2.cliente || '').split(' ')[0].substring(0, 8) : '';
+                    const label2 = showLabel2 ? String(res2.cliente || '').split(' ')[0].substring(0, 8) : '';
 
                     html += `<td class="${tdClass}" style="padding:0; height:40px; border-bottom:1px solid #f1f5f9; border-right:1px solid #f1f5f9; vertical-align:middle;">
                                 <div style="display:flex; width:100%; height:100%; align-items:center;">
