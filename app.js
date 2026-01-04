@@ -84,7 +84,12 @@ async function preloadAppSession() {
         ]);
 
         if (resRooms.success) currentRoomsList = resRooms.habitaciones;
-        if (resProds.success) currentProductsList = resProds.productos;
+        if (resProds.success) {
+            currentProductsList = resProds.productos;
+            if (currentProductsList.length > 0) {
+                console.log("🔍 DEBUG PRODUCT DATA:", currentProductsList[0]);
+            }
+        }
         if (resUsers.success) currentUsersList = resUsers.usuarios;
         if (resRes.success) currentReservationsList = resRes.reservas;
 
@@ -2064,7 +2069,7 @@ function renderRooms(rooms) {
             html += `
             <div class="room-card fade-in">
                 <div class="room-img-box" onclick="openRoomDetail('${r.id}')">
-                    <img src="${mainImg}" alt="Room ${r.numero}" onerror="this.src='https://via.placeholder.com/300?text=Sin+Imagen'">
+                    <img src="${mainImg}" alt="Room ${r.numero}" onerror="this.onerror=null; this.src='data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0MCIgaGVpZ2h0PSI0MCIgdmlld0JveD0iMCAwIDQwIDQwIj48cmVjdCB3aWR0aD0iNDAiIGhlaWdodD0iNDAiIGZpbGw9IiNjYmQ1ZTEiLz48dGV4dCB4PSI1MCUiIHk9IjUwJSIgZm9udC1zaXplPSIxMCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iIGZpbGw9IiM2NDc0OGIiPlNpbjwvdGV4dD48L3N2Zz4';">
                     <div class="room-badges">
                         <span class="room-badge" style="background:${badgeColor}">${computedStatus.toUpperCase()}</span>
                         <span class="room-badge" style="background:rgba(0,0,0,0.6); backdrop-filter:blur(4px);"><i class="fas fa-user-friends"></i> ${r.capacidad || 2}</span>
