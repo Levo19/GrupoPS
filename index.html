@@ -306,9 +306,45 @@
                 </div>
 
                 <div class="form-group">
-                    <label class="form-label" style="color:#64748B;">Detalle Camas</label>
-                    <input type="text" id="editCamas" class="form-input" placeholder="Ej: 1 Cama King, 2 de 1.5 plz"
-                        style="color:black; background:#f1f5f9; border:1px solid #cbd5e1;">
+                    <label class="form-label" style="color:#64748B;">Detalle Camas (Configuración)</label>
+                    <div
+                        style="display:flex; flex-direction:column; gap:10px; background:#f8fafc; padding:15px; border-radius:12px; border:1px solid #e2e8f0;">
+                        <!-- 2 Plazas -->
+                        <div style="display:flex; justify-content:space-between; align-items:center;">
+                            <div style="display:flex; flex-direction:column;">
+                                <span style="font-weight:700; color:#1e293b;">Cama 2 Plazas</span>
+                                <span style="font-size:0.75rem; color:#64748B;">(Matrimonial / King)</span>
+                            </div>
+                            <div class="bed-counter-control"
+                                style="display:flex; align-items:center; gap:10px; background:white; padding:4px; border-radius:8px; border:1px solid #cbd5e1;">
+                                <button type="button" onclick="adjustBedCount('2plz', -1)"
+                                    style="width:28px; height:28px; border:none; background:#f1f5f9; color:#ef4444; border-radius:6px; font-weight:bold; cursor:pointer;">-</button>
+                                <span id="count-2plz"
+                                    style="min-width:20px; text-align:center; font-weight:800; color:#0f172a;">0</span>
+                                <button type="button" onclick="adjustBedCount('2plz', 1)"
+                                    style="width:28px; height:28px; border:none; background:#f1f5f9; color:#22c55e; border-radius:6px; font-weight:bold; cursor:pointer;">+</button>
+                            </div>
+                        </div>
+                        <!-- 1.5 Plazas -->
+                        <div
+                            style="display:flex; justify-content:space-between; align-items:center; border-top:1px dashed #e2e8f0; padding-top:10px;">
+                            <div style="display:flex; flex-direction:column;">
+                                <span style="font-weight:700; color:#1e293b;">Cama 1.5 Plazas</span>
+                                <span style="font-size:0.75rem; color:#64748B;">(Personal / Twin)</span>
+                            </div>
+                            <div class="bed-counter-control"
+                                style="display:flex; align-items:center; gap:10px; background:white; padding:4px; border-radius:8px; border:1px solid #cbd5e1;">
+                                <button type="button" onclick="adjustBedCount('1.5plz', -1)"
+                                    style="width:28px; height:28px; border:none; background:#f1f5f9; color:#ef4444; border-radius:6px; font-weight:bold; cursor:pointer;">-</button>
+                                <span id="count-15plz"
+                                    style="min-width:20px; text-align:center; font-weight:800; color:#0f172a;">0</span>
+                                <button type="button" onclick="adjustBedCount('1.5plz', 1)"
+                                    style="width:28px; height:28px; border:none; background:#f1f5f9; color:#22c55e; border-radius:6px; font-weight:bold; cursor:pointer;">+</button>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Hidden input to store legacy string for backend compatibility -->
+                    <input type="hidden" id="editCamas">
                 </div>
 
                 <div class="form-group">
@@ -322,50 +358,57 @@
                     </select>
                 </div>
 
-                <!-- MEDIA MANAGER -->
+                <!-- MEDIA MANAGER REDESIGN -->
                 <div class="media-manager" style="margin-top:20px; border-top:1px solid #e2e8f0; padding-top:15px;">
-                    <label class="form-label"
-                        style="color:#0f172a; font-weight:bold; margin-bottom:10px; display:block;">Galería Multimedia
-                        (Máx 4 Fotos + 1 Video)</label>
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+                        <label class="form-label" style="color:#0f172a; font-weight:bold; margin:0;">Galería
+                            Multimedia</label>
+                        <span
+                            style="font-size:0.75rem; background:#f1f5f9; padding:2px 8px; border-radius:10px; color:#64748B;">Máx
+                            4 Fotos + 1 Video</span>
+                    </div>
 
                     <!-- Hidden Inputs for Sync -->
                     <input type="hidden" id="editFotosJSON">
                     <input type="hidden" id="editVideoURL">
 
-                    <div style="display:grid; grid-template-columns: repeat(5, 1fr); gap:10px;">
+                    <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:12px;">
                         <!-- Slots 1-4: Images -->
-                        <div class="media-slot" id="slot-img-0" onclick="triggerMediaUpload('img', 0)">
-                            <i class="fas fa-plus"></i> <span style="font-size:0.7rem;">Foto 1</span>
-                            <img src="" class="media-preview" style="display:none;">
-                            <button type="button" class="media-del"
+                        <div class="media-card-slot" id="slot-img-0" onclick="triggerMediaUpload('img', 0)">
+                            <div class="media-empty-state"><i class="fas fa-camera"></i><span>Foto 1</span></div>
+                            <img src="" class="media-preview-img">
+                            <button type="button" class="media-remove-btn"
                                 onclick="removeMedia(event, 'img', 0)">&times;</button>
                         </div>
-                        <div class="media-slot" id="slot-img-1" onclick="triggerMediaUpload('img', 1)">
-                            <i class="fas fa-plus"></i> <span style="font-size:0.7rem;">Foto 2</span>
-                            <img src="" class="media-preview" style="display:none;">
-                            <button type="button" class="media-del"
+
+                        <div class="media-card-slot" id="slot-img-1" onclick="triggerMediaUpload('img', 1)">
+                            <div class="media-empty-state"><i class="fas fa-camera"></i><span>Foto 2</span></div>
+                            <img src="" class="media-preview-img">
+                            <button type="button" class="media-remove-btn"
                                 onclick="removeMedia(event, 'img', 1)">&times;</button>
                         </div>
-                        <div class="media-slot" id="slot-img-2" onclick="triggerMediaUpload('img', 2)">
-                            <i class="fas fa-plus"></i> <span style="font-size:0.7rem;">Foto 3</span>
-                            <img src="" class="media-preview" style="display:none;">
-                            <button type="button" class="media-del"
+
+                        <div class="media-card-slot" id="slot-img-2" onclick="triggerMediaUpload('img', 2)">
+                            <div class="media-empty-state"><i class="fas fa-camera"></i><span>Foto 3</span></div>
+                            <img src="" class="media-preview-img">
+                            <button type="button" class="media-remove-btn"
                                 onclick="removeMedia(event, 'img', 2)">&times;</button>
                         </div>
-                        <div class="media-slot" id="slot-img-3" onclick="triggerMediaUpload('img', 3)">
-                            <i class="fas fa-plus"></i> <span style="font-size:0.7rem;">Foto 4</span>
-                            <img src="" class="media-preview" style="display:none;">
-                            <button type="button" class="media-del"
+
+                        <div class="media-card-slot" id="slot-img-3" onclick="triggerMediaUpload('img', 3)">
+                            <div class="media-empty-state"><i class="fas fa-camera"></i><span>Foto 4</span></div>
+                            <img src="" class="media-preview-img">
+                            <button type="button" class="media-remove-btn"
                                 onclick="removeMedia(event, 'img', 3)">&times;</button>
                         </div>
 
-                        <!-- Slot 5: Video -->
-                        <div class="media-slot video-slot" id="slot-video" onclick="triggerMediaUpload('video', 0)"
-                            style="border-color:#f472b6; background:#fdf2f8;">
-                            <i class="fas fa-video" style="color:#db2777;"></i> <span
-                                style="font-size:0.7rem; color:#be185d;">Video</span>
-                            <div class="media-preview-video" style="display:none; font-size:2rem;">🎥</div>
-                            <button type="button" class="media-del"
+                        <!-- Slot 5: Video (Spans 2 cols if needed, or just regular) -->
+                        <div class="media-card-slot video-mode" id="slot-video" onclick="triggerMediaUpload('video', 0)"
+                            style="grid-column: span 2;">
+                            <div class="media-empty-state" style="color:#db2777;"><i
+                                    class="fas fa-video"></i><span>Video Tour</span></div>
+                            <div class="media-preview-video-icon" style="display:none;">🎥 VIDEO CARGADO</div>
+                            <button type="button" class="media-remove-btn"
                                 onclick="removeMedia(event, 'video', 0)">&times;</button>
                         </div>
                     </div>
