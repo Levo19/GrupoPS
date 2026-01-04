@@ -578,45 +578,36 @@ thead tr th.sticky-col {
 }
 
 /* =========================================
-   ROOM MANAGER STYLES
+   ROOM MANAGER STYLES (PREMIUM REDESIGN)
    ========================================= */
 .room-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-    gap: 25px;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 30px;
+    padding-bottom: 40px;
 }
 
 .room-card {
     background: white;
     border-radius: var(--radius-l);
     overflow: hidden;
-    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
-    transition: transform 0.3s, box-shadow 0.3s;
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -2px rgba(0, 0, 0, 0.025);
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
     position: relative;
-    border: 1px solid rgba(0, 0, 0, 0.05);
+    border: 1px solid rgba(226, 232, 240, 0.6);
     display: flex;
     flex-direction: column;
     height: 100%;
 }
 
-.room-body {
-    padding: 20px;
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-}
-
-.room-actions {
-    margin-top: auto;
-}
-
 .room-card:hover {
-    transform: translateY(-5px);
-    box-shadow: 0 12px 20px rgba(0, 0, 0, 0.1);
+    transform: translateY(-8px);
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+    border-color: rgba(15, 118, 110, 0.2);
 }
 
 .room-img-box {
-    height: 160px;
+    height: 180px;
     background: #cbd5e1;
     position: relative;
     overflow: hidden;
@@ -626,107 +617,255 @@ thead tr th.sticky-col {
     width: 100%;
     height: 100%;
     object-fit: cover;
-    transition: transform 0.5s;
+    transition: transform 0.7s ease;
 }
 
 .room-card:hover .room-img {
-    transform: scale(1.05);
+    transform: scale(1.1);
+}
+
+/* Gradient Overlay for Text Readability */
+.room-img-overlay {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    height: 60%;
+    background: linear-gradient(to top, rgba(0, 0, 0, 0.6) 0%, transparent 100%);
+    pointer-events: none;
+    z-index: 1;
 }
 
 .room-status-badge {
     position: absolute;
     top: 15px;
     right: 15px;
-    padding: 6px 12px;
-    border-radius: 20px;
+    padding: 6px 14px;
+    border-radius: 30px;
     font-size: 0.75rem;
-    font-weight: 700;
+    font-weight: 800;
     text-transform: uppercase;
-    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-    backdrop-filter: blur(5px);
+    letter-spacing: 0.5px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    z-index: 2;
+    border: 1px solid rgba(255, 255, 255, 0.2);
 }
 
+/* Status Colors (Vibrant) */
 .status-disponible {
-    background: rgba(16, 185, 129, 0.9);
+    background: rgba(34, 197, 94, 0.9);
     color: white;
 }
 
-/* Green */
 .status-ocupado {
-    background: rgba(239, 68, 68, 0.9);
+    background: rgba(239, 68, 68, 0.95);
     color: white;
 }
 
-/* Red */
 .status-mantenimiento {
-    background: rgba(245, 158, 11, 0.9);
+    background: rgba(245, 158, 11, 0.95);
     color: white;
 }
 
-/* Orange */
 .status-sucio {
-    background: rgba(99, 102, 241, 0.9);
+    background: rgba(99, 102, 241, 0.95);
     color: white;
 }
 
-/* Indigo */
 .room-body {
     padding: 20px;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
 }
 
-.room-number {
-    font-size: 1.25rem;
-    font-weight: 800;
-    color: var(--text-main);
+.room-header-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
     margin-bottom: 5px;
 }
 
-.room-type {
-    font-size: 0.85rem;
-    color: #64748B;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    font-weight: 600;
+.room-number {
+    font-size: 1.4rem;
+    font-weight: 800;
+    color: var(--text-main);
+    line-height: 1.2;
 }
 
-.room-meta {
+.room-price {
+    font-size: 1.2rem;
+    font-weight: 800;
+    color: var(--primary);
+    background: #f0fdfa;
+    /* Teal 50 */
+    padding: 4px 10px;
+    border-radius: 8px;
+}
+
+.room-type {
+    font-size: 0.8rem;
+    color: #64748B;
+    text-transform: uppercase;
+    font-weight: 700;
+    letter-spacing: 1px;
+    margin-bottom: 12px;
+}
+
+.room-features {
     display: flex;
     gap: 15px;
-    margin: 15px 0;
-    font-size: 0.9rem;
+    margin: 10px 0 20px 0;
+    font-size: 0.85rem;
     color: #475569;
 }
 
-.room-actions {
+.feature-item {
     display: flex;
-    justify-content: space-between;
     align-items: center;
-    gap: 8px;
+    gap: 6px;
+    background: #f8fafc;
+    padding: 6px 10px;
+    border-radius: 8px;
+    border: 1px solid #e2e8f0;
+}
+
+.room-actions {
+    margin-top: auto;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
     border-top: 1px solid #f1f5f9;
     padding-top: 15px;
-    margin-top: 5px;
 }
 
-.btn-icon {
-    width: 32px;
-    height: 32px;
-    border-radius: 8px;
-    border: none;
-    background: #f1f5f9;
-    color: #64748B;
+.btn-room-action {
+    padding: 10px;
+    border-radius: 10px;
+    font-weight: 600;
+    font-size: 0.9rem;
     cursor: pointer;
+    border: none;
     transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
 }
 
-.btn-icon:hover {
-    background: #e2e8f0;
+.btn-primary-ghost {
+    background: #f0fdfa;
+    /* Teal 50 */
     color: var(--primary);
 }
 
-.price-tag {
-    font-weight: 700;
-    color: var(--primary-dark);
-    font-size: 1.1rem;
+.btn-primary-ghost:hover {
+    background: var(--primary);
+    color: white;
+}
+
+.btn-secondary-ghost {
+    background: #f8fafc;
+    color: #64748B;
+}
+
+.btn-secondary-ghost:hover {
+    background: #e2e8f0;
+    color: var(--text-main);
+}
+
+/* --- MEDIA MANAGER STYLES --- */
+.media-card-slot {
+    aspect-ratio: 1;
+    /* Square */
+    border: 2px dashed #cbd5e1;
+    border-radius: 12px;
+    position: relative;
+    cursor: pointer;
+    overflow: hidden;
+    background: #f8fafc;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.media-card-slot:hover {
+    border-color: var(--primary);
+    background: #f0fdfa;
+}
+
+.media-card-slot.video-mode {
+    aspect-ratio: auto;
+    /* Fit content or fixed height? */
+    height: 100%;
+    border-color: #fca5a5;
+    background: #fff1f2;
+}
+
+.media-card-slot.video-mode:hover {
+    border-color: #ef4444;
+}
+
+.media-empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 5px;
+    color: #94a3b8;
+    pointer-events: none;
+}
+
+.media-empty-state i {
+    font-size: 1.5rem;
+}
+
+.media-empty-state span {
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.media-preview-img {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: none;
+    /* JS toggles this */
+}
+
+/* Remove Button overlay */
+.media-remove-btn {
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: rgba(239, 68, 68, 0.9);
+    color: white;
+    border: none;
+    cursor: pointer;
+    display: none;
+    /* JS toggles */
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    z-index: 10;
+}
+
+.media-card-slot:hover .media-preview-img+.media-remove-btn {
+    display: flex;
+    /* Show only if image exists? Logic in JS better */
+}
+
+.media-remove-btn:hover {
+    transform: scale(1.1);
 }
 
 /* =========================================
