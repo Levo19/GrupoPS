@@ -682,8 +682,7 @@ function initDatePicker(roomId, preDate = null) {
     // Strict Logic for Check-In
     if (checkInMode === 'checkin') {
         // Force Start Date = Today
-        const today = new Date();
-        const isoToday = today.toISOString().split('T')[0];
+        const isoToday = getLocalISODate(new Date());
         pickerState.startDate = isoToday;
         pickerState.endDate = null;
 
@@ -715,7 +714,7 @@ function changePickerMonth(d) {
 
 function selectPickerDate(dateStr) {
     const { startDate, endDate, roomId } = pickerState;
-    const today = new Date().toISOString().split('T')[0];
+    const today = getLocalISODate(new Date());
 
     // 1. Strict Check-In Logic
     if (checkInMode === 'checkin') {
@@ -800,7 +799,7 @@ function selectPickerDate(dateStr) {
 // Helper: Determine status of a date
 function getDateDetails(roomId, dateStr) {
     // 1. Past
-    const today = new Date().toISOString().split('T')[0];
+    const today = getLocalISODate(new Date());
     if (dateStr < today) return { type: 'past', color: 'grey' };
 
     if (!roomId || !currentReservationsList) return { type: 'free', color: 'white' };
@@ -1099,6 +1098,11 @@ function openNewReservation(roomId, roomNum, dateStr) {
 
     setupCheckInModal(roomId, roomNum, dateStr);
 }
+
+// ALIAS for Grid Button
+window.openReservation = function (roomId, roomNum) {
+    openNewReservation(roomId, roomNum, null);
+};
 
 async function setupCheckInModal(roomId, roomNum, preSelectedDate) {
     try {
@@ -1455,6 +1459,18 @@ async function processCheckIn(e) {
         submitBtn.innerText = 'Confirmar'; // Reset
         submitBtn.disabled = false;
         return;
+        return;
+    }
+
+    // [FIX] Strict Check-In Date Validation
+    if (!data.isReservation && !data.isExtension && data.action === 'checkIn') {
+        const todayIso = getLocalISODate(new Date());
+        if (data.fechaEntrada !== todayIso) {
+            alert('⛔ Error: El Check-In (Ingreso Inmediato) solo puede realizarse con fecha de HOY (' + todayIso + ').\n\nSi desea registrar una entrada futura, use la opción "Reservar".');
+            submitBtn.innerText = 'Confirmar';
+            submitBtn.disabled = false;
+            return;
+        }
     }
 
     // Initial Load
@@ -2094,7 +2110,7 @@ function renderRooms(rooms) {
                     `<button class="btn-room-action primary" onclick="openCheckIn('${r.id}', '${r.numero}')"><i class="fas fa-key"></i> Check-In</button>`
                 }
                     <button class="btn-room-action secondary" style="background:#25D366; color:white; border:none;" onclick="window.open('${waLink}', '_blank')"><i class="fab fa-whatsapp"></i> Compartir</button>
-                    ${isAdmin ? `<button class="btn-room-action secondary" onclick="openRoomEditor('${r.id}')" style="grid-column: span 2;"><i class="fas fa-cog"></i> Editar</button>` : ''}
+                    ${isAdmin ? `<button class="btn-room-action secondary" onclick="openRoomEditor('${r.id}')"><i class="fas fa-cog"></i> Editar</button>` : ''}
                     </div>
                 </div>
             </div>
@@ -2602,7 +2618,7 @@ function renderProducts(products) {
 
         if (p.imagen_url && p.imagen_url.length > 5) {
             // FIXED: Safer onerror handling
-            imgDisplay = `<img src="${p.imagen_url}" 
+            imgDisplay = `<img src="${p.imagen_url}" referrerpolicy="no-referrer"
                 style="width:40px; height:40px; border-radius:4px; object-fit:cover;" 
                 onerror="this.onerror=null; this.src='data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0MCIgaGVpZ2h0PSI0MCIgdmlld0JveD0iMCAwIDQwIDQwIj48cmVjdCB3aWR0aD0iNDAiIGhlaWdodD0iNDAiIGZpbGw9IiNjYmQ1ZTEiLz48dGV4dCB4PSI1MCUiIHk9IjUwJSIgZm9udC1zaXplPSIxMCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iIGZpbGw9IiM2NDc0OGIiPlNpbjwvdGV4dD48L3N2Zz4';">`;
         }
