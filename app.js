@@ -2137,7 +2137,28 @@ function renderRooms(rooms) {
             } catch (e) { if (r.fotos && r.fotos.length > 5) mainImg = optimizeDriveUrl(r.fotos); }
 
             // WhatsApp Text
-            const shareText = `*${CONFIG.APP_NAME || 'Casa Munay'}*\n\nHabitación ${r.numero} (${r.tipo})\n💰 Precio: S/ ${r.precio}\n👥 Capacidad: ${r.capacidad || 2} Personas\n🛏️ Camas: ${r.camas || 'No especificado'}\n\nVer Fotos: ${mainImg}`;
+            // WhatsApp Text with Smart Gallery
+            let galleryText = '';
+
+            // 1. Add Photos
+            if (mediaFiles && mediaFiles.length > 0) {
+                galleryText += '\n\n📸 *Galería de Fotos:*';
+                mediaFiles.forEach((url, i) => {
+                    if (url && url.length > 5) {
+                        galleryText += `\n${i + 1}. ${optimizeDriveUrl(url)}`;
+                    }
+                });
+            } else if (r.fotos && r.fotos.length > 5 && !r.fotos.startsWith('[')) {
+                // Legacy single photo
+                galleryText += `\n\n📸 Foto: ${optimizeDriveUrl(r.fotos)}`;
+            }
+
+            // 2. Add Video
+            if (r.video && r.video.length > 5) {
+                galleryText += `\n\n🎥 *Video Tour:* ${r.video}`;
+            }
+
+            const shareText = `*${CONFIG.APP_NAME || 'Casa Munay'}*\n\nHabitación ${r.numero} (${r.tipo})\n💰 Precio: S/ ${r.precio}\n👥 Capacidad: ${r.capacidad || 2} Personas\n🛏️ Camas: ${r.camas || 'No especificado'}${galleryText}`;
             const waLink = `https://wa.me/?text=${encodeURIComponent(shareText)}`;
 
             // Bed Text (Hide if empty)
