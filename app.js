@@ -2119,6 +2119,11 @@ function renderRooms(rooms) {
             else if (computedStatus.toLowerCase() === 'mantenimiento') badgeClass = 'status-mantenimiento';
             else if (computedStatus.toLowerCase() === 'sucio') badgeClass = 'status-sucio';
 
+            let statusColorVar = 'var(--primary)';
+            if (badgeClass === 'status-ocupado') statusColorVar = '#ef4444';
+            if (badgeClass === 'status-mantenimiento') statusColorVar = '#f59e0b';
+            if (badgeClass === 'status-sucio') statusColorVar = '#ea580c';
+
             // Parse Media for Display
             let mainImg = 'https://images.unsplash.com/photo-1631049307264-da0ec9d70304?auto=format&fit=crop&q=80&w=1000';
             let mediaFiles = [];
@@ -2135,51 +2140,81 @@ function renderRooms(rooms) {
             const shareText = `*${CONFIG.APP_NAME || 'Casa Munay'}*\n\nHabitación ${r.numero} (${r.tipo})\n💰 Precio: S/ ${r.precio}\n👥 Capacidad: ${r.capacidad || 2} Personas\n🛏️ Camas: ${r.camas || 'No especificado'}\n\nVer Fotos: ${mainImg}`;
             const waLink = `https://wa.me/?text=${encodeURIComponent(shareText)}`;
 
-            // PREMIUM CARD HTML
+            // Bed Text (Hide if empty)
+            const bedText = (r.camas && r.camas !== 'Estándar') ? r.camas : '';
+
+            // FLIP CARD STRUCTURE
             html += `
             <div class="room-card fade-in">
-                <div class="room-img-box" onclick="openRoomDetail('${r.id}')">
-                    <img src="${mainImg}" class="room-img" alt="Room ${r.numero}" onerror="this.onerror=null; this.src='data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0MCIgaGVpZ2h0PSI0MCIgdmlld0JveD0iMCAwIDQwIDQwIj48cmVjdCB3aWR0aD0iNDAiIGhlaWdodD0iNDAiIGZpbGw9IiNjYmQ1ZTEiLz48dGV4dCB4PSI1MCUiIHk9IjUwJSIgZm9udC1zaXplPSIxMCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iIGZpbGw9IiM2NDc0OGIiPlNpbjwvdGV4dD48L3N2Zz4';">
-                    
-                    <div class="room-img-overlay"></div>
-                    
-                    <div class="room-status-badge ${badgeClass}">
-                        ${computedStatus}
-                    </div>
-                </div>
-
-                <div class="room-body">
-                    <div class="room-header-row">
-                        <div class="room-number">Hab. ${r.numero}</div>
-                        <div class="room-price">S/ ${r.precio}</div>
-                    </div>
-                    <div class="room-type">${r.tipo}</div>
-
-                    <div class="room-features">
-                        <div class="feature-item" title="Capacidad">
-                            <i class="fas fa-user-friends" style="color:var(--primary);"></i> ${r.capacidad || 2}
+                <div class="room-card-inner">
+                    <!-- FRONT FACE -->
+                    <div class="room-card-front" style="border-bottom-color: ${statusColorVar};">
+                        <div class="room-img-box">
+                            <img src="${mainImg}" class="room-img" alt="Room ${r.numero}" onerror="this.onerror=null; this.src='data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0MCIgaGVpZ2h0PSI0MCIgdmlld0JveD0iMCAwIDQwIDQwIj48cmVjdCB3aWR0aD0iNDAiIGhlaWdodD0iNDAiIGZpbGw9IiNjYmQ1ZTEiLz48dGV4dCB4PSI1MCUiIHk9IjUwJSIgZm9udC1zaXplPSIxMCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iIGZpbGw9IiM2NDc0OGIiPlNpbjwvdGV4dD48L3N2Zz4';">
+                            <div class="room-img-overlay"></div>
+                            <div class="room-status-badge ${badgeClass}">
+                                ${computedStatus}
+                            </div>
                         </div>
-                        <div class="feature-item" title="Camas" style="flex:1; overflow:hidden; white-space:nowrap; text-overflow:ellipsis;">
-                            <i class="fas fa-bed" style="color:var(--primary);"></i> ${r.camas || 'Estándar'}
-                        </div>
-                    </div>
 
-                    <div class="room-actions">
-                        ${computedStatus.toLowerCase() === 'ocupado' ?
-                    `<button class="btn-room-action btn-secondary-ghost" onclick="openCheckIn('${r.id}', '${r.numero}')">Ver Info</button>` :
-                    `<button class="btn-room-action btn-primary-ghost" onclick="openCheckIn('${r.id}', '${r.numero}')">
-                                <i class="fas fa-key"></i> Check-In
-                             </button>`
+                        <div class="room-body">
+                            <div class="room-header-row">
+                                <div class="room-number">Hab. ${r.numero}</div>
+                                <div class="room-price">S/ ${r.precio}</div>
+                            </div>
+                            <div class="room-type">${r.tipo}</div>
+
+                            <div class="room-features">
+                                <div class="feature-item" title="Capacidad">
+                                    <i class="fas fa-user-friends" style="color:var(--primary);"></i> ${r.capacidad || 2}
+                                </div>
+                                ${bedText ? `
+                                <div class="feature-item" title="Camas" style="flex:1; overflow:hidden; white-space:nowrap; text-overflow:ellipsis;">
+                                    <i class="fas fa-bed" style="color:var(--primary);"></i> ${bedText}
+                                </div>` : ''}
+                            </div>
+
+                            <!-- FRONT: Instant Actions -->
+                            <div class="room-actions" style="margin-top:auto;">
+                                ${computedStatus.toLowerCase() === 'ocupado' ?
+                    `<button class="btn-room-action btn-secondary-ghost" style="width:100%;" onclick="openRoomDetail('${r.id}')">
+                                        VER DETALLES
+                                     </button>` :
+                    computedStatus.toLowerCase() === 'sucio' ?
+                        `<button class="btn-room-action btn-primary-ghost" style="width:100%; color:var(--text-main);" onclick="openRoomDetail('${r.id}')">
+                                        <i class="fas fa-broom"></i> LIMPIEZA
+                                     </button>` :
+                        // Disponible
+                        `<button class="btn-room-action btn-primary-ghost" style="width:100%; background:var(--primary); color:white;" onclick="openCheckIn('${r.id}', '${r.numero}')">
+                                        <i class="fas fa-key"></i> CHECK-IN RÁPIDO
+                                     </button>`
                 }
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- BACK FACE -->
+                    <div class="room-card-back">
+                        <h3 style="margin-bottom:15px; color:var(--text-main); font-size:1rem;">Opciones</h3>
                         
-                        <button class="btn-room-action btn-secondary-ghost" onclick="window.open('${waLink}', '_blank')">
-                            <i class="fab fa-whatsapp" style="color:#25D366; font-size:1.1rem;"></i>
-                        </button>
-                        
-                        ${isAdmin ?
-                    `<button class="btn-room-action btn-secondary-ghost" onclick="openRoomEditor('${r.id}')">
-                                <i class="fas fa-cog"></i>
-                             </button>` : ''}
+                        <div style="display:flex; flex-direction:column; gap:10px; width:100%;">
+                            <button class="btn-room-action btn-secondary-ghost" onclick="openRoomDetail('${r.id}')" style="background:white; border:1px solid #e2e8f0;">
+                                <i class="fas fa-eye"></i> Ver Info / Estado
+                            </button>
+
+                            <button class="btn-room-action btn-secondary-ghost" onclick="openReservation('${r.id}', '${r.numero}')" style="background:#f0fdf4; border:1px solid #bbf7d0; color:#166534;">
+                                <i class="fas fa-calendar-plus"></i> Reservar (Futuro)
+                            </button>
+                            
+                            <button class="btn-room-action btn-secondary-ghost" onclick="window.open('${waLink}', '_blank')" style="background:white; border:1px solid #e2e8f0;">
+                                <i class="fab fa-whatsapp" style="color:#25D366; font-size:1.1rem;"></i> Compartir
+                            </button>
+
+                            ${isAdmin ? `
+                            <button class="btn-room-action btn-secondary-ghost" onclick="openRoomEditor('${r.id}')" style="background:white; border:1px solid #e2e8f0;">
+                                <i class="fas fa-cog"></i> Configurar
+                            </button>` : ''}
+                        </div>
                     </div>
                 </div>
             </div>
@@ -2206,7 +2241,7 @@ async function handleMediaFileSelect(input) {
     const file = input.files[0];
 
     // UI Loading
-    const slotId = currentUploadSlot.type === 'video' ? 'slot-video' : `slot-img-${currentUploadSlot.index}`;
+    const slotId = currentUploadSlot.type === 'video' ? 'slot-video' : `slot - img - ${currentUploadSlot.index} `;
     const slotEl = document.getElementById(slotId);
     if (slotEl) slotEl.style.opacity = '0.5';
 
@@ -2280,7 +2315,7 @@ function removeMedia(e, type, index) {
         }
         document.getElementById('editFotosJSON').value = JSON.stringify(urls);
 
-        const slot = document.getElementById(`slot-img-${index}`);
+        const slot = document.getElementById(`slot - img - ${index} `);
         const img = slot.querySelector('.media-preview-img');
         img.src = '';
         img.style.display = 'none';
@@ -2307,7 +2342,7 @@ function openNewRoom() {
 
     // Reset all slots
     for (let i = 0; i < 4; i++) {
-        const slot = document.getElementById(`slot-img-${i}`);
+        const slot = document.getElementById(`slot - img - ${i} `);
         if (slot) {
             slot.querySelector('.media-preview-img').style.display = 'none';
             slot.classList.remove('has-content');
@@ -2359,7 +2394,7 @@ function openRoomEditor(id) {
 
     // Render Slots
     for (let i = 0; i < 4; i++) {
-        const slot = document.getElementById(`slot-img-${i}`);
+        const slot = document.getElementById(`slot - img - ${i} `);
         if (!slot) continue;
         const img = slot.querySelector('.media-preview-img');
         if (photos[i] && photos[i].length > 5) {
@@ -2469,7 +2504,7 @@ async function loadUsersView() {
                 <i class="fas fa-spinner fa-spin" style="font-size: 2rem; color: var(--primary);"></i>
                 <p style="margin-top:15px; color:#64748B;">Cargando usuarios...</p>
             </div>
-        `;
+    `;
     }
 
     try {
@@ -2483,11 +2518,11 @@ async function loadUsersView() {
             currentUsersList = data.usuarios;
             renderUsers(data.usuarios);
         } else if (currentUsersList.length === 0) {
-            container.innerHTML = `<div style="color:red; text-align:center;">Error: ${data.error}</div>`;
+            container.innerHTML = `<div style="color:red; text-align:center;"> Error: ${data.error}</div>`;
         }
     } catch (e) {
         if (currentUsersList.length === 0) {
-            container.innerHTML = `<div style="color:red; text-align:center;">Error de conexión: ${e.message}</div>`;
+            container.innerHTML = `<div style="color:red; text-align:center;"> Error de conexión: ${e.message}</div>`;
         }
     }
 }
@@ -2511,7 +2546,7 @@ function renderUsers(users) {
                 </tr>
             </thead>
             <tbody>
-    `;
+                `;
 
     users.forEach(u => {
         let roleColor = '#64748B';
@@ -2523,16 +2558,16 @@ function renderUsers(users) {
             : `<span style="background:#f1f5f9; color:#64748B; padding:4px 8px; border-radius:6px; font-size:0.8rem; font-weight:600;">Inactivo</span>`;
 
         html += `
-        <tr style="border-bottom:1px solid #f1f5f9;">
-            <td style="padding:15px; font-weight:600;">${u.nombre}</td>
-            <td style="padding:15px;">${u.email}</td>
-            <td style="padding:15px; color:${roleColor}; font-weight:bold;">${u.rol}</td>
-            <td style="padding:15px;">${statusBadge}</td>
-            <td style="padding:15px;">
-                <button class="btn-icon" onclick="editUser('${u.id}')"><i class="fas fa-edit"></i></button>
-            </td>
-        </tr>
-        `;
+                <tr style="border-bottom:1px solid #f1f5f9;">
+                    <td style="padding:15px; font-weight:600;">${u.nombre}</td>
+                    <td style="padding:15px;">${u.email}</td>
+                    <td style="padding:15px; color:${roleColor}; font-weight:bold;">${u.rol}</td>
+                    <td style="padding:15px;">${statusBadge}</td>
+                    <td style="padding:15px;">
+                        <button class="btn-icon" onclick="editUser('${u.id}')"><i class="fas fa-edit"></i></button>
+                    </td>
+                </tr>
+                `;
     });
 
     html += '</tbody></table></div>';
@@ -3825,6 +3860,34 @@ async function loadFinanceData(isBackground = false) {
     }
 }
 
+// State for active tab
+let currentFinanceTab = 'ingresos';
+
+function switchFinanceTab(tab) {
+    currentFinanceTab = tab;
+
+    // Update visuals
+    const tabs = ['ingresos', 'gastos', 'shifts'];
+    const tabIds = {
+        'ingresos': 'tabIngresos',
+        'gastos': 'tabGastos',
+        'shifts': 'tabShifts'
+    };
+
+    tabs.forEach(t => {
+        const btn = document.getElementById(tabIds[t]);
+        if (t === tab) {
+            btn.style.color = 'var(--primary)';
+            btn.style.borderBottom = '3px solid var(--primary)';
+        } else {
+            btn.style.color = '#94a3b8';
+            btn.style.borderBottom = 'none';
+        }
+    });
+
+    renderFinanceTable(tab);
+}
+
 function updateFinanceUI() {
     if (!currentFinanceReport) return;
     const r = currentFinanceReport;
@@ -3835,26 +3898,18 @@ function updateFinanceUI() {
     const util = r.resumen.utilidad;
     const utilEl = document.getElementById('kpiUtilidad');
     utilEl.innerText = `S/ ${util.toFixed(2)}`;
-    utilEl.style.color = util >= 0 ? '#1e293b' : '#ef4444'; // Red if loss
+    utilEl.style.color = util >= 0 ? '#1e293b' : '#ef4444';
 
-    // 2. Refresh Table based on active tab
-    const activeBtn = document.getElementById('tabIngresos');
-    // If Ingresos has border-bottom primary, it's active.
-    if (activeBtn.style.borderBottom.includes('var(--primary)') || activeBtn.style.borderBottom.includes('rgb(')) {
-        renderFinanceTable('ingresos');
-    } else {
-        renderFinanceTable('gastos');
-    }
+    // 2. Refresh Table based on active tab state
+    renderFinanceTable(currentFinanceTab);
 }
-
-
 
 function renderFinanceTable(type) {
     const thead = document.getElementById('financeThead');
     const tbody = document.getElementById('financeTbody');
     const r = currentFinanceReport;
 
-    if (!r) return; // Guard: Data not loaded yet
+    if (!r) return;
 
     if (type === 'ingresos') {
         thead.innerHTML = `
@@ -3865,7 +3920,7 @@ function renderFinanceTable(type) {
                 <th style="padding:12px; text-align:right; color:#64748B;">Monto</th>
             </tr>`;
 
-        if (r.ingresos.length === 0) {
+        if (!r.ingresos || r.ingresos.length === 0) {
             tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; padding:20px; color:#94a3b8;">No hay ingresos registrados</td></tr>';
             return;
         }
@@ -3881,8 +3936,7 @@ function renderFinanceTable(type) {
             </tr>
         `).join('');
 
-    } else {
-        // GASTOS
+    } else if (type === 'gastos') {
         thead.innerHTML = `
             <tr>
                 <th style="padding:12px; text-align:left; color:#64748B;">Fecha</th>
@@ -3891,7 +3945,7 @@ function renderFinanceTable(type) {
                 <th style="padding:12px; text-align:right; color:#64748B;">Monto</th>
             </tr>`;
 
-        if (r.gastos.length === 0) {
+        if (!r.gastos || r.gastos.length === 0) {
             tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; padding:20px; color:#94a3b8;">No hay gastos registrados</td></tr>';
             return;
         }
@@ -3902,6 +3956,39 @@ function renderFinanceTable(type) {
                 <td style="padding:12px; font-weight:500;">${g.descripcion}</td>
                 <td style="padding:12px;">${g.categoria}</td>
                 <td style="padding:12px; text-align:right; font-weight:bold; color:#ef4444;">- S/ ${g.monto.toFixed(2)}</td>
+            </tr>
+        `).join('');
+
+    } else if (type === 'shifts') {
+        thead.innerHTML = `
+            <tr>
+                <th style="padding:12px; text-align:left; color:#64748B;">Inicio</th>
+                <th style="padding:12px; text-align:left; color:#64748B;">Responsable</th>
+                <th style="padding:12px; text-align:left; color:#64748B;">Monto Inicial</th>
+                <th style="padding:12px; text-align:right; color:#64748B;">Cierre</th>
+                <th style="padding:12px; text-align:center; color:#64748B;">Estado</th>
+            </tr>`;
+
+        // Check if turnos/cajas exists in report. If not, we might need to fetch or use a placeholder.
+        // Assuming r.cajas based on context, otherwise show empty
+        const list = r.cajas || [];
+
+        if (list.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:20px; color:#94a3b8;">No hay historial de turnos</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = list.map(c => `
+            <tr style="border-bottom:1px solid #f1f5f9;">
+                <td style="padding:12px;">${new Date(c.fechaApertura).toLocaleString()}</td>
+                <td style="padding:12px; font-weight:500;">${c.usuarioApertura}</td>
+                <td style="padding:12px;">S/ ${c.montoInicial}</td>
+                <td style="padding:12px; text-align:right;">${c.montoCierre ? 'S/ ' + c.montoCierre : '-'}</td>
+                <td style="padding:12px; text-align:center;">
+                    <span style="padding:2px 8px; border-radius:10px; font-size:0.8rem; background:${c.fechaCierre ? '#cbd5e1' : '#bbf7d0'}; color:${c.fechaCierre ? '#475569' : '#166534'};">
+                        ${c.fechaCierre ? 'Cerrado' : 'Abierto'}
+                    </span>
+                </td>
             </tr>
         `).join('');
     }
@@ -5921,129 +6008,3 @@ async function updateDashboardStats() {
 }
 
 // ===== FINANCE TABS LOGIC (Restored) =====
-let currentFinanceTab = 'ingresos'; // 'ingresos' | 'gastos' | 'shifts'
-
-function switchFinanceTab(tab) {
-    currentFinanceTab = tab;
-
-    // 1. Update Buttons
-    document.getElementById('tabIngresos').style.borderBottom = 'none';
-    document.getElementById('tabIngresos').style.color = '#94a3b8';
-
-    document.getElementById('tabGastos').style.borderBottom = 'none';
-    document.getElementById('tabGastos').style.color = '#94a3b8';
-
-    document.getElementById('tabShifts').style.borderBottom = 'none';
-    document.getElementById('tabShifts').style.color = '#94a3b8';
-
-    const activeBtn = document.getElementById('tab' + tab.charAt(0).toUpperCase() + tab.slice(1));
-    if (activeBtn) {
-        activeBtn.style.borderBottom = '3px solid var(--primary)';
-        activeBtn.style.color = 'var(--primary)';
-    }
-
-    // 2. Refresh Table
-    renderFinanceTable();
-}
-
-function renderFinanceTable() {
-    const thead = document.getElementById('financeThead');
-    const tbody = document.getElementById('financeTableBody');
-    if (!thead || !tbody) return;
-
-    tbody.innerHTML = '';
-
-    // Filter Data by Month
-    // For now we assume currentFinanceList contains ALL data and we filter by 'currentFinanceMonth' if implemented
-    // Or we just rely on what 'loadFinanceData' fetched (which respects the month selector).
-    // Let's assume currentFinanceData has { ingresos:[], gastos:[], turnos:[] }
-
-    if (currentFinanceTab === 'ingresos') {
-        thead.innerHTML = `
-            <tr style="text-align:left; color:#64748B; border-bottom:2px solid #f1f5f9;">
-                <th style="padding:15px;">Fecha</th>
-                <th style="padding:15px;">Descripción</th>
-                <th style="padding:15px;">Método</th>
-                <th style="padding:15px; text-align:right;">Monto</th>
-            </tr>
-        `;
-
-        const list = currentFinanceData.ingresos || [];
-        if (list.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; padding:20px; color:#94a3b8;">No hay ingresos registrados</td></tr>';
-        } else {
-            list.forEach(i => {
-                tbody.innerHTML += `
-                <tr style="border-bottom:1px solid #f1f5f9;">
-                    <td style="padding:15px;">${new Date(i.fecha).toLocaleDateString()} ${new Date(i.fecha).toLocaleTimeString()}</td>
-                    <td style="padding:15px;">${i.descripcion}</td>
-                    <td style="padding:15px;">${i.metodo}</td>
-                    <td style="padding:15px; text-align:right; font-weight:bold; color:#166534;">S/ ${Number(i.monto).toFixed(2)}</td>
-                </tr>`;
-            });
-        }
-
-    } else if (currentFinanceTab === 'gastos') {
-        thead.innerHTML = `
-            <tr style="text-align:left; color:#64748B; border-bottom:2px solid #f1f5f9;">
-                <th style="padding:15px;">Fecha</th>
-                <th style="padding:15px;">Descripción</th>
-                <th style="padding:15px;">Categoría</th>
-                <th style="padding:15px; text-align:right;">Monto</th>
-            </tr>
-        `;
-
-        const list = currentFinanceData.gastos || [];
-        if (list.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; padding:20px; color:#94a3b8;">No hay gastos registrados</td></tr>';
-        } else {
-            list.forEach(g => {
-                tbody.innerHTML += `
-                <tr style="border-bottom:1px solid #f1f5f9;">
-                    <td style="padding:15px;">${new Date(g.fecha).toLocaleDateString()}</td>
-                    <td style="padding:15px;">${g.descripcion}</td>
-                    <td style="padding:15px;"><span style="background:#fee2e2; color:#ef4444; padding:2px 6px; border-radius:4px; font-size:0.8rem;">${g.categoria}</span></td>
-                    <td style="padding:15px; text-align:right; font-weight:bold; color:#ef4444;">- S/ ${Number(g.monto).toFixed(2)}</td>
-                </tr>`;
-            });
-        }
-    } else if (currentFinanceTab === 'shifts') {
-        thead.innerHTML = `
-            <tr style="text-align:left; color:#64748B; border-bottom:2px solid #f1f5f9;">
-                <th style="padding:15px;">Inicio</th>
-                <th style="padding:15px;">Responsable</th>
-                <th style="padding:15px; text-align:right;">Monto Inicial</th>
-                <th style="padding:15px; text-align:right;">Monto Final</th>
-                <th style="padding:15px;">Estado</th>
-                <th style="padding:15px;">Acciones</th>
-            </tr>
-        `;
-
-        const list = currentFinanceData.turnos || [];
-        if (list.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:20px; color:#94a3b8;">No hay historial de turnos</td></tr>';
-        } else {
-            list.forEach(t => {
-                let statusBadge = t.fechaFin
-                    ? `<span style="background:#fee2e2; color:#ef4444; padding:4px 8px; border-radius:12px; font-size:0.75rem; font-weight:bold;">Cerrada</span>`
-                    : `<span style="background:#dcfce7; color:#166534; padding:4px 8px; border-radius:12px; font-size:0.75rem; font-weight:bold;">Abierta</span>`;
-
-                tbody.innerHTML += `
-                <tr style="border-bottom:1px solid #f1f5f9;">
-                    <td style="padding:15px;">
-                        <div style="font-weight:bold;">${new Date(t.fechaInicio).toLocaleDateString()}</div>
-                        <div style="font-size:0.8rem; color:#94a3b8;">${new Date(t.fechaInicio).toLocaleTimeString()}</div>
-                    </td>
-                    <td style="padding:15px;">${t.responsable}</td>
-                    <td style="padding:15px; text-align:right;">S/ ${Number(t.montoInicial).toFixed(2)}</td>
-                    <td style="padding:15px; text-align:right;">${t.fechaFin ? 'S/ ' + Number(t.montoFinal).toFixed(2) : '-'}</td>
-                    <td style="padding:15px;">${statusBadge}</td>
-                    <td style="padding:15px; display:flex; gap:10px;">
-                        <button class="btn-icon" onclick='printShiftTicket(${JSON.stringify(t)})' title="Imprimir Ticket"><i class="fas fa-print"></i></button>
-                        <button class="btn-icon" onclick="openShiftDetails('${t.id}')" title="Ver Detalles"><i class="fas fa-eye"></i></button>
-                    </td>
-                </tr>`;
-            });
-        }
-    }
-}
